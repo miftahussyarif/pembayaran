@@ -17,9 +17,22 @@
 		'Pembayaran App'
 	);
 	const currentYear = new Date().getFullYear();
+	let faviconUrl = $derived(page.data?.profilPesantren?.logoUrl || '/favicon.svg');
+	let faviconType = $derived.by(() => {
+		const url = faviconUrl || '/favicon.svg';
+		const lower = url.toLowerCase();
+		if (lower.endsWith('.png')) return 'image/png';
+		if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+		if (lower.endsWith('.webp')) return 'image/webp';
+		return 'image/svg+xml';
+	});
 	
 	let { children } = $props();
 </script>
+
+<svelte:head>
+	<link rel="icon" href={faviconUrl} type={faviconType} />
+</svelte:head>
 
 <div class="drawer lg:drawer-open bg-base-200 min-h-screen">
 	<input id="my-drawer-2" type="checkbox" class="drawer-toggle" />

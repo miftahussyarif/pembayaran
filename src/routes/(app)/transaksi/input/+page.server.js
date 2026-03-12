@@ -68,10 +68,16 @@ export const actions = {
 				.where(eq(schema.jenisPembayaran.id, jenisPembayaranId));
 
 			const isGratisSyahriyah = santriRow && santriRow.nominalSyahriyah === 0;
+			const isYatim = /yatim/i.test(santriRow?.namaKategori || '');
 			const isSyahriyah = !!jenisRow?.namaPembayaran && /syahriyah|spp/i.test(jenisRow.namaPembayaran);
+			const isSmkSmpBulanan = jenisRow?.tipe === 'smk_bulanan' || jenisRow?.tipe === 'smp_bulanan';
+			const isYatimGratisSmkSmp = isYatim && isSyahriyah && isSmkSmpBulanan;
 
 			if (isSyahriyah) {
 				nominalDibayar = santriRow?.nominalSyahriyah ?? 0;
+			}
+			if (isYatimGratisSmkSmp) {
+				nominalDibayar = 0;
 			}
 
 			if (isGratisSyahriyah && jenisRow?.tipe === 'bulanan') {
@@ -82,7 +88,7 @@ export const actions = {
 				};
 			}
 			
-			if (nominalDibayar <= 0) {
+			if (nominalDibayar <= 0 && !isYatimGratisSmkSmp) {
 				return {
 					success: false,
 					message: 'Nominal harus lebih dari 0'

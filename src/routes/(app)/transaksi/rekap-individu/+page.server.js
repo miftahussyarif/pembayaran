@@ -76,6 +76,9 @@ export async function load({ url }) {
 	const smpBySantriId = new Map(santriSmpList.map(s => [s.santriId, s]));
 
 	const rekapIndividu = santris.map(s => {
+		const isYatim = /yatim/i.test(s.namaKategori || '');
+		const smkBulananNominalEff = isYatim ? 0 : smkBulananNominal;
+		const smpBulananNominalEff = isYatim ? 0 : smpBulananNominal;
 		const startDate = s.tanggalMasuk ? new Date(s.tanggalMasuk) : now;
 		const endDate = s.tanggalKeluar ? new Date(s.tanggalKeluar) : now;
 		const monthsRange = startDate <= endDate ? buildMonthRange(startDate, endDate) : [];
@@ -111,7 +114,7 @@ export async function load({ url }) {
 
 		const smkInfo = smkBySantriId.get(s.id);
 		let smkBulanan = [];
-		if (smkInfo) {
+		if (smkInfo && !isYatim) {
 			const smkStart = new Date(smkInfo.startYear, (smkInfo.startMonth || 1) - 1, 1);
 			const smkEnd = smkInfo.endYear && smkInfo.endMonth
 				? new Date(smkInfo.endYear, smkInfo.endMonth - 1, 1)
@@ -135,7 +138,7 @@ export async function load({ url }) {
 					bulan: m.monthName,
 					tahun: m.year,
 					paid: paidItems.length > 0,
-					nominalTagihan: smkBulananNominal,
+					nominalTagihan: smkBulananNominalEff,
 					nominalDibayar,
 					tanggalBayar: paidItems[0]?.tanggalBayar || null
 				};
@@ -144,7 +147,7 @@ export async function load({ url }) {
 
 		const smpInfo = smpBySantriId.get(s.id);
 		let smpBulanan = [];
-		if (smpInfo) {
+		if (smpInfo && !isYatim) {
 			const smpStart = new Date(smpInfo.startYear, (smpInfo.startMonth || 1) - 1, 1);
 			const smpEnd = smpInfo.endYear && smpInfo.endMonth
 				? new Date(smpInfo.endYear, smpInfo.endMonth - 1, 1)
@@ -168,7 +171,7 @@ export async function load({ url }) {
 					bulan: m.monthName,
 					tahun: m.year,
 					paid: paidItems.length > 0,
-					nominalTagihan: smpBulananNominal,
+					nominalTagihan: smpBulananNominalEff,
 					nominalDibayar,
 					tanggalBayar: paidItems[0]?.tanggalBayar || null
 				};
@@ -177,9 +180,9 @@ export async function load({ url }) {
 
 		const totalTagihanSyahriyah = syahriyah.length * (s.nominalSyahriyah ?? 0);
 		const totalDibayarSyahriyah = syahriyah.reduce((sum, m) => sum + (m.nominalDibayar || 0), 0);
-		const totalTagihanSmkBulanan = smkBulanan.length * (smkBulananNominal || 0);
+		const totalTagihanSmkBulanan = smkBulanan.length * (smkBulananNominalEff || 0);
 		const totalDibayarSmkBulanan = smkBulanan.reduce((sum, m) => sum + (m.nominalDibayar || 0), 0);
-		const totalTagihanSmpBulanan = smpBulanan.length * (smpBulananNominal || 0);
+		const totalTagihanSmpBulanan = smpBulanan.length * (smpBulananNominalEff || 0);
 		const totalDibayarSmpBulanan = smpBulanan.reduce((sum, m) => sum + (m.nominalDibayar || 0), 0);
 
 		const startYear = (s.tanggalMasuk ? new Date(s.tanggalMasuk) : now).getFullYear();

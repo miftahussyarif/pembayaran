@@ -40,13 +40,18 @@
 		!!selectedJenis && /syahriyah|spp/i.test(selectedJenis.namaPembayaran || '')
 	);
 	let isSantriGratisSyahriyah = $derived(selectedSantri?.nominalSyahriyah === 0);
+	let isSantriYatim = $derived(!!selectedSantri?.namaKategori && /yatim/i.test(selectedSantri.namaKategori));
+	let isSmkSmpBulanan = $derived(
+		selectedJenis?.tipe === 'smk_bulanan' || selectedJenis?.tipe === 'smp_bulanan'
+	);
+	let isYatimGratisSmkSmp = $derived(isSantriYatim && isSyahriyah && isSmkSmpBulanan);
 	let isFormValid = $derived(
 		selectedSantriId &&
 		selectedTahunAjaranId &&
 		selectedJenisId &&
-		nominal > 0 &&
+		(isYatimGratisSmkSmp ? nominal >= 0 : nominal > 0) &&
 		(!isBulanan || selectedBulan) &&
-		!(isBulanan && isSantriGratisSyahriyah)
+		!(isBulanan && isSantriGratisSyahriyah && !isYatimGratisSmkSmp)
 	);
 
 	// Cek apakah bulan sudah lunas
@@ -64,6 +69,7 @@
 		if (!selectedJenis) return;
 		if (isSyahriyah) {
 			nominal = selectedSantri?.nominalSyahriyah ?? 0;
+			if (isYatimGratisSmkSmp) nominal = 0;
 			return;
 		}
 		nominal = selectedJenis.nominalDefault;
@@ -206,13 +212,13 @@
 
 						<div class="form-control w-full md:col-span-2">
 							<label for="nominalDibayar" class="label"><span class="label-text font-medium">Nominal Pembayaran (Rp)</span></label>
-							<input id="nominalDibayar" type="number" name="nominalDibayar" bind:value={nominal} class="input input-bordered w-full font-bold text-lg" min="1" required />
-							{#if nominal <= 0}
+							<input id="nominalDibayar" type="number" name="nominalDibayar" bind:value={nominal} class="input input-bordered w-full font-bold text-lg" min={isYatimGratisSmkSmp ? 0 : 1} required />
+							{#if nominal <= 0 && !isYatimGratisSmkSmp}
 								<div class="label pt-2 pb-0">
 									<span class="label-text-alt text-error">Nominal harus lebih dari 0</span>
 								</div>
 							{/if}
-							{#if isBulanan && isSantriGratisSyahriyah}
+							{#if isBulanan && isSantriGratisSyahriyah && !isYatimGratisSmkSmp}
 								<div class="label pt-2 pb-0">
 									<span class="label-text-alt text-error">Santri kategori gratis tidak dapat membayar SPP/Syahriyah.</span>
 								</div>
