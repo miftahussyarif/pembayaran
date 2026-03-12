@@ -1,12 +1,19 @@
 <script>
 	import { enhance } from '$app/forms';
-	let { data } = $props();
+	let { data, form } = $props();
 	let editSantri = $state(null);
 </script>
 
 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
 	<h2 class="text-2xl font-bold">Data Santri</h2>
 	<div class="flex gap-2 w-full sm:w-auto">
+		<button class="btn btn-sm btn-outline" onclick={() => my_modal_import_santri.showModal()}>
+			<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+				<path d="M3 14a1 1 0 011-1h3v-2H5a1 1 0 110-2h2V7a1 1 0 112 0v2h2a1 1 0 110 2H9v2h3a1 1 0 011 1v2H3v-2z" />
+				<path d="M7 3a1 1 0 012 0v7H7V3z" />
+			</svg>
+			Import Excel
+		</button>
 		<div class="form-control flex-1 sm:w-64">
 			<input type="text" placeholder="Cari santri..." class="input input-sm input-bordered w-full" />
 		</div>
@@ -18,6 +25,12 @@
 		</button>
 	</div>
 </div>
+
+{#if form?.type}
+	<div class={`alert ${form.type === 'success' ? 'alert-success' : 'alert-error'} mb-4 shadow-sm`}>
+		<span>{form.message}</span>
+	</div>
+{/if}
 
 <div class="card bg-base-100 shadow-sm border border-base-200">
 	<div class="overflow-x-auto">
@@ -86,6 +99,37 @@
 		</table>
 	</div>
 </div>
+
+<!-- Modal Import Santri -->
+<dialog id="my_modal_import_santri" class="modal">
+	<div class="modal-box max-w-lg">
+		<h3 class="font-bold text-lg mb-2">Import Santri (Excel/CSV)</h3>
+		<p class="text-sm text-base-content/60 mb-4">
+			Gunakan file CSV dari Excel dengan header: nomor_induk, nama_lengkap, kategori, tanggal_masuk, tanggal_keluar, is_active.
+		</p>
+		<div class="alert alert-info mb-4 flex items-center justify-between gap-3">
+			<span>Unduh template contoh agar formatnya benar.</span>
+			<div class="flex gap-3">
+				<a href="/master/santri/sample.xlsx" class="link link-primary font-semibold" target="_blank" rel="noopener">Sample .xlsx</a>
+				<a href="/master/santri/sample.csv" class="link link-primary font-semibold" target="_blank" rel="noopener">Sample .csv</a>
+			</div>
+		</div>
+		<form method="POST" action="?/import" enctype="multipart/form-data" use:enhance>
+			<div class="form-control w-full mb-4">
+				<label class="label" for="importFile"><span class="label-text">File CSV</span></label>
+				<input id="importFile" name="file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="file-input file-input-bordered w-full" required />
+				<label class="label">
+					<span class="label-text-alt text-base-content/60">Tanggal gunakan format YYYY-MM-DD. Kolom kategori boleh kosong.</span>
+				</label>
+			</div>
+			<div class="modal-action">
+				<button type="button" class="btn" onclick={() => my_modal_import_santri.close()}>Batal</button>
+				<button type="submit" class="btn btn-primary">Import</button>
+			</div>
+		</form>
+	</div>
+	<form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 
 <!-- Modal Tambah Santri -->
 <dialog id="my_modal_santri" class="modal">

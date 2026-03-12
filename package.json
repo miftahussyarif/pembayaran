@@ -32,6 +32,7 @@
 		"better-sqlite3": "^12.6.2",
 		"dotenv": "^17.3.1",
 		"drizzle-orm": "^0.45.1",
-		"js-cookie": "^3.0.5"
+		"js-cookie": "^3.0.5",
+		"xlsx": "^0.18.5"
 	}
 }

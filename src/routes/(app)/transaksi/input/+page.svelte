@@ -9,9 +9,26 @@
 	let selectedTahunAjaranId = $state('');
 	let selectedBulan = $state('');
 	let isSubmitting = $state(false);
+	let santriSearch = $state('');
 	
 	let selectedJenis = $derived(data.jenisPembayarans.find(j => j.id == selectedJenisId) || null);
 	let selectedSantri = $derived(data.santris.find(s => s.id == selectedSantriId) || null);
+	let filteredSantris = $derived.by(() => {
+		const query = santriSearch.trim().toLowerCase();
+		let list = data.santris;
+		if (query) {
+			list = data.santris.filter((s) => {
+				const nomor = String(s.nomorInduk || '').toLowerCase();
+				const nama = String(s.namaLengkap || '').toLowerCase();
+				return nomor.includes(query) || nama.includes(query);
+			});
+		}
+		if (selectedSantriId && !list.some((s) => s.id == selectedSantriId)) {
+			const selected = data.santris.find((s) => s.id == selectedSantriId);
+			if (selected) list = [selected, ...list];
+		}
+		return list;
+	});
 	
 	let nominal = $state(0);
 	let isBulanan = $derived(
@@ -100,15 +117,21 @@
 						<!-- Pilih Santri -->
 						<div class="form-control w-full">
 							<label for="santriId" class="label"><span class="label-text font-medium">Santri</span></label>
+							<input type="text" placeholder="Cari nama atau nomor induk..." class="input input-bordered w-full mb-2" bind:value={santriSearch} />
 							<select id="santriId" name="santriId" class="select select-bordered w-full" bind:value={selectedSantriId} required>
 								<option value="" disabled selected>Pilih Santri...</option>
-								{#each data.santris as santri}
+								{#each filteredSantris as santri}
 									<option value={santri.id}>
 										{santri.nomorInduk} - {santri.namaLengkap}
 										{santri.nominalSyahriyah === 0 ? ' (GRATIS SPP)' : ''}
 									</option>
 								{/each}
 							</select>
+							{#if santriSearch && filteredSantris.length === 0}
+								<div class="label pt-2 pb-0">
+									<span class="label-text-alt text-base-content/60">Tidak ada santri yang cocok.</span>
+								</div>
+							{/if}
 						</div>
 
 						<!-- Pilih Tahun -->

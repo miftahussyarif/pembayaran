@@ -6,36 +6,38 @@ export const GET = async ({ locals }) => {
 		return new Response('Forbidden', { status: 403 });
 	}
 
-	const pembayaran = await db.select().from(schema.pembayaran);
-	const mutasi = await db.select().from(schema.mutasiSaldoBendahara);
-	const systemLogs = await db.select().from(schema.systemLogs);
-	const users = await db.select().from(schema.users);
-	const pengaturan = await db.select().from(schema.pengaturanPesantren);
-	const tahunAjaran = await db.select().from(schema.tahunAjaran);
-	const jenisPembayaran = await db.select().from(schema.jenisPembayaran);
-	const kategoriSantri = await db.select().from(schema.kategoriSantri);
-	const santri = await db.select().from(schema.santri);
-	const santriSmk = await db.select().from(schema.santriSmk);
-	const santriSmp = await db.select().from(schema.santriSmp);
+	const payload = await db.transaction(async (tx) => {
+		const pembayaran = await tx.select().from(schema.pembayaran);
+		const mutasi = await tx.select().from(schema.mutasiSaldoBendahara);
+		const systemLogs = await tx.select().from(schema.systemLogs);
+		const users = await tx.select().from(schema.users);
+		const pengaturan = await tx.select().from(schema.pengaturanPesantren);
+		const tahunAjaran = await tx.select().from(schema.tahunAjaran);
+		const jenisPembayaran = await tx.select().from(schema.jenisPembayaran);
+		const kategoriSantri = await tx.select().from(schema.kategoriSantri);
+		const santri = await tx.select().from(schema.santri);
+		const santriSmk = await tx.select().from(schema.santriSmk);
+		const santriSmp = await tx.select().from(schema.santriSmp);
 
-	const payload = {
-		type: 'pesantren-backup',
-		version: 1,
-		exportedAt: new Date().toISOString(),
-		data: {
-			users,
-			pengaturan,
-			tahunAjaran,
-			jenisPembayaran,
-			kategoriSantri,
-			santri,
-			santriSmk,
-			santriSmp,
-			pembayaran,
-			mutasi,
-			systemLogs
-		}
-	};
+		return {
+			type: 'pesantren-backup',
+			version: 1,
+			exportedAt: new Date().toISOString(),
+			data: {
+				users,
+				pengaturan,
+				tahunAjaran,
+				jenisPembayaran,
+				kategoriSantri,
+				santri,
+				santriSmk,
+				santriSmp,
+				pembayaran,
+				mutasi,
+				systemLogs
+			}
+		};
+	});
 
 	const json = JSON.stringify(payload, null, 2);
 

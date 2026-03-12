@@ -53,64 +53,75 @@ export const actions = {
 			return { type: 'error', message: 'Format backup tidak dikenali.' };
 		}
 
-		const users = Array.isArray(payload.data.users) ? payload.data.users : [];
-		const pengaturan = Array.isArray(payload.data.pengaturan) ? payload.data.pengaturan : [];
-		const tahunAjaran = Array.isArray(payload.data.tahunAjaran) ? payload.data.tahunAjaran : [];
-		const jenisPembayaran = Array.isArray(payload.data.jenisPembayaran) ? payload.data.jenisPembayaran : [];
-		const kategoriSantri = Array.isArray(payload.data.kategoriSantri) ? payload.data.kategoriSantri : [];
-		const santri = Array.isArray(payload.data.santri) ? payload.data.santri : [];
-		const santriSmk = Array.isArray(payload.data.santriSmk) ? payload.data.santriSmk : [];
-		const santriSmp = Array.isArray(payload.data.santriSmp) ? payload.data.santriSmp : [];
-		const pembayaran = Array.isArray(payload.data.pembayaran) ? payload.data.pembayaran : [];
-		const mutasi = Array.isArray(payload.data.mutasi) ? payload.data.mutasi : [];
-		const systemLogs = Array.isArray(payload.data.systemLogs) ? payload.data.systemLogs : [];
+		const backupData = payload.data || {};
+		const asArray = (value) => (Array.isArray(value) ? value : []);
+		const users = asArray(backupData.users);
+		const pengaturan = asArray(backupData.pengaturan);
+		const tahunAjaran = asArray(backupData.tahunAjaran);
+		const jenisPembayaran = asArray(backupData.jenisPembayaran);
+		const kategoriSantri = asArray(backupData.kategoriSantri);
+		const santri = asArray(backupData.santri);
+		const santriSmk = asArray(backupData.santriSmk);
+		const santriSmp = asArray(backupData.santriSmp);
+		const pembayaran = asArray(backupData.pembayaran);
+		const mutasi = asArray(backupData.mutasi);
+		const systemLogs = asArray(backupData.systemLogs);
+
+		const insertInBatches = async (tx, table, rows, batchSize = 100) => {
+			for (let i = 0; i < rows.length; i += batchSize) {
+				const batch = rows.slice(i, i + batchSize);
+				await tx.insert(table).values(batch);
+			}
+		};
 
 		try {
-			await db.delete(schema.pembayaran);
-			await db.delete(schema.mutasiSaldoBendahara);
-			await db.delete(schema.systemLogs);
-			await db.delete(schema.santriSmk);
-			await db.delete(schema.santriSmp);
-			await db.delete(schema.santri);
-			await db.delete(schema.kategoriSantri);
-			await db.delete(schema.jenisPembayaran);
-			await db.delete(schema.tahunAjaran);
-			await db.delete(schema.pengaturanPesantren);
-			await db.delete(schema.users);
+			await db.transaction(async (tx) => {
+				await tx.delete(schema.pembayaran);
+				await tx.delete(schema.mutasiSaldoBendahara);
+				await tx.delete(schema.systemLogs);
+				await tx.delete(schema.santriSmk);
+				await tx.delete(schema.santriSmp);
+				await tx.delete(schema.santri);
+				await tx.delete(schema.kategoriSantri);
+				await tx.delete(schema.jenisPembayaran);
+				await tx.delete(schema.tahunAjaran);
+				await tx.delete(schema.pengaturanPesantren);
+				await tx.delete(schema.users);
 
-			if (users.length) {
-				await db.insert(schema.users).values(users);
-			}
-			if (pengaturan.length) {
-				await db.insert(schema.pengaturanPesantren).values(pengaturan);
-			}
-			if (tahunAjaran.length) {
-				await db.insert(schema.tahunAjaran).values(tahunAjaran);
-			}
-			if (jenisPembayaran.length) {
-				await db.insert(schema.jenisPembayaran).values(jenisPembayaran);
-			}
-			if (kategoriSantri.length) {
-				await db.insert(schema.kategoriSantri).values(kategoriSantri);
-			}
-			if (santri.length) {
-				await db.insert(schema.santri).values(santri);
-			}
-			if (santriSmk.length) {
-				await db.insert(schema.santriSmk).values(santriSmk);
-			}
-			if (santriSmp.length) {
-				await db.insert(schema.santriSmp).values(santriSmp);
-			}
-			if (pembayaran.length) {
-				await db.insert(schema.pembayaran).values(pembayaran);
-			}
-			if (mutasi.length) {
-				await db.insert(schema.mutasiSaldoBendahara).values(mutasi);
-			}
-			if (systemLogs.length) {
-				await db.insert(schema.systemLogs).values(systemLogs);
-			}
+				if (users.length) {
+					await insertInBatches(tx, schema.users, users);
+				}
+				if (pengaturan.length) {
+					await insertInBatches(tx, schema.pengaturanPesantren, pengaturan);
+				}
+				if (tahunAjaran.length) {
+					await insertInBatches(tx, schema.tahunAjaran, tahunAjaran);
+				}
+				if (jenisPembayaran.length) {
+					await insertInBatches(tx, schema.jenisPembayaran, jenisPembayaran);
+				}
+				if (kategoriSantri.length) {
+					await insertInBatches(tx, schema.kategoriSantri, kategoriSantri);
+				}
+				if (santri.length) {
+					await insertInBatches(tx, schema.santri, santri);
+				}
+				if (santriSmk.length) {
+					await insertInBatches(tx, schema.santriSmk, santriSmk);
+				}
+				if (santriSmp.length) {
+					await insertInBatches(tx, schema.santriSmp, santriSmp);
+				}
+				if (pembayaran.length) {
+					await insertInBatches(tx, schema.pembayaran, pembayaran);
+				}
+				if (mutasi.length) {
+					await insertInBatches(tx, schema.mutasiSaldoBendahara, mutasi);
+				}
+				if (systemLogs.length) {
+					await insertInBatches(tx, schema.systemLogs, systemLogs);
+				}
+			});
 
 			try {
 				await db.insert(schema.systemLogs).values({
