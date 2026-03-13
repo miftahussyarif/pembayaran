@@ -142,6 +142,8 @@
 										<th>Bulan</th>
 										<th class="text-right">Tagihan</th>
 										<th class="text-right">Dibayar</th>
+										<th>Tgl Bayar</th>
+										<th>No. Kwitansi</th>
 										<th>Status</th>
 									</tr>
 								</thead>
@@ -156,6 +158,8 @@
 												<td>{m.bulan} {m.tahun}</td>
 												<td class="text-right">{formatRupiah(m.nominalTagihan)}</td>
 												<td class="text-right">{formatRupiah(m.nominalDibayar)}</td>
+												<td class="text-xs text-base-content/70">{formatTanggal(m.tanggalBayar)}</td>
+												<td class="text-xs font-mono">{m.nomorKwitansi || '-'}</td>
 												<td>
 													{#if m.paid}
 														<span class="badge badge-success badge-sm">Lunas</span>
@@ -185,6 +189,8 @@
 										<th>Bulan</th>
 										<th class="text-right">Tagihan</th>
 										<th class="text-right">Dibayar</th>
+										<th>Tgl Bayar</th>
+										<th>No. Kwitansi</th>
 										<th>Status</th>
 									</tr>
 								</thead>
@@ -199,6 +205,8 @@
 												<td>{m.bulan} {m.tahun}</td>
 												<td class="text-right">{formatRupiah(m.nominalTagihan)}</td>
 												<td class="text-right">{formatRupiah(m.nominalDibayar)}</td>
+												<td class="text-xs text-base-content/70">{formatTanggal(m.tanggalBayar)}</td>
+												<td class="text-xs font-mono">{m.nomorKwitansi || '-'}</td>
 												<td>
 													{#if m.paid}
 														<span class="badge badge-success badge-sm">Lunas</span>
@@ -229,6 +237,8 @@
 										<th>Bulan</th>
 										<th class="text-right">Tagihan</th>
 										<th class="text-right">Dibayar</th>
+										<th>Tgl Bayar</th>
+										<th>No. Kwitansi</th>
 										<th>Status</th>
 									</tr>
 								</thead>
@@ -243,6 +253,8 @@
 												<td>{m.bulan} {m.tahun}</td>
 												<td class="text-right">{formatRupiah(m.nominalTagihan)}</td>
 												<td class="text-right">{formatRupiah(m.nominalDibayar)}</td>
+												<td class="text-xs text-base-content/70">{formatTanggal(m.tanggalBayar)}</td>
+												<td class="text-xs font-mono">{m.nomorKwitansi || '-'}</td>
 												<td>
 													{#if m.paid}
 														<span class="badge badge-success badge-sm">Lunas</span>
@@ -278,6 +290,8 @@
 										<th>Bulan</th>
 										<th class="text-right">Tagihan</th>
 										<th class="text-right">Dibayar</th>
+										<th>Tgl Bayar</th>
+										<th>No. Kwitansi</th>
 										<th>Status</th>
 									</tr>
 								</thead>
@@ -292,6 +306,8 @@
 												<td>{m.bulan} {m.tahun}</td>
 												<td class="text-right">{formatRupiah(m.nominalTagihan)}</td>
 												<td class="text-right">{formatRupiah(m.nominalDibayar)}</td>
+												<td class="text-xs text-base-content/70">{formatTanggal(m.tanggalBayar)}</td>
+												<td class="text-xs font-mono">{m.nomorKwitansi || '-'}</td>
 												<td>
 													{#if m.paid}
 														<span class="badge badge-success badge-sm">Lunas</span>

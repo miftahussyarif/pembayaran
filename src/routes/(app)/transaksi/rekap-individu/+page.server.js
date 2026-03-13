@@ -119,7 +119,8 @@ export async function load({ url }) {
 				paid: paidItems.length > 0,
 				nominalTagihan: s.nominalSyahriyah ?? 0,
 				nominalDibayar,
-				tanggalBayar: paidItems[0]?.tanggalBayar || null
+				tanggalBayar: paidItems[0]?.tanggalBayar || null,
+				nomorKwitansi: paidItems[0]?.nomorKwitansi || null
 			};
 		});
 
@@ -133,7 +134,8 @@ export async function load({ url }) {
 				paid: paidItems.length > 0,
 				nominalTagihan: s.nominalKonsumsi ?? 0,
 				nominalDibayar,
-				tanggalBayar: paidItems[0]?.tanggalBayar || null
+				tanggalBayar: paidItems[0]?.tanggalBayar || null,
+				nomorKwitansi: paidItems[0]?.nomorKwitansi || null
 			};
 		}) : [];
 
