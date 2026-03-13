@@ -136,5 +136,7 @@ export const pengaturanPesantren = sqliteTable('pengaturan_pesantren', {
 	alamat: text('alamat').notNull().default('Jl. Pendidikan No. 123, Kota Santri'),
 	noTelp: text('no_telp').notNull().default('(021) 1234567'),
 	logoUrl: text('logo_url').default(''),
-	stampUrl: text('stamp_url').default('')
+	stampUrl: text('stamp_url').default(''),
+	telegramBotToken: text('telegram_bot_token'),
+	telegramChatId: text('telegram_chat_id')
 });

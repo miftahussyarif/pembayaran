@@ -99,4 +99,16 @@ try {
 	// column may already exist
 }
 
+try {
+	sqlite.exec(`ALTER TABLE pengaturan_pesantren ADD COLUMN telegram_bot_token TEXT`);
+} catch (e) {
+	// column may already exist
+}
+
+try {
+	sqlite.exec(`ALTER TABLE pengaturan_pesantren ADD COLUMN telegram_chat_id TEXT`);
+} catch (e) {
+	// column may already exist
+}
+
 export const db = drizzle(sqlite, { schema });

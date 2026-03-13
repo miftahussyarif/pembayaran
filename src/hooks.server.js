@@ -1,4 +1,48 @@
 import { redirect } from '@sveltejs/kit';
+import { db } from '$lib/server/db/index.js';
+import * as schema from '$lib/server/db/schema.js';
+import { generateBackup, sendBackupToTelegram } from '$lib/server/backup.js';
+
+// Setup Daily Backup Cron (Every Minute Check)
+let lastBackupDate = '';
+
+if (typeof process !== 'undefined') {
+	setInterval(async () => {
+		const now = new Date();
+		const today = now.toISOString().split('T')[0];
+		const hour = now.getHours();
+		const minute = now.getMinutes();
+
+		// Check if it's 12:00 PM and we haven't backed up today
+		if (hour === 12 && minute === 0 && lastBackupDate !== today) {
+			console.log(`[Backup] Starting scheduled backup for ${today}...`);
+			try {
+				const pengaturan = await db.select().from(schema.pengaturanPesantren).limit(1);
+				if (pengaturan[0]?.telegramBotToken && pengaturan[0]?.telegramChatId) {
+					const backupData = await generateBackup();
+					const result = await sendBackupToTelegram(
+						pengaturan[0].telegramBotToken,
+						pengaturan[0].telegramChatId,
+						backupData
+					);
+					
+					if (result.ok) {
+						console.log(`[Backup] Scheduled backup sent to Telegram: ${today}`);
+						lastBackupDate = today;
+					} else {
+						console.error(`[Backup] Failed to send scheduled backup:`, result);
+					}
+				} else {
+					console.log(`[Backup] Telegram not configured, skipping scheduled backup.`);
+					// Mark as done even if skipped to avoid repeating logs every minute during the hour 12:00
+					lastBackupDate = today;
+				}
+			} catch (error) {
+				console.error(`[Backup] Scheduled backup error:`, error);
+			}
+		}
+	}, 60000); // Pulse every 1 minute
+}
 
 export const handle = async ({ event, resolve }) => {
 	// 1. Ambil session cookie
