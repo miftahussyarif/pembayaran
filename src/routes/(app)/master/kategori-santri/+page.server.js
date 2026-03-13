@@ -12,11 +12,12 @@ export const actions = {
 		const data = await request.formData();
 		const namaKategori = data.get('namaKategori')?.toString().trim();
 		const nominalSyahriyah = Number(data.get('nominalSyahriyah') || 0);
+		const nominalKonsumsi = Number(data.get('nominalKonsumsi') || 0);
 
 		if (!namaKategori) return { success: false, error: 'Nama kategori wajib diisi.' };
 
 		try {
-			await db.insert(schema.kategoriSantri).values({ namaKategori, nominalSyahriyah });
+			await db.insert(schema.kategoriSantri).values({ namaKategori, nominalSyahriyah, nominalKonsumsi });
 			return { success: true };
 		} catch (error) {
 			return { success: false, error: 'Kategori gagal ditambahkan (mungkin nama sudah ada).' };
@@ -28,12 +29,13 @@ export const actions = {
 		const id = Number(data.get('id'));
 		const namaKategori = data.get('namaKategori')?.toString().trim();
 		const nominalSyahriyah = Number(data.get('nominalSyahriyah') || 0);
+		const nominalKonsumsi = Number(data.get('nominalKonsumsi') || 0);
 
 		if (!namaKategori) return { success: false, error: 'Nama kategori wajib diisi.' };
 
 		try {
 			await db.update(schema.kategoriSantri)
-				.set({ namaKategori, nominalSyahriyah })
+				.set({ namaKategori, nominalSyahriyah, nominalKonsumsi })
 				.where(eq(schema.kategoriSantri.id, id));
 			try {
 				await db.insert(schema.systemLogs).values({

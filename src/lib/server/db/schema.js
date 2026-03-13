@@ -16,7 +16,8 @@ export const jenisPembayaran = sqliteTable('jenis_pembayaran', {
 export const kategoriSantri = sqliteTable('kategori_santri', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	namaKategori: text('nama_kategori').notNull().unique(),
-	nominalSyahriyah: integer('nominal_syahriyah').notNull().default(0)
+	nominalSyahriyah: integer('nominal_syahriyah').notNull().default(0),
+	nominalKonsumsi: integer('nominal_konsumsi').notNull().default(0)
 });
 
 export const santri = sqliteTable('santri', {

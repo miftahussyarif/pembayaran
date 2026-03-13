@@ -56,8 +56,8 @@
 
 <div class="flex flex-col lg:flex-row lg:items-end gap-3 mb-6">
 	<div class="form-control w-full sm:w-56">
-		<label class="label py-0"><span class="label-text text-xs">Sorting</span></label>
-		<select class="select select-sm select-bordered w-full" bind:value={sortBy} onchange={() => { filterValue = ''; }}>
+		<label class="label py-0" for="sort-select"><span class="label-text text-xs">Sorting</span></label>
+		<select id="sort-select" class="select select-sm select-bordered w-full" bind:value={sortBy} onchange={() => { filterValue = ''; }}>
 			<option value="kategori">Kategori Santri</option>
 			<option value="kabupaten">Alamat: Kabupaten</option>
 			<option value="kecamatan">Alamat: Kecamatan</option>
@@ -65,8 +65,8 @@
 		</select>
 	</div>
 	<div class="form-control w-full sm:w-56">
-		<label class="label py-0"><span class="label-text text-xs">Filter</span></label>
-		<select class="select select-sm select-bordered w-full" bind:value={filterValue}>
+		<label class="label py-0" for="filter-select"><span class="label-text text-xs">Filter</span></label>
+		<select id="filter-select" class="select select-sm select-bordered w-full" bind:value={filterValue}>
 			<option value="">Semua</option>
 			{#each filterOptions as opt}
 				<option value={opt}>{opt}</option>
@@ -88,8 +88,8 @@
 		Import Excel
 	</button>
 	<div class="form-control w-full sm:w-56">
-		<label class="label py-0"><span class="label-text text-xs">Cari Santri</span></label>
-		<input type="text" placeholder="Cari santri..." class="input input-sm input-bordered w-full" />
+		<label class="label py-0" for="search-input"><span class="label-text text-xs">Cari Santri</span></label>
+		<input id="search-input" type="text" placeholder="Cari santri..." class="input input-sm input-bordered w-full" />
 	</div>
 	<button class="btn btn-sm btn-primary w-full sm:w-auto" onclick={() => my_modal_santri.showModal()}>
 		<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -193,11 +193,11 @@
 		</div>
 		<form method="POST" action="?/import" enctype="multipart/form-data" use:enhance>
 			<div class="form-control w-full mb-4">
-				<label class="label" for="importFile"><span class="label-text">File CSV</span></label>
+				<label class="label" for="importFile"><span class="label-text">File Excel/CSV</span></label>
 				<input id="importFile" name="file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="file-input file-input-bordered w-full" required />
-				<label class="label">
+				<div class="label py-1">
 					<span class="label-text-alt text-base-content/60">Tanggal gunakan format YYYY-MM-DD. Kolom kategori boleh kosong.</span>
-				</label>
+				</div>
 			</div>
 			<div class="modal-action">
 				<button type="button" class="btn" onclick={() => my_modal_import_santri.close()}>Batal</button>

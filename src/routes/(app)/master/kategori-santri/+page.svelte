@@ -30,7 +30,8 @@
 				<tr>
 					<th>No</th>
 					<th>Nama Kategori</th>
-					<th>Nominal Syahriyah / Bulan</th>
+					<th>Syahriyah / Bulan</th>
+					<th>Konsumsi / Bulan</th>
 					<th>Aksi</th>
 				</tr>
 			</thead>
@@ -52,7 +53,16 @@
 								</span>
 							{:else}
 								<span class="font-medium text-primary">{formatRupiah(k.nominalSyahriyah)}</span>
-								<span class="text-xs text-base-content/50 ml-1">/ bulan</span>
+							{/if}
+						</td>
+						<td>
+							{#if k.nominalKonsumsi === 0}
+								<span class="badge badge-success gap-1 font-bold">
+									<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+									GRATIS
+								</span>
+							{:else}
+								<span class="font-medium text-secondary">{formatRupiah(k.nominalKonsumsi)}</span>
 							{/if}
 						</td>
 						<td class="flex gap-2">
@@ -83,14 +93,26 @@
 				<label class="label" for="namaKategori"><span class="label-text font-semibold">Nama Kategori</span></label>
 				<input type="text" id="namaKategori" name="namaKategori" placeholder="Contoh: Reguler, Yatim, Dhuafa..." class="input input-bordered w-full" required />
 			</div>
-			<div class="form-control w-full mb-6">
-				<label class="label" for="nominalSyahriyah">
-					<span class="label-text font-semibold">Nominal Syahriyah</span>
-					<span class="label-text-alt text-base-content/50">Isi 0 jika GRATIS</span>
-				</label>
-				<div class="relative">
-					<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50 text-sm font-medium">Rp</span>
-					<input type="number" id="nominalSyahriyah" name="nominalSyahriyah" value="0" min="0" class="input input-bordered w-full pl-10" required />
+			<div class="grid grid-cols-2 gap-4">
+				<div class="form-control w-full mb-6">
+					<label class="label" for="nominalSyahriyah">
+						<span class="label-text font-semibold">Syahriyah</span>
+						<span class="label-text-alt text-base-content/50">0 = GRATIS</span>
+					</label>
+					<div class="relative">
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50 text-sm font-medium">Rp</span>
+						<input type="number" id="nominalSyahriyah" name="nominalSyahriyah" value="0" min="0" class="input input-bordered w-full pl-10" required />
+					</div>
+				</div>
+				<div class="form-control w-full mb-6">
+					<label class="label" for="nominalKonsumsi">
+						<span class="label-text font-semibold">Konsumsi</span>
+						<span class="label-text-alt text-base-content/50">0 = GRATIS</span>
+					</label>
+					<div class="relative">
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50 text-sm font-medium">Rp</span>
+						<input type="number" id="nominalKonsumsi" name="nominalKonsumsi" value="0" min="0" class="input input-bordered w-full pl-10" required />
+					</div>
 				</div>
 			</div>
 			<div class="modal-action">
@@ -115,14 +137,26 @@
 				<label class="label" for="editNamaKategori"><span class="label-text font-semibold">Nama Kategori</span></label>
 				<input type="text" id="editNamaKategori" name="namaKategori" value={editKategori.namaKategori} class="input input-bordered w-full" required />
 			</div>
-			<div class="form-control w-full mb-6">
-				<label class="label" for="editNominal">
-					<span class="label-text font-semibold">Nominal Syahriyah</span>
-					<span class="label-text-alt text-base-content/50">Isi 0 jika GRATIS</span>
-				</label>
-				<div class="relative">
-					<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50 text-sm font-medium">Rp</span>
-					<input type="number" id="editNominal" name="nominalSyahriyah" value={editKategori.nominalSyahriyah} min="0" class="input input-bordered w-full pl-10" required />
+			<div class="grid grid-cols-2 gap-4">
+				<div class="form-control w-full mb-6">
+					<label class="label" for="editNominalSyahriyah">
+						<span class="label-text font-semibold">Syahriyah</span>
+						<span class="label-text-alt text-base-content/50">0 = GRATIS</span>
+					</label>
+					<div class="relative">
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50 text-sm font-medium">Rp</span>
+						<input type="number" id="editNominalSyahriyah" name="nominalSyahriyah" value={editKategori.nominalSyahriyah} min="0" class="input input-bordered w-full pl-10" required />
+					</div>
+				</div>
+				<div class="form-control w-full mb-6">
+					<label class="label" for="editNominalKonsumsi">
+						<span class="label-text font-semibold">Konsumsi</span>
+						<span class="label-text-alt text-base-content/50">0 = GRATIS</span>
+					</label>
+					<div class="relative">
+						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50 text-sm font-medium">Rp</span>
+						<input type="number" id="editNominalKonsumsi" name="nominalKonsumsi" value={editKategori.nominalKonsumsi || 0} min="0" class="input input-bordered w-full pl-10" required />
+					</div>
 				</div>
 			</div>
 			<div class="modal-action">
