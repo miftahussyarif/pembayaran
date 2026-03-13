@@ -124,7 +124,7 @@ export async function load({ url }) {
 			};
 		});
 
-		const konsumsi = s.nominalKonsumsi > 0 ? monthsRange.map(m => {
+		const konsumsi = monthsRange.map(m => {
 			const key = `${m.year}-${m.monthName}`;
 			const paidItems = konsumsiByKey.get(key) || [];
 			const nominalDibayar = paidItems.reduce((sum, p) => sum + (p.nominalDibayar || 0), 0);
@@ -137,7 +137,7 @@ export async function load({ url }) {
 				tanggalBayar: paidItems[0]?.tanggalBayar || null,
 				nomorKwitansi: paidItems[0]?.nomorKwitansi || null
 			};
-		}) : [];
+		});
 
 		const smkInfo = smkBySantriId.get(s.id);
 		let smkBulanan = [];
@@ -205,9 +205,9 @@ export async function load({ url }) {
 			});
 		}
 
-		const totalTagihanSyahriyah = syahriyah.length * (s.nominalSyahriyah ?? 0);
+		const totalTagihanSyahriyah = syahriyah.reduce((sum, m) => sum + (m.nominalTagihan || 0), 0);
 		const totalDibayarSyahriyah = syahriyah.reduce((sum, m) => sum + (m.nominalDibayar || 0), 0);
-		const totalTagihanKonsumsi = konsumsi.length * (s.nominalKonsumsi ?? 0);
+		const totalTagihanKonsumsi = konsumsi.reduce((sum, m) => sum + (m.nominalTagihan || 0), 0);
 		const totalDibayarKonsumsi = konsumsi.reduce((sum, m) => sum + (m.nominalDibayar || 0), 0);
 		const totalTagihanSmkBulanan = smkBulanan.length * (smkBulananNominalEff || 0);
 		const totalDibayarSmkBulanan = smkBulanan.reduce((sum, m) => sum + (m.nominalDibayar || 0), 0);
