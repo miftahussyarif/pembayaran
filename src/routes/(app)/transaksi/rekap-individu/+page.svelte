@@ -103,10 +103,16 @@
 					<div>
 						<div class="text-lg font-bold">{s.namaLengkap}</div>
 						<div class="text-sm text-base-content/60">No. Induk: {s.nomorInduk}</div>
-						<div class="text-sm text-base-content/60">Kategori: {s.namaKategori || '-'} {s.nominalSyahriyah === 0 ? '(Gratis SPP)' : ''}</div>
+						<div class="text-sm text-base-content/60">Kategori: {s.namaKategori || '-'}</div>
 						<div class="text-xs text-base-content/50 mt-1">Masuk: {formatTanggal(s.tanggalMasuk)} · Keluar: {s.tanggalKeluar ? formatTanggal(s.tanggalKeluar) : 'Belum keluar'}</div>
 					</div>
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-8">
+					<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-8">
+						<div class="text-left">
+							<div class="text-sm text-base-content/60">Tagihan Konsumsi</div>
+							<div class="text-base font-semibold">{formatRupiah(s.totalTagihanKonsumsi)}</div>
+							<div class="text-sm text-success">Dibayar: {formatRupiah(s.totalDibayarKonsumsi)}</div>
+							<div class="text-sm text-error">Sisa: {formatRupiah(Math.max(0, (s.totalTagihanKonsumsi || 0) - (s.totalDibayarKonsumsi || 0)))}</div>
+						</div>
 						<div class="text-left">
 							<div class="text-sm text-base-content/60">Tagihan Lain</div>
 							<div class="text-base font-semibold">{formatRupiah(s.totalTagihanLain)}</div>
@@ -146,6 +152,49 @@
 										</tr>
 									{:else}
 										{#each s.syahriyah as m}
+											<tr>
+												<td>{m.bulan} {m.tahun}</td>
+												<td class="text-right">{formatRupiah(m.nominalTagihan)}</td>
+												<td class="text-right">{formatRupiah(m.nominalDibayar)}</td>
+												<td>
+													{#if m.paid}
+														<span class="badge badge-success badge-sm">Lunas</span>
+													{:else}
+														<span class="badge badge-outline badge-sm">Belum</span>
+													{/if}
+												</td>
+											</tr>
+										{/each}
+									{/if}
+								</tbody>
+							</table>
+						</div>
+					</div>
+				{/if}
+				<!-- Konsumsi Bulanan -->
+				{#if s.nominalKonsumsi !== 0}
+					<div class="mb-6">
+						<div class="flex items-center justify-between mb-2">
+							<h3 class="font-semibold">Konsumsi Bulanan</h3>
+							<span class="badge badge-outline">{s.konsumsi.length} bulan</span>
+						</div>
+						<div class="overflow-x-auto">
+							<table class="table table-sm w-full">
+								<thead>
+									<tr class="bg-base-200/60">
+										<th>Bulan</th>
+										<th class="text-right">Tagihan</th>
+										<th class="text-right">Dibayar</th>
+										<th>Status</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#if s.konsumsi.length === 0}
+										<tr>
+											<td colspan="4" class="text-center text-base-content/50 py-4">Belum ada periode konsumsi.</td>
+										</tr>
+									{:else}
+										{#each s.konsumsi as m}
 											<tr>
 												<td>{m.bulan} {m.tahun}</td>
 												<td class="text-right">{formatRupiah(m.nominalTagihan)}</td>
