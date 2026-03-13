@@ -21,3 +21,10 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Local database files
+local.db
+local.db-*
+sqlite.db
+*.db
+*.db-*

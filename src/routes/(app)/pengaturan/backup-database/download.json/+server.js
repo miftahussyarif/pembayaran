@@ -1,5 +1,34 @@
 import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
+import { readFile, access } from 'node:fs/promises';
+import path from 'node:path';
+
+const resolveUploadPath = (url) => {
+	if (!url || typeof url !== 'string') return null;
+	if (!url.startsWith('/uploads/')) return null;
+	const filename = url.replace('/uploads/', '');
+	if (!filename) return null;
+	return path.join('static', 'uploads', filename);
+};
+
+const collectUploads = async (urls) => {
+	const files = [];
+	for (const url of urls) {
+		const filePath = resolveUploadPath(url);
+		if (!filePath) continue;
+		try {
+			await access(filePath);
+			const buffer = await readFile(filePath);
+			files.push({
+				path: url,
+				contentBase64: buffer.toString('base64')
+			});
+		} catch (e) {
+			// ignore missing files
+		}
+	}
+	return files;
+};
 
 export const GET = async ({ locals }) => {
 	if (locals.user?.role !== 'admin') {
@@ -16,12 +45,19 @@ export const GET = async ({ locals }) => {
 		const jenisPembayaran = await tx.select().from(schema.jenisPembayaran);
 		const kategoriSantri = await tx.select().from(schema.kategoriSantri);
 		const santri = await tx.select().from(schema.santri);
+		const santriDetail = await tx.select().from(schema.santriDetail);
 		const santriSmk = await tx.select().from(schema.santriSmk);
 		const santriSmp = await tx.select().from(schema.santriSmp);
+		const uploadUrls = [
+			...pengaturan.map((p) => p.logoUrl).filter(Boolean),
+			...pengaturan.map((p) => p.stampUrl).filter(Boolean),
+			...users.map((u) => u.signatureUrl).filter(Boolean)
+		];
+		const files = await collectUploads(uploadUrls);
 
 		return {
 			type: 'pesantren-backup',
-			version: 1,
+			version: 2,
 			exportedAt: new Date().toISOString(),
 			data: {
 				users,
@@ -30,12 +66,14 @@ export const GET = async ({ locals }) => {
 				jenisPembayaran,
 				kategoriSantri,
 				santri,
+				santriDetail,
 				santriSmk,
 				santriSmp,
 				pembayaran,
 				mutasi,
 				systemLogs
-			}
+			},
+			files
 		};
 	});
 

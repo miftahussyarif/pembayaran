@@ -38,6 +38,7 @@
 						<th>Username</th>
 						<th>Nama Lengkap</th>
 						<th>Role</th>
+						<th>Tanda Tangan</th>
 						<th class="text-right">Aksi</th>
 					</tr>
 				</thead>
@@ -50,6 +51,13 @@
 								<span class="badge badge-sm badge-outline uppercase text-[10px] {u.role === 'admin' ? 'badge-primary' : (u.role === 'bendahara' ? 'badge-info' : 'badge-warning')}">
 									{u.role}
 								</span>
+							</td>
+							<td>
+								{#if u.signatureUrl}
+									<img src={u.signatureUrl} alt="Tanda tangan" class="w-14 h-10 object-contain border rounded bg-base-100" />
+								{:else}
+									<span class="text-xs text-base-content/40">-</span>
+								{/if}
 							</td>
 							<td class="text-right">
 								<div class="flex gap-1 justify-end flex-wrap">
@@ -107,7 +115,7 @@
 <dialog id="modal_add_user" class="modal">
 	<div class="modal-box">
 		<h3 class="font-bold text-lg mb-4">Tambah Pengguna Baru</h3>
-		<form method="POST" action="?/createUser" use:enhance>
+		<form method="POST" action="?/createUser" enctype="multipart/form-data" use:enhance>
 			<div class="form-control w-full mb-3">
 				<label class="label" for="namaLengkapNew"><span class="label-text">Nama Lengkap</span></label>
 				<input type="text" id="namaLengkapNew" name="namaLengkap" placeholder="Nama..." class="input input-sm input-bordered w-full" required />
@@ -128,6 +136,10 @@
 					<option value="admin">Admin System</option>
 				</select>
 			</div>
+			<div class="form-control w-full mb-6">
+				<label class="label" for="signatureNew"><span class="label-text">Tanda Tangan (JPG)</span></label>
+				<input type="file" id="signatureNew" name="signatureFile" accept=".jpg,.jpeg,image/jpeg" class="file-input file-input-bordered w-full" />
+			</div>
 			<div class="modal-action">
 				<button type="button" class="btn" onclick={() => modal_add_user.close()}>Batal</button>
 				<button type="submit" class="btn btn-primary">Simpan User</button>
@@ -142,7 +154,7 @@
 	<div class="modal-box">
 		<h3 class="font-bold text-lg mb-4">Edit Data User</h3>
 		{#if editUser}
-		<form method="POST" action="?/updateUser" use:enhance={() => {
+		<form method="POST" action="?/updateUser" enctype="multipart/form-data" use:enhance={() => {
 			return async ({ update }) => { await update(); modal_edit_user.close(); editUser = null; };
 		}}>
 			<input type="hidden" name="id" value={editUser.id} />
@@ -161,6 +173,16 @@
 					<option value="petugas" selected={editUser.role === 'petugas'}>Petugas</option>
 					<option value="admin" selected={editUser.role === 'admin'}>Admin System</option>
 				</select>
+			</div>
+			<div class="form-control w-full mb-6">
+				<label class="label" for="signatureEdit"><span class="label-text">Tanda Tangan (JPG)</span></label>
+				<input type="file" id="signatureEdit" name="signatureFile" accept=".jpg,.jpeg,image/jpeg" class="file-input file-input-bordered w-full" />
+				{#if editUser.signatureUrl}
+					<div class="mt-3 flex items-center gap-3">
+						<img src={editUser.signatureUrl} alt="Tanda tangan saat ini" class="w-20 h-12 object-contain border rounded bg-base-100" />
+						<span class="text-xs text-base-content/60">Tanda tangan saat ini</span>
+					</div>
+				{/if}
 			</div>
 			<div class="modal-action">
 				<button type="button" class="btn" onclick={() => { modal_edit_user.close(); editUser = null; }}>Batal</button>

@@ -45,6 +45,58 @@ sqlite.exec(`
 		end_year INTEGER,
 		FOREIGN KEY (santri_id) REFERENCES santri(id)
 	);
+	CREATE TABLE IF NOT EXISTS santri_detail (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		santri_id INTEGER NOT NULL UNIQUE,
+		tempat_lahir TEXT,
+		tanggal_lahir TEXT,
+		jenis_kelamin TEXT,
+		golongan_darah TEXT,
+		nik TEXT,
+		no_kk TEXT,
+		anak_ke INTEGER,
+		jumlah_saudara INTEGER,
+		tinggi_cm INTEGER,
+		berat_kg INTEGER,
+		alamat_lengkap TEXT,
+		rt TEXT,
+		rw TEXT,
+		desa_kelurahan TEXT,
+		kecamatan TEXT,
+		kabupaten TEXT,
+		provinsi TEXT,
+		no_kip TEXT,
+		no_kis_kps_pkh TEXT,
+		kebutuhan_khusus TEXT,
+		nama_ayah TEXT,
+		tanggal_lahir_ayah TEXT,
+		pendidikan_ayah TEXT,
+		nik_ayah TEXT,
+		alamat_ayah TEXT,
+		no_hp_ayah TEXT,
+		pekerjaan_ayah TEXT,
+		penghasilan_ayah INTEGER,
+		nama_ibu TEXT,
+		tanggal_lahir_ibu TEXT,
+		pendidikan_ibu TEXT,
+		nik_ibu TEXT,
+		alamat_ibu TEXT,
+		pekerjaan_ibu TEXT,
+		penghasilan_ibu INTEGER,
+		FOREIGN KEY (santri_id) REFERENCES santri(id)
+	);
 `);
+
+try {
+	sqlite.exec(`ALTER TABLE users ADD COLUMN signature_url TEXT`);
+} catch (e) {
+	// column may already exist
+}
+
+try {
+	sqlite.exec(`ALTER TABLE pengaturan_pesantren ADD COLUMN stamp_url TEXT`);
+} catch (e) {
+	// column may already exist
+}
 
 export const db = drizzle(sqlite, { schema });

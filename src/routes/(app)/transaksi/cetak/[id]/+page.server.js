@@ -14,9 +14,13 @@ export async function load({ params }) {
 	const [tahunAjaran] = await db.select().from(schema.tahunAjaran).where(eq(schema.tahunAjaran.id, pembayaran.tahunAjaranId));
 	
 	let petugas = 'Admin';
+	let petugasSignatureUrl = '';
 	if (pembayaran.inputById) {
 		const [userRow] = await db.select().from(schema.users).where(eq(schema.users.id, pembayaran.inputById));
-		if (userRow) petugas = userRow.namaLengkap;
+		if (userRow) {
+			petugas = userRow.namaLengkap;
+			petugasSignatureUrl = userRow.signatureUrl || '';
+		}
 	}
 	
 	return {
@@ -24,6 +28,7 @@ export async function load({ params }) {
 		santri,
 		jenisPembayaran,
 		tahunAjaran,
-		petugas
+		petugas,
+		petugasSignatureUrl
 	};
 }

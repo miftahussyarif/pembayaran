@@ -21,6 +21,7 @@ export const actions = {
 		const alamat = data.get('alamat')?.toString() || '';
 		const noTelp = data.get('noTelp')?.toString() || '';
 		const logoFile = data.get('logoFile');
+		const stampFile = data.get('stampFile');
 
 		try {
 			const [current] = await db
@@ -29,6 +30,7 @@ export const actions = {
 				.where(eq(schema.pengaturanPesantren.id, id));
 
 			let logoUrl = current?.logoUrl || '';
+			let stampUrl = current?.stampUrl || '';
 
 			if (logoFile && typeof logoFile === 'object' && 'arrayBuffer' in logoFile && logoFile.size > 0) {
 				const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
@@ -48,8 +50,26 @@ export const actions = {
 				logoUrl = `/uploads/${filename}`;
 			}
 
+			if (stampFile && typeof stampFile === 'object' && 'arrayBuffer' in stampFile && stampFile.size > 0) {
+				const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+				if (!allowed.includes(stampFile.type)) {
+					return { success: false, error: 'Format stempel tidak didukung. Gunakan PNG/JPG/WebP.' };
+				}
+
+				const ext = stampFile.type === 'image/png' ? 'png'
+					: stampFile.type === 'image/webp' ? 'webp'
+					: 'jpg';
+				const uploadsDir = path.join('static', 'uploads');
+				await mkdir(uploadsDir, { recursive: true });
+				const filename = `stamp-${id}-${Date.now()}.${ext}`;
+				const filePath = path.join(uploadsDir, filename);
+				const buffer = Buffer.from(await stampFile.arrayBuffer());
+				await writeFile(filePath, buffer);
+				stampUrl = `/uploads/${filename}`;
+			}
+
 			await db.update(schema.pengaturanPesantren)
-				.set({ namaPesantren, logoUrl, alamat, noTelp })
+				.set({ namaPesantren, logoUrl, stampUrl, alamat, noTelp })
 				.where(eq(schema.pengaturanPesantren.id, id));
 
 			return { success: true, message: 'Profil Pesantren berhasil diperbarui! Refresh halaman untuk melihat efek di Sidebar.' };

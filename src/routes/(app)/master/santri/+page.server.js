@@ -79,12 +79,15 @@ const insertInBatches = async (tx, table, rows, batchSize = 100) => {
 
 export async function load() {
 	const santris = await db.select().from(schema.santri);
+	const santriDetails = await db.select().from(schema.santriDetail);
 	const kategoris = await db.select().from(schema.kategoriSantri).orderBy(schema.kategoriSantri.namaKategori);
-	return { santris, kategoris };
+	const detailBySantriId = new Map(santriDetails.map((d) => [d.santriId, d]));
+	const santrisWithDetail = santris.map((s) => ({ ...s, detail: detailBySantriId.get(s.id) || null }));
+	return { santris: santrisWithDetail, kategoris };
 }
 
 export const actions = {
-	create: async ({ request }) => {
+	create: async ({ request, locals, getClientAddress }) => {
 		const data = await request.formData();
 		const nomorInduk = data.get('nomorInduk');
 		const namaLengkap = data.get('namaLengkap');
@@ -93,10 +96,81 @@ export const actions = {
 		const kategoriId = data.get('kategoriId') ? Number(data.get('kategoriId')) : null;
 		const isActive = data.get('isActive') === 'on';
 
+		const toText = (value) => {
+			if (value === null || value === undefined) return null;
+			const text = value.toString().trim();
+			return text === '' ? null : text;
+		};
+		const toNumber = (value) => {
+			if (value === null || value === undefined || value === '') return null;
+			const num = Number(value);
+			return Number.isFinite(num) ? num : null;
+		};
+
+		const detailData = {
+			tempatLahir: toText(data.get('tempatLahir')),
+			tanggalLahir: toText(data.get('tanggalLahir')),
+			jenisKelamin: toText(data.get('jenisKelamin')),
+			golonganDarah: toText(data.get('golonganDarah')),
+			nik: toText(data.get('nik')),
+			noKk: toText(data.get('noKk')),
+			anakKe: toNumber(data.get('anakKe')),
+			jumlahSaudara: toNumber(data.get('jumlahSaudara')),
+			tinggiCm: toNumber(data.get('tinggiCm')),
+			beratKg: toNumber(data.get('beratKg')),
+			alamatLengkap: toText(data.get('alamatLengkap')),
+			rt: toText(data.get('rt')),
+			rw: toText(data.get('rw')),
+			desaKelurahan: toText(data.get('desaKelurahan')),
+			kecamatan: toText(data.get('kecamatan')),
+			kabupaten: toText(data.get('kabupaten')),
+			provinsi: toText(data.get('provinsi')),
+			noKip: toText(data.get('noKip')),
+			noKisKpsPkh: toText(data.get('noKisKpsPkh')),
+			kebutuhanKhusus: toText(data.get('kebutuhanKhusus')),
+			namaAyah: toText(data.get('namaAyah')),
+			tanggalLahirAyah: toText(data.get('tanggalLahirAyah')),
+			pendidikanAyah: toText(data.get('pendidikanAyah')),
+			nikAyah: toText(data.get('nikAyah')),
+			alamatAyah: toText(data.get('alamatAyah')),
+			noHpAyah: toText(data.get('noHpAyah')),
+			pekerjaanAyah: toText(data.get('pekerjaanAyah')),
+			penghasilanAyah: toNumber(data.get('penghasilanAyah')),
+			namaIbu: toText(data.get('namaIbu')),
+			tanggalLahirIbu: toText(data.get('tanggalLahirIbu')),
+			pendidikanIbu: toText(data.get('pendidikanIbu')),
+			nikIbu: toText(data.get('nikIbu')),
+			alamatIbu: toText(data.get('alamatIbu')),
+			pekerjaanIbu: toText(data.get('pekerjaanIbu')),
+			penghasilanIbu: toNumber(data.get('penghasilanIbu'))
+		};
+
 		try {
-			await db.insert(schema.santri).values({ nomorInduk, namaLengkap, tanggalMasuk, tanggalKeluar, kategoriId, isActive });
+			await db.transaction(async (tx) => {
+				const [newSantri] = await tx
+					.insert(schema.santri)
+					.values({ nomorInduk, namaLengkap, tanggalMasuk, tanggalKeluar, kategoriId, isActive })
+					.returning();
+				await tx.insert(schema.santriDetail).values({ santriId: newSantri.id, ...detailData });
+
+				try {
+					await tx.insert(schema.systemLogs).values({
+						userId: locals.user?.id || null,
+						username: locals.user?.username || null,
+						role: locals.user?.role || null,
+						aksi: 'create',
+						modul: 'master-santri',
+						keterangan: `Tambah santri: ${namaLengkap} (${nomorInduk})`,
+						ip: getClientAddress(),
+						createdAt: new Date().toISOString()
+					});
+				} catch (e) {
+					// ignore
+				}
+			});
 			return { success: true };
 		} catch (error) {
+			console.error(error);
 			return { success: false, error: 'Gagal menambah, mungkin nomor induk sudah ada.' };
 		}
 	},
@@ -110,11 +184,69 @@ export const actions = {
 		const tanggalKeluar = data.get('tanggalKeluar') || null;
 		const kategoriId = data.get('kategoriId') ? Number(data.get('kategoriId')) : null;
 		const isActive = data.get('isActive') === 'on';
+		const toText = (value) => {
+			if (value === null || value === undefined) return null;
+			const text = value.toString().trim();
+			return text === '' ? null : text;
+		};
+		const toNumber = (value) => {
+			if (value === null || value === undefined || value === '') return null;
+			const num = Number(value);
+			return Number.isFinite(num) ? num : null;
+		};
+		const detailData = {
+			tempatLahir: toText(data.get('tempatLahir')),
+			tanggalLahir: toText(data.get('tanggalLahir')),
+			jenisKelamin: toText(data.get('jenisKelamin')),
+			golonganDarah: toText(data.get('golonganDarah')),
+			nik: toText(data.get('nik')),
+			noKk: toText(data.get('noKk')),
+			anakKe: toNumber(data.get('anakKe')),
+			jumlahSaudara: toNumber(data.get('jumlahSaudara')),
+			tinggiCm: toNumber(data.get('tinggiCm')),
+			beratKg: toNumber(data.get('beratKg')),
+			alamatLengkap: toText(data.get('alamatLengkap')),
+			rt: toText(data.get('rt')),
+			rw: toText(data.get('rw')),
+			desaKelurahan: toText(data.get('desaKelurahan')),
+			kecamatan: toText(data.get('kecamatan')),
+			kabupaten: toText(data.get('kabupaten')),
+			provinsi: toText(data.get('provinsi')),
+			noKip: toText(data.get('noKip')),
+			noKisKpsPkh: toText(data.get('noKisKpsPkh')),
+			kebutuhanKhusus: toText(data.get('kebutuhanKhusus')),
+			namaAyah: toText(data.get('namaAyah')),
+			tanggalLahirAyah: toText(data.get('tanggalLahirAyah')),
+			pendidikanAyah: toText(data.get('pendidikanAyah')),
+			nikAyah: toText(data.get('nikAyah')),
+			alamatAyah: toText(data.get('alamatAyah')),
+			noHpAyah: toText(data.get('noHpAyah')),
+			pekerjaanAyah: toText(data.get('pekerjaanAyah')),
+			penghasilanAyah: toNumber(data.get('penghasilanAyah')),
+			namaIbu: toText(data.get('namaIbu')),
+			tanggalLahirIbu: toText(data.get('tanggalLahirIbu')),
+			pendidikanIbu: toText(data.get('pendidikanIbu')),
+			nikIbu: toText(data.get('nikIbu')),
+			alamatIbu: toText(data.get('alamatIbu')),
+			pekerjaanIbu: toText(data.get('pekerjaanIbu')),
+			penghasilanIbu: toNumber(data.get('penghasilanIbu'))
+		};
 
 		try {
 			await db.update(schema.santri)
 				.set({ nomorInduk, namaLengkap, tanggalMasuk, tanggalKeluar, kategoriId, isActive })
 				.where(eq(schema.santri.id, id));
+			const [currentDetail] = await db
+				.select()
+				.from(schema.santriDetail)
+				.where(eq(schema.santriDetail.santriId, id));
+			if (currentDetail) {
+				await db.update(schema.santriDetail)
+					.set(detailData)
+					.where(eq(schema.santriDetail.santriId, id));
+			} else {
+				await db.insert(schema.santriDetail).values({ santriId: id, ...detailData });
+			}
 			try {
 				await db.insert(schema.systemLogs).values({
 					userId: locals.user?.id || null,
@@ -163,6 +295,7 @@ export const actions = {
 	delete: async ({ request, locals, getClientAddress }) => {
 		const data = await request.formData();
 		const id = Number(data.get('id'));
+		await db.delete(schema.santriDetail).where(eq(schema.santriDetail.santriId, id));
 		await db.delete(schema.santri).where(eq(schema.santri.id, id));
 		try {
 			await db.insert(schema.systemLogs).values({
@@ -273,13 +406,54 @@ export const actions = {
 				}
 			}
 
+			const detailData = {
+				tempatLahir: String(pick(row, 'tempat_lahir') || '').trim() || null,
+				tanggalLahir: String(pick(row, 'tanggal_lahir') || '').trim() || null,
+				jenisKelamin: String(pick(row, 'jenis_kelamin') || '').trim() || null,
+				golonganDarah: String(pick(row, 'golongan_darah') || '').trim() || null,
+				nik: String(pick(row, 'nik') || '').trim() || null,
+				noKk: String(pick(row, 'no_kk') || '').trim() || null,
+				anakKe: Number(pick(row, 'anak_ke')) || null,
+				jumlahSaudara: Number(pick(row, 'jumlah_saudara')) || null,
+				tinggiCm: Number(pick(row, 'tinggi_cm')) || null,
+				beratKg: Number(pick(row, 'berat_kg')) || null,
+				alamatLengkap: String(pick(row, 'alamat_lengkap') || '').trim() || null,
+				rt: String(pick(row, 'rt') || '').trim() || null,
+				rw: String(pick(row, 'rw') || '').trim() || null,
+				desaKelurahan: String(pick(row, 'desa_kelurahan') || '').trim() || null,
+				kecamatan: String(pick(row, 'kecamatan') || '').trim() || null,
+				kabupaten: String(pick(row, 'kabupaten') || '').trim() || null,
+				provinsi: String(pick(row, 'provinsi') || '').trim() || null,
+				noKip: String(pick(row, 'no_kip') || '').trim() || null,
+				noKisKpsPkh: String(pick(row, 'no_kis_kps_pkh') || '').trim() || null,
+				kebutuhanKhusus: String(pick(row, 'kebutuhan_khusus') || '').trim() || null,
+				namaAyah: String(pick(row, 'nama_ayah') || '').trim() || null,
+				tanggalLahirAyah: String(pick(row, 'tanggal_lahir_ayah') || '').trim() || null,
+				pendidikanAyah: String(pick(row, 'pendidikan_ayah') || '').trim() || null,
+				nikAyah: String(pick(row, 'nik_ayah') || '').trim() || null,
+				alamatAyah: String(pick(row, 'alamat_ayah') || '').trim() || null,
+				noHpAyah: String(pick(row, 'no_hp_ayah') || '').trim() || null,
+				pekerjaanAyah: String(pick(row, 'pekerjaan_ayah') || '').trim() || null,
+				penghasilanAyah: Number(pick(row, 'penghasilan_ayah')) || null,
+				namaIbu: String(pick(row, 'nama_ibu') || '').trim() || null,
+				tanggalLahirIbu: String(pick(row, 'tanggal_lahir_ibu') || '').trim() || null,
+				pendidikanIbu: String(pick(row, 'pendidikan_ibu') || '').trim() || null,
+				nikIbu: String(pick(row, 'nik_ibu') || '').trim() || null,
+				alamatIbu: String(pick(row, 'alamat_ibu') || '').trim() || null,
+				pekerjaanIbu: String(pick(row, 'pekerjaan_ibu') || '').trim() || null,
+				penghasilanIbu: Number(pick(row, 'penghasilan_ibu')) || null
+			};
+
 			prepared.push({
-				nomorInduk,
-				namaLengkap,
-				tanggalMasuk,
-				tanggalKeluar,
-				kategoriId,
-				isActive
+				santri: {
+					nomorInduk,
+					namaLengkap,
+					tanggalMasuk,
+					tanggalKeluar,
+					kategoriId,
+					isActive
+				},
+				detail: detailData
 			});
 		}
 
@@ -289,16 +463,18 @@ export const actions = {
 
 		const existing = await db.select({ nomorInduk: schema.santri.nomorInduk }).from(schema.santri);
 		const existingSet = new Set(existing.map((row) => row.nomorInduk));
-		const toInsert = prepared.filter((row) => !existingSet.has(row.nomorInduk));
+		const toInsert = prepared.filter((p) => !existingSet.has(p.santri.nomorInduk));
 		const skipped = prepared.length - toInsert.length;
 
 		try {
 			await db.transaction(async (tx) => {
-				if (toInsert.length) {
-					await insertInBatches(tx, schema.santri, toInsert);
+				for (const item of toInsert) {
+					const [newSantri] = await tx.insert(schema.santri).values(item.santri).returning();
+					await tx.insert(schema.santriDetail).values({ santriId: newSantri.id, ...item.detail });
 				}
 			});
 		} catch (e) {
+			console.error(e);
 			return { type: 'error', message: 'Gagal menyimpan data import. Periksa format CSV.' };
 		}
 

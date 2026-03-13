@@ -106,8 +106,22 @@
 				<div>
 					<!-- Kosong di kiri -->
 				</div>
-				<div class="text-center">
+				<div class="text-center relative">
 					<p class="mb-16 text-base-content/70">Penerima / Bendahara</p>
+					{#if $page.data.profilPesantren?.stampUrl}
+						<img
+							src={$page.data.profilPesantren.stampUrl}
+							alt="Stempel lembaga"
+							class="w-28 h-28 object-contain opacity-80 absolute left-1/2 -translate-x-1/2 -top-2"
+						/>
+					{/if}
+					{#if data.petugasSignatureUrl}
+						<img
+							src={data.petugasSignatureUrl}
+							alt="Tanda tangan"
+							class="w-32 h-16 object-contain mx-auto mb-2 relative"
+						/>
+					{/if}
 					<div class="w-32 border-b border-base-content mx-auto"></div>
 					<p class="mt-2 font-semibold">{data.petugas}</p>
 				</div>

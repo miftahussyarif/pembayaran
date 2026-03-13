@@ -3,6 +3,16 @@ import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+
+const resolveUploadPath = (url) => {
+	if (!url || typeof url !== 'string') return null;
+	if (!url.startsWith('/uploads/')) return null;
+	const filename = url.replace('/uploads/', '');
+	if (!filename) return null;
+	return path.join('static', 'uploads', filename);
+};
 
 export const load = async ({ locals }) => {
 	if (locals.user?.role !== 'admin') {
@@ -54,6 +64,7 @@ export const actions = {
 		}
 
 		const backupData = payload.data || {};
+		const backupFiles = Array.isArray(payload.files) ? payload.files : [];
 		const asArray = (value) => (Array.isArray(value) ? value : []);
 		const users = asArray(backupData.users);
 		const pengaturan = asArray(backupData.pengaturan);
@@ -61,6 +72,7 @@ export const actions = {
 		const jenisPembayaran = asArray(backupData.jenisPembayaran);
 		const kategoriSantri = asArray(backupData.kategoriSantri);
 		const santri = asArray(backupData.santri);
+		const santriDetail = asArray(backupData.santriDetail);
 		const santriSmk = asArray(backupData.santriSmk);
 		const santriSmp = asArray(backupData.santriSmp);
 		const pembayaran = asArray(backupData.pembayaran);
@@ -81,6 +93,7 @@ export const actions = {
 				await tx.delete(schema.systemLogs);
 				await tx.delete(schema.santriSmk);
 				await tx.delete(schema.santriSmp);
+				await tx.delete(schema.santriDetail);
 				await tx.delete(schema.santri);
 				await tx.delete(schema.kategoriSantri);
 				await tx.delete(schema.jenisPembayaran);
@@ -106,6 +119,9 @@ export const actions = {
 				if (santri.length) {
 					await insertInBatches(tx, schema.santri, santri);
 				}
+				if (santriDetail.length) {
+					await insertInBatches(tx, schema.santriDetail, santriDetail);
+				}
 				if (santriSmk.length) {
 					await insertInBatches(tx, schema.santriSmk, santriSmk);
 				}
@@ -123,6 +139,17 @@ export const actions = {
 				}
 			});
 
+			if (backupFiles.length) {
+				const uploadsDir = path.join('static', 'uploads');
+				await mkdir(uploadsDir, { recursive: true });
+				for (const file of backupFiles) {
+					const filePath = resolveUploadPath(file?.path);
+					if (!filePath || !file?.contentBase64) continue;
+					const buffer = Buffer.from(file.contentBase64, 'base64');
+					await writeFile(filePath, buffer);
+				}
+			}
+
 			try {
 				await db.insert(schema.systemLogs).values({
 					userId: locals.user?.id || null,
@@ -130,7 +157,7 @@ export const actions = {
 					role: locals.user?.role || null,
 					aksi: 'restore',
 					modul: 'backup-restore',
-					keterangan: `Restore backup: master(users=${users.length}, santri=${santri.length}, smk=${santriSmk.length}, smp=${santriSmp.length}), pembayaran=${pembayaran.length}, mutasi=${mutasi.length}`,
+					keterangan: `Restore backup: master(users=${users.length}, santri=${santri.length}, santri_detail=${santriDetail.length}, smk=${santriSmk.length}, smp=${santriSmp.length}), pembayaran=${pembayaran.length}, mutasi=${mutasi.length}, files=${backupFiles.length}`,
 					ip: getClientAddress(),
 					createdAt: new Date().toISOString()
 				});

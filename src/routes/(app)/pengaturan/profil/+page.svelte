@@ -37,6 +37,17 @@
 			</div>
 
 			<div class="form-control w-full mb-4">
+				<label class="label"><span class="label-text font-bold uppercase text-xs tracking-wider">Stempel Lembaga (Upload)</span></label>
+				<input type="file" name="stampFile" accept="image/*" class="file-input file-input-bordered w-full" />
+				{#if data.profilPesantren?.stampUrl}
+					<div class="mt-3 flex items-center gap-3">
+						<img src={data.profilPesantren.stampUrl} alt="Stempel saat ini" class="w-12 h-12 rounded-md object-cover border" />
+						<span class="text-xs text-base-content/60">Stempel saat ini</span>
+					</div>
+				{/if}
+			</div>
+
+			<div class="form-control w-full mb-4">
 				<label class="label"><span class="label-text font-bold uppercase text-xs tracking-wider">Alamat Lengkap</span></label>
 				<textarea name="alamat" class="textarea textarea-bordered h-24" required>{data.profilPesantren?.alamat || ''}</textarea>
 			</div>

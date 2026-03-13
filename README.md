@@ -120,6 +120,68 @@ sudo systemctl restart nginx
 
 ---
 
+## Instalasi di aaPanel
+
+Panduan singkat deploy dengan aaPanel (Nginx + Node.js Manager).
+
+### 1. Siapkan Site di aaPanel
+1. Login aaPanel → **Website** → **Add site**.
+2. Masukkan domain/subdomain.
+3. Pilih **Nginx**.
+4. Selesai.
+
+### 2. Install Node.js Manager
+1. aaPanel → **App Store**.
+2. Install **Node.js Manager** (atau “Node Project Manager”).
+
+### 3. Upload / Clone Project
+Opsi A (Upload ZIP):
+1. aaPanel → **File** → buka folder site, upload zip project.
+2. Extract di folder site (mis. `/www/wwwroot/domain`).
+
+Opsi B (Git):
+1. aaPanel → **Terminal**.
+2. `cd /www/wwwroot/domain`
+3. `git clone <repo-anda> .`
+
+### 4. Install Dependency & Build
+Jalankan via Terminal aaPanel:
+```bash
+cd /www/wwwroot/domain
+npm install
+npm run build
+```
+
+### 5. Jalankan Node Project
+1. aaPanel → **Node Project** → **Add Project**.
+2. Pilih folder project.
+3. Node Version: **LTS**.
+4. Start Command:
+```bash
+npm run preview -- --host 0.0.0.0 --port 4173
+```
+5. Start Project.
+
+### 6. Reverse Proxy (Wajib)
+1. aaPanel → **Website** → **Settings** (domain) → **Reverse Proxy**.
+2. Tambahkan proxy ke:
+```
+http://127.0.0.1:4173
+```
+3. Simpan.
+
+### 7. Permission Folder Upload
+Pastikan folder `static/uploads/` dan file `local.db` bisa ditulis:
+```bash
+cd /www/wwwroot/domain
+chmod -R 755 static/uploads
+chmod 664 local.db
+```
+
+> Jika memakai port berbeda, sesuaikan di **Start Command** dan **Reverse Proxy**.
+
+---
+
 ## Kompilasi ke Aplikasi Windows (Desktop)
 
 Aplikasi ini adalah **web app**. Untuk dijadikan aplikasi Windows, Anda perlu **membungkus** web app menggunakan **Tauri** atau **Electron**.

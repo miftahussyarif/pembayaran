@@ -29,6 +29,46 @@ export const santri = sqliteTable('santri', {
 	isActive: integer('is_active', { mode: 'boolean' }).default(true)
 });
 
+export const santriDetail = sqliteTable('santri_detail', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	santriId: integer('santri_id').references(() => santri.id).notNull().unique(),
+	tempatLahir: text('tempat_lahir'),
+	tanggalLahir: text('tanggal_lahir'),
+	jenisKelamin: text('jenis_kelamin'),
+	golonganDarah: text('golongan_darah'),
+	nik: text('nik'),
+	noKk: text('no_kk'),
+	anakKe: integer('anak_ke'),
+	jumlahSaudara: integer('jumlah_saudara'),
+	tinggiCm: integer('tinggi_cm'),
+	beratKg: integer('berat_kg'),
+	alamatLengkap: text('alamat_lengkap'),
+	rt: text('rt'),
+	rw: text('rw'),
+	desaKelurahan: text('desa_kelurahan'),
+	kecamatan: text('kecamatan'),
+	kabupaten: text('kabupaten'),
+	provinsi: text('provinsi'),
+	noKip: text('no_kip'),
+	noKisKpsPkh: text('no_kis_kps_pkh'),
+	kebutuhanKhusus: text('kebutuhan_khusus'),
+	namaAyah: text('nama_ayah'),
+	tanggalLahirAyah: text('tanggal_lahir_ayah'),
+	pendidikanAyah: text('pendidikan_ayah'),
+	nikAyah: text('nik_ayah'),
+	alamatAyah: text('alamat_ayah'),
+	noHpAyah: text('no_hp_ayah'),
+	pekerjaanAyah: text('pekerjaan_ayah'),
+	penghasilanAyah: integer('penghasilan_ayah'),
+	namaIbu: text('nama_ibu'),
+	tanggalLahirIbu: text('tanggal_lahir_ibu'),
+	pendidikanIbu: text('pendidikan_ibu'),
+	nikIbu: text('nik_ibu'),
+	alamatIbu: text('alamat_ibu'),
+	pekerjaanIbu: text('pekerjaan_ibu'),
+	penghasilanIbu: integer('penghasilan_ibu')
+});
+
 export const santriSmk = sqliteTable('santri_smk', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	santriId: integer('santri_id').references(() => santri.id).notNull().unique(),
@@ -64,7 +104,8 @@ export const users = sqliteTable('users', {
 	username: text('username').notNull().unique(),
 	passwordHash: text('password_hash').notNull(),
 	role: text('role', { enum: ['admin', 'bendahara', 'petugas'] }).notNull().default('admin'),
-	namaLengkap: text('nama_lengkap').notNull()
+	namaLengkap: text('nama_lengkap').notNull(),
+	signatureUrl: text('signature_url')
 });
 
 export const mutasiSaldoBendahara = sqliteTable('mutasi_saldo_bendahara', {
@@ -93,5 +134,6 @@ export const pengaturanPesantren = sqliteTable('pengaturan_pesantren', {
 	namaPesantren: text('nama_pesantren').notNull().default('Pesantren Al-Hikmah'),
 	alamat: text('alamat').notNull().default('Jl. Pendidikan No. 123, Kota Santri'),
 	noTelp: text('no_telp').notNull().default('(021) 1234567'),
-	logoUrl: text('logo_url').default('')
+	logoUrl: text('logo_url').default(''),
+	stampUrl: text('stamp_url').default('')
 });
