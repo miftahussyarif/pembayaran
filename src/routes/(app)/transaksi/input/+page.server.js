@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
-import { eq, isNotNull, desc } from 'drizzle-orm';
+import { eq, isNotNull, desc, and } from 'drizzle-orm';
 
 export async function load() {
 	// Ambil data Dropdown
@@ -11,7 +11,7 @@ export async function load() {
 			nomorInduk: schema.santri.nomorInduk,
 			namaLengkap: schema.santri.namaLengkap,
 			kategoriId: schema.santri.kategoriId,
-			nominalSyahriyah: schema.kategoriSantri.nominalSyahriyah,
+			nominalKonsumsi: schema.kategoriSantri.nominalKonsumsi,
 			namaKategori: schema.kategoriSantri.namaKategori
 		})
 		.from(schema.santri)
@@ -26,7 +26,36 @@ export async function load() {
 	// Ambil semua pembayaran bulanan untuk validasi status
 	const pembayaranBulanan = await db.select().from(schema.pembayaran).where(isNotNull(schema.pembayaran.bulan));
 
-	return { santris, tahunAjarans, jenisPembayarans, riwayatData, pembayaranBulanan };
+	// Ambil pemetaan kategori gratis
+	const kategoriGratis = await db.select().from(schema.kategoriGratis);
+
+	// Cari/buat jenisPembayaran "Lain-lain" untuk pembayaran khusus
+	let jenisKhusus = jenisPembayarans.find(j => j.tipe === 'sekali' && j.namaPembayaran === 'Pembayaran Lain-lain');
+	if (!jenisKhusus) {
+		try {
+			const [created] = await db.insert(schema.jenisPembayaran).values({
+				namaPembayaran: 'Pembayaran Lain-lain',
+				tipe: 'sekali',
+				nominalDefault: 0
+			}).returning();
+			jenisKhusus = created;
+		} catch (e) {
+			// Mungkin sudah ada
+			jenisKhusus = (await db.select().from(schema.jenisPembayaran)).find(
+				j => j.namaPembayaran === 'Pembayaran Lain-lain'
+			);
+		}
+	}
+
+	return {
+		santris,
+		tahunAjarans,
+		jenisPembayarans,
+		riwayatData,
+		pembayaranBulanan,
+		kategoriGratis,
+		khususJenisId: jenisKhusus?.id || null
+	};
 }
 
 export const actions = {
@@ -38,9 +67,10 @@ export const actions = {
 			const jenisPembayaranId = Number(formData.get('jenisPembayaranId'));
 			let nominalDibayar = Number(formData.get('nominalDibayar'));
 			const bulan = formData.get('bulan') || null;
+			const keteranganKhusus = formData.get('keteranganKhusus')?.toString().trim() || null;
 			const inputById = locals.user?.id || null;
 
-			// Validasi data dasar (nominal dicek setelah aturan syahriyah)
+			// Validasi data dasar
 			if (!santriId || !tahunAjaranId || !jenisPembayaranId) {
 				return {
 					success: false,
@@ -48,51 +78,71 @@ export const actions = {
 				};
 			}
 
-			// Cek aturan: santri kategori yatim/gratis tidak boleh bayar SPP/Syahriyah (bulanan)
-			const [santriRow] = await db
-				.select({
-					id: schema.santri.id,
-					nominalSyahriyah: schema.kategoriSantri.nominalSyahriyah,
-					namaKategori: schema.kategoriSantri.namaKategori
-				})
-				.from(schema.santri)
-				.leftJoin(schema.kategoriSantri, eq(schema.santri.kategoriId, schema.kategoriSantri.id))
-				.where(eq(schema.santri.id, santriId));
+			// Jika ini pembayaran khusus, gunakan nominal dari form langsung
+			const isKhusus = !!keteranganKhusus;
 
-			const [jenisRow] = await db
-				.select({
-					tipe: schema.jenisPembayaran.tipe,
-					namaPembayaran: schema.jenisPembayaran.namaPembayaran
-				})
-				.from(schema.jenisPembayaran)
-				.where(eq(schema.jenisPembayaran.id, jenisPembayaranId));
+			if (!isKhusus) {
+				// Cek aturan kategori santri
+				const [santriRow] = await db
+					.select({
+						id: schema.santri.id,
+						kategoriId: schema.santri.kategoriId,
+						nominalKonsumsi: schema.kategoriSantri.nominalKonsumsi,
+						namaKategori: schema.kategoriSantri.namaKategori
+					})
+					.from(schema.santri)
+					.leftJoin(schema.kategoriSantri, eq(schema.santri.kategoriId, schema.kategoriSantri.id))
+					.where(eq(schema.santri.id, santriId));
 
-			const isGratisSyahriyah = santriRow && santriRow.nominalSyahriyah === 0;
-			const isYatim = /yatim/i.test(santriRow?.namaKategori || '');
-			const isSyahriyah = !!jenisRow?.namaPembayaran && /syahriyah|spp/i.test(jenisRow.namaPembayaran);
-			const isSmkSmpBulanan = jenisRow?.tipe === 'smk_bulanan' || jenisRow?.tipe === 'smp_bulanan';
-			const isYatimGratisSmkSmp = isYatim && isSyahriyah && isSmkSmpBulanan;
+				const [jenisRow] = await db
+					.select({
+						id: schema.jenisPembayaran.id,
+						tipe: schema.jenisPembayaran.tipe,
+						namaPembayaran: schema.jenisPembayaran.namaPembayaran,
+						nominalDefault: schema.jenisPembayaran.nominalDefault
+					})
+					.from(schema.jenisPembayaran)
+					.where(eq(schema.jenisPembayaran.id, jenisPembayaranId));
 
-			if (isSyahriyah) {
-				nominalDibayar = santriRow?.nominalSyahriyah ?? 0;
-			}
-			if (isYatimGratisSmkSmp) {
-				nominalDibayar = 0;
-			}
+				// Cek apakah ada nominal khusus untuk kategori santri ini
+				const [customNominalRow] = await db
+					.select({ nominal: schema.kategoriGratis.nominal })
+					.from(schema.kategoriGratis)
+					.where(and(
+						eq(schema.kategoriGratis.kategoriId, santriRow.kategoriId),
+						eq(schema.kategoriGratis.jenisPembayaranId, jenisPembayaranId)
+					));
 
-			if (isGratisSyahriyah && jenisRow?.tipe === 'bulanan') {
-				const labelKategori = santriRow.namaKategori ? ` (${santriRow.namaKategori})` : '';
-				return {
-					success: false,
-					message: `Santri kategori gratis${labelKategori} tidak dapat melakukan pembayaran SPP/Syahriyah.`
-				};
-			}
-			
-			if (nominalDibayar <= 0 && !isYatimGratisSmkSmp) {
-				return {
-					success: false,
-					message: 'Nominal harus lebih dari 0'
-				};
+				const hasCustomNominal = customNominalRow !== undefined;
+				const customNominal = customNominalRow?.nominal;
+				const isGratis = hasCustomNominal && customNominal === 0;
+
+				if (hasCustomNominal && customNominal !== null) {
+					nominalDibayar = customNominal;
+				} else {
+					// Fallback: untuk konsumsi gunakan nominalKonsumsi dari kategori, otherwise nominalDefault
+					const isKonsumsi = !!jenisRow?.namaPembayaran && /konsumsi/i.test(jenisRow.namaPembayaran);
+
+					if (isKonsumsi && santriRow?.nominalKonsumsi !== undefined) {
+						nominalDibayar = santriRow.nominalKonsumsi;
+					} else {
+						nominalDibayar = jenisRow.nominalDefault;
+					}
+				}
+
+				if (nominalDibayar <= 0 && !isGratis) {
+					return {
+						success: false,
+						message: 'Nominal harus lebih dari 0'
+					};
+				}
+			} else {
+				if (nominalDibayar <= 0) {
+					return {
+						success: false,
+						message: 'Nominal pembayaran lain-lain harus lebih dari 0'
+					};
+				}
 			}
 
 			// Generate No Kwitansi sederhana
@@ -108,7 +158,8 @@ export const actions = {
 				nominalDibayar,
 				tanggalBayar,
 				nomorKwitansi,
-				inputById
+				inputById,
+				keteranganKhusus
 			}).returning();
 
 			const newTrx = Array.isArray(pembayaranResult) ? pembayaranResult[0] : pembayaranResult;
@@ -129,7 +180,7 @@ export const actions = {
 					role: locals.user?.role || null,
 					aksi: 'input',
 					modul: 'transaksi',
-					keterangan: `Input pembayaran ${newTrx.id} untuk santri ${santriId}`,
+					keterangan: `Input pembayaran ${newTrx.id} untuk santri ${santriId}${keteranganKhusus ? ` (Lain-lain: ${keteranganKhusus})` : ''}`,
 					ip: getClientAddress(),
 					createdAt: new Date().toISOString()
 				});

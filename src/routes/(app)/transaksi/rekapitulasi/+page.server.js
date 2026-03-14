@@ -63,9 +63,7 @@ export async function load({ url }) {
 	const ringkasanPerJenis = {};
 	for (const p of rekap) {
 		const key = p.namaPembayaran || 'Lainnya';
-		const nominalRekap = isSyahriyah(p.namaPembayaran)
-			? (p.nominalSyahriyah || 0)
-			: (p.nominalDibayar || 0);
+		const nominalRekap = p.nominalDibayar || 0;
 		p.nominalRekap = nominalRekap;
 		if (!ringkasanPerJenis[key]) {
 			ringkasanPerJenis[key] = { nama: key, jumlahTransaksi: 0, totalNominal: 0 };

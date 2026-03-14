@@ -45,7 +45,7 @@
 
 <div class="flex flex-col gap-4 mb-6 no-print">
 	<h2 class="text-2xl font-bold">Rekapitulasi Individu</h2>
-	<p class="text-sm text-base-content/60">Rekap tagihan syahriyah per bulan dan pembayaran tahunan/insidental untuk setiap santri.</p>
+	<p class="text-sm text-base-content/60">Rekap tagihan per bulan dan pembayaran tahunan/insidental untuk setiap santri.</p>
 </div>
 
 <div class="no-print card bg-base-100 shadow-sm border border-base-200 mb-6">
@@ -106,77 +106,25 @@
 						<div class="text-sm text-base-content/60">Kategori: {s.namaKategori || '-'}</div>
 						<div class="text-xs text-base-content/50 mt-1">Masuk: {formatTanggal(s.tanggalMasuk)} · Keluar: {s.tanggalKeluar ? formatTanggal(s.tanggalKeluar) : 'Belum keluar'}</div>
 					</div>
-					<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-8">
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-8">
 						<div class="text-left">
 							<div class="text-sm text-base-content/60">Tagihan Konsumsi</div>
 							<div class="text-base font-semibold">{formatRupiah(s.totalTagihanKonsumsi)}</div>
 							<div class="text-sm text-success">Dibayar: {formatRupiah(s.totalDibayarKonsumsi)}</div>
 							<div class="text-sm text-error">Sisa: {formatRupiah(Math.max(0, (s.totalTagihanKonsumsi || 0) - (s.totalDibayarKonsumsi || 0)))}</div>
 						</div>
-						<div class="text-left">
-							<div class="text-sm text-base-content/60">Tagihan Lain</div>
+						<div class="text-right">
+							<div class="text-sm text-base-content/60">Pembayaran Lain-lain (Tahunan)</div>
 							<div class="text-base font-semibold">{formatRupiah(s.totalTagihanLain)}</div>
 							<div class="text-sm text-success">Dibayar: {formatRupiah(s.totalDibayarLain)}</div>
 							<div class="text-sm text-error">Sisa: {formatRupiah(s.totalSisaLain)}</div>
 						</div>
-						<div class="text-right">
-							<div class="text-sm text-base-content/60">Tagihan Syahriyah</div>
-							<div class="text-base font-semibold">{formatRupiah(s.totalTagihanSyahriyah)}</div>
-							<div class="text-sm text-success">Dibayar: {formatRupiah(s.totalDibayarSyahriyah)}</div>
-							<div class="text-sm text-error">Sisa: {formatRupiah(Math.max(0, (s.totalTagihanSyahriyah || 0) - (s.totalDibayarSyahriyah || 0)))}</div>
-						</div>
 					</div>
 				</div>
 
-				<!-- Syahriyah Bulanan -->
-				{#if s.nominalSyahriyah !== 0}
-					<div class="mb-6">
-						<div class="flex items-center justify-between mb-2">
-							<h3 class="font-semibold">Syahriyah Bulanan</h3>
-							<span class="badge badge-outline">{s.syahriyah.length} bulan</span>
-						</div>
-						<div class="overflow-x-auto">
-							<table class="table table-sm w-full">
-								<thead>
-									<tr class="bg-base-200/60">
-										<th>Bulan</th>
-										<th class="text-right">Tagihan</th>
-										<th class="text-right">Dibayar</th>
-										<th>Tgl Bayar</th>
-										<th>No. Kwitansi</th>
-										<th>Status</th>
-									</tr>
-								</thead>
-								<tbody>
-									{#if s.syahriyah.length === 0}
-										<tr>
-											<td colspan="4" class="text-center text-base-content/50 py-4">Belum ada periode syahriyah.</td>
-										</tr>
-									{:else}
-										{#each s.syahriyah as m}
-											<tr>
-												<td>{m.bulan} {m.tahun}</td>
-												<td class="text-right">{formatRupiah(m.nominalTagihan)}</td>
-												<td class="text-right">{formatRupiah(m.nominalDibayar)}</td>
-												<td class="text-xs text-base-content/70">{formatTanggal(m.tanggalBayar)}</td>
-												<td class="text-xs font-mono">{m.nomorKwitansi || '-'}</td>
-												<td>
-													{#if m.paid}
-														<span class="badge badge-success badge-sm">Lunas</span>
-													{:else}
-														<span class="badge badge-outline badge-sm">Belum</span>
-													{/if}
-												</td>
-											</tr>
-										{/each}
-									{/if}
-								</tbody>
-							</table>
-						</div>
-					</div>
-				{/if}
+
 				<!-- Konsumsi Bulanan -->
-				{#if s.nominalKonsumsi !== 0}
+				{#if s.konsumsiNominalEff > 0 || s.totalDibayarKonsumsi > 0}
 					<div class="mb-6">
 						<div class="flex items-center justify-between mb-2">
 							<h3 class="font-semibold">Konsumsi Bulanan</h3>
@@ -224,7 +172,7 @@
 				{/if}
 
 				<!-- SMK Bulanan -->
-				{#if s.smkBulanan && s.smkBulanan.length > 0}
+				{#if (s.smkBulananNominalEff > 0 || s.totalDibayarSmkBulanan > 0) && s.smkBulanan && s.smkBulanan.length > 0}
 					<div class="mb-6">
 						<div class="flex items-center justify-between mb-2">
 							<h3 class="font-semibold">Pembayaran SMK Bulanan</h3>
@@ -277,7 +225,7 @@
 				{/if}
 
 				<!-- SMP Bulanan -->
-				{#if s.smpBulanan && s.smpBulanan.length > 0}
+				{#if (s.smpBulananNominalEff > 0 || s.totalDibayarSmpBulanan > 0) && s.smpBulanan && s.smpBulanan.length > 0}
 					<div class="mb-6">
 						<div class="flex items-center justify-between mb-2">
 							<h3 class="font-semibold">Pembayaran SMP Bulanan</h3>
@@ -351,7 +299,7 @@
 							<tbody>
 								{#if s.pembayaranLain.length === 0}
 									<tr>
-										<td colspan="6" class="text-center text-base-content/50 py-4">Tidak ada jenis pembayaran non-bulanan.</td>
+										<td colspan="7" class="text-center text-base-content/50 py-4">Tidak ada jenis pembayaran non-bulanan.</td>
 									</tr>
 								{:else}
 									{#each s.pembayaranLain as p}
@@ -370,6 +318,43 @@
 						</table>
 					</div>
 				</div>
+
+				<!-- Pembayaran Khusus (hanya tampil jika ada) -->
+				{#if s.pembayaranKhusus && s.pembayaranKhusus.length > 0}
+					<div class="mt-4">
+						<div class="flex items-center justify-between mb-2">
+							<h3 class="font-semibold flex items-center gap-2">
+								<span class="text-warning">📌</span> Pembayaran Lain-lain
+							</h3>
+							<span class="badge badge-warning badge-outline">{s.pembayaranKhusus.length} transaksi</span>
+						</div>
+						<div class="overflow-x-auto">
+							<table class="table table-sm w-full">
+								<thead>
+									<tr class="bg-warning/10">
+										<th>Keterangan</th>
+										<th class="text-right">Nominal</th>
+										<th>Tgl Bayar</th>
+										<th>No. Kwitansi</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each s.pembayaranKhusus as pk}
+										<tr>
+											<td class="font-medium">{pk.keterangan}</td>
+											<td class="text-right font-semibold">{formatRupiah(pk.nominalDibayar)}</td>
+											<td class="text-xs text-base-content/70">{formatTanggal(pk.tanggalBayar)}</td>
+											<td class="text-xs font-mono">{pk.nomorKwitansi || '-'}</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
+						</div>
+						<div class="flex justify-end mt-2 text-sm">
+							<div>Total Lain-lain: <strong>{formatRupiah(s.totalKhusus)}</strong></div>
+						</div>
+					</div>
+				{/if}
 			</div>
 			</div>
 		{/each}

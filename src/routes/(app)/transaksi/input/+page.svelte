@@ -10,6 +10,8 @@
 	let selectedBulan = $state('');
 	let isSubmitting = $state(false);
 	let santriSearch = $state('');
+	let isKhusus = $state(false);
+	let keteranganKhusus = $state('');
 	
 	let selectedJenis = $derived(data.jenisPembayarans.find(j => j.id == selectedJenisId) || null);
 	let selectedSantri = $derived(data.santris.find(s => s.id == selectedSantriId) || null);
@@ -32,27 +34,30 @@
 	
 	let nominal = $state(0);
 	let isBulanan = $derived(
-		selectedJenis?.tipe === 'bulanan' ||
-		selectedJenis?.tipe === 'smk_bulanan' ||
-		selectedJenis?.tipe === 'smp_bulanan'
+		!isKhusus && (
+			selectedJenis?.tipe === 'bulanan' ||
+			selectedJenis?.tipe === 'smk_bulanan' ||
+			selectedJenis?.tipe === 'smp_bulanan'
+		)
 	);
-	let isSyahriyah = $derived(
-		!!selectedJenis && /syahriyah|spp/i.test(selectedJenis.namaPembayaran || '')
-	);
-	let isSantriGratisSyahriyah = $derived(selectedSantri?.nominalSyahriyah === 0);
-	let isSantriYatim = $derived(!!selectedSantri?.namaKategori && /yatim/i.test(selectedSantri.namaKategori));
-	let isSmkSmpBulanan = $derived(
-		selectedJenis?.tipe === 'smk_bulanan' || selectedJenis?.tipe === 'smp_bulanan'
-	);
-	let isYatimGratisSmkSmp = $derived(isSantriYatim && isSyahriyah && isSmkSmpBulanan);
-	let isFormValid = $derived(
-		selectedSantriId &&
-		selectedTahunAjaranId &&
-		selectedJenisId &&
-		(isYatimGratisSmkSmp ? nominal >= 0 : nominal > 0) &&
-		(!isBulanan || selectedBulan) &&
-		!(isBulanan && isSantriGratisSyahriyah && !isYatimGratisSmkSmp)
-	);
+	let isGratis = $derived.by(() => {
+		if (isKhusus) return false;
+		if (!selectedSantriId || !selectedJenisId) return false;
+		return data.kategoriGratis.some(g => 
+			g.kategoriId == selectedSantri?.kategoriId && 
+			g.jenisPembayaranId == selectedJenisId
+		);
+	});
+
+	let isFormValid = $derived.by(() => {
+		if (!selectedSantriId || !selectedTahunAjaranId) return false;
+		if (isKhusus) {
+			return keteranganKhusus.trim().length > 0 && nominal > 0;
+		}
+		return selectedJenisId &&
+			(isGratis ? nominal >= 0 : nominal > 0) &&
+			(!isBulanan || selectedBulan);
+	});
 
 	// Cek apakah bulan sudah lunas
 	let isBulanLunas = $derived.by(() => {
@@ -65,14 +70,50 @@
 		);
 	});
 
+	// Auto-fill nominal ketika memilih jenis pembayaran & santri
 	$effect(() => {
+		if (isKhusus) return; // Jangan auto-fill untuk pembayaran khusus
 		if (!selectedJenis) return;
-		if (isSyahriyah) {
-			nominal = selectedSantri?.nominalSyahriyah ?? 0;
-			if (isYatimGratisSmkSmp) nominal = 0;
+
+		// 1. Jika gratis (nominal = 0 di kategoriGratis), set 0
+		if (isGratis) {
+			nominal = 0;
 			return;
 		}
+
+		// 2. Cek apakah ada nominal khusus di kategoriGratis untuk kategori santri + jenis pembayaran ini
+		if (selectedSantri && selectedJenisId) {
+			const customMapping = data.kategoriGratis.find(g =>
+				g.kategoriId == selectedSantri.kategoriId &&
+				g.jenisPembayaranId == selectedJenisId &&
+				g.nominal !== null && g.nominal !== 0
+			);
+			if (customMapping) {
+				nominal = customMapping.nominal;
+				return;
+			}
+		}
+
+		// 3. Fallback: untuk konsumsi, gunakan nominalKonsumsi dari kategori jika ada
+		if (/konsumsi/i.test(selectedJenis.namaPembayaran) && selectedSantri?.nominalKonsumsi) {
+			nominal = selectedSantri.nominalKonsumsi;
+			return;
+		}
+
+		// 4. Default: gunakan nominalDefault dari jenis pembayaran
 		nominal = selectedJenis.nominalDefault;
+	});
+
+	// Reset state ketika toggle khusus berubah
+	$effect(() => {
+		if (isKhusus) {
+			selectedJenisId = '';
+			selectedBulan = '';
+			nominal = 0;
+			keteranganKhusus = '';
+		} else {
+			keteranganKhusus = '';
+		}
 	});
 
 </script>
@@ -112,6 +153,8 @@
 							selectedBulan = '';
 							selectedJenisId = '';
 							nominal = 0;
+							isKhusus = false;
+							keteranganKhusus = '';
 							await invalidateAll();
 							return;
 						}
@@ -128,8 +171,7 @@
 								<option value="" disabled selected>Pilih Santri...</option>
 								{#each filteredSantris as santri}
 									<option value={santri.id}>
-										{santri.nomorInduk} - {santri.namaLengkap}
-										{santri.nominalSyahriyah === 0 ? ' (GRATIS SPP)' : ''}
+										{santri.nomorInduk} - {santri.namaLengkap} ({santri.namaKategori || 'Tanpa Kategori'})
 									</option>
 								{/each}
 							</select>
@@ -150,28 +192,58 @@
 							</select>
 						</div>
 
-						<!-- Pilih Jenis Tagihan -->
+						<!-- Toggle Pembayaran Lain-lain -->
 						<div class="form-control w-full md:col-span-2">
-							<label for="jenisPembayaranId" class="label"><span class="label-text font-medium">Jenis Pembayaran</span></label>
-							<select id="jenisPembayaranId" name="jenisPembayaranId" class="select select-bordered w-full" bind:value={selectedJenisId} required>
-								<option value="" disabled selected>Pilih Tagihan...</option>
-								{#each data.jenisPembayarans as jp}
-									<option value={jp.id}>
-										{jp.namaPembayaran} (
-											{jp.tipe === 'bulanan' ? 'Bulanan' :
-											jp.tipe === 'tahunan' ? 'Tahunan' :
-											jp.tipe === 'sekali' ? 'Sekali' :
-											jp.tipe === 'smk_bulanan' ? 'SMK Bulanan' :
-											jp.tipe === 'smk_tahunan' ? 'SMK Tahunan' :
-											jp.tipe === 'smk_sekali' ? 'SMK Sekali' :
-											jp.tipe === 'smp_bulanan' ? 'SMP Bulanan' :
-											jp.tipe === 'smp_tahunan' ? 'SMP Tahunan' :
-											jp.tipe === 'smp_sekali' ? 'SMP Sekali' : jp.tipe}
-										)
-									</option>
-								{/each}
-							</select>
+							<label class="label cursor-pointer justify-start gap-3">
+								<input type="checkbox" class="toggle toggle-warning" bind:checked={isKhusus} />
+								<span class="label-text font-medium">Pembayaran Lain-lain</span>
+								<span class="label-text-alt text-base-content/50">(Tentukan sendiri jenis & nominal)</span>
+							</label>
 						</div>
+
+						{#if isKhusus}
+							<!-- Mode Pembayaran Lain-lain -->
+							<input type="hidden" name="jenisPembayaranId" value={data.khususJenisId} />
+
+							<div class="form-control w-full md:col-span-2 bg-warning/5 p-4 rounded-xl border border-warning/20">
+								<label for="keteranganKhusus" class="label"><span class="label-text font-medium text-warning">Untuk Pembayaran</span></label>
+								<input
+									id="keteranganKhusus"
+									type="text"
+									name="keteranganKhusus"
+									placeholder="Contoh: Seragam baru, Biaya wisuda, Denda keterlambatan..."
+									class="input input-bordered w-full"
+									bind:value={keteranganKhusus}
+									required
+								/>
+								<div class="label pt-2 pb-0">
+									<span class="label-text-alt text-base-content/50">Tuliskan deskripsi untuk pembayaran ini</span>
+								</div>
+							</div>
+						{:else}
+							<!-- Pilih Jenis Tagihan (Mode Normal) -->
+							<div class="form-control w-full md:col-span-2">
+								<label for="jenisPembayaranId" class="label"><span class="label-text font-medium">Jenis Pembayaran</span></label>
+								<select id="jenisPembayaranId" name="jenisPembayaranId" class="select select-bordered w-full" bind:value={selectedJenisId} required>
+									<option value="" disabled selected>Pilih Tagihan...</option>
+									{#each data.jenisPembayarans.filter(jp => jp.namaPembayaran !== 'Pembayaran Lain-lain') as jp}
+										<option value={jp.id}>
+											{jp.namaPembayaran} (
+												{jp.tipe === 'bulanan' ? 'Bulanan' :
+												jp.tipe === 'tahunan' ? 'Tahunan' :
+												jp.tipe === 'sekali' ? 'Sekali' :
+												jp.tipe === 'smk_bulanan' ? 'SMK Bulanan' :
+												jp.tipe === 'smk_tahunan' ? 'SMK Tahunan' :
+												jp.tipe === 'smk_sekali' ? 'SMK Sekali' :
+												jp.tipe === 'smp_bulanan' ? 'SMP Bulanan' :
+												jp.tipe === 'smp_tahunan' ? 'SMP Tahunan' :
+												jp.tipe === 'smp_sekali' ? 'SMP Sekali' : jp.tipe}
+											)
+										</option>
+									{/each}
+								</select>
+							</div>
+						{/if}
 
 						<!-- Pilihan Bulan (Jika Bulanan) -->
 						{#if isBulanan}
@@ -212,15 +284,20 @@
 
 						<div class="form-control w-full md:col-span-2">
 							<label for="nominalDibayar" class="label"><span class="label-text font-medium">Nominal Pembayaran (Rp)</span></label>
-							<input id="nominalDibayar" type="number" name="nominalDibayar" bind:value={nominal} class="input input-bordered w-full font-bold text-lg" min={isYatimGratisSmkSmp ? 0 : 1} required />
-							{#if nominal <= 0 && !isYatimGratisSmkSmp}
+							<input id="nominalDibayar" type="number" name="nominalDibayar" bind:value={nominal} class="input input-bordered w-full font-bold text-lg" min={isGratis ? 0 : 1} required />
+							{#if nominal <= 0 && !isGratis && !isKhusus}
 								<div class="label pt-2 pb-0">
 									<span class="label-text-alt text-error">Nominal harus lebih dari 0</span>
 								</div>
 							{/if}
-							{#if isBulanan && isSantriGratisSyahriyah && !isYatimGratisSmkSmp}
+							{#if isKhusus && nominal <= 0}
 								<div class="label pt-2 pb-0">
-									<span class="label-text-alt text-error">Santri kategori gratis tidak dapat membayar SPP/Syahriyah.</span>
+									<span class="label-text-alt text-error">Nominal pembayaran lain-lain harus lebih dari 0</span>
+								</div>
+							{/if}
+							{#if isGratis}
+								<div class="label pt-2 pb-0">
+									<span class="label-text-alt text-success font-medium">✨ Pembayaran ini GRATIS untuk kategori santri {selectedSantri?.namaKategori}</span>
 								</div>
 							{/if}
 						</div>
@@ -256,6 +333,9 @@
 								<div class="font-bold text-sm">{r.nomorKwitansi}</div>
 								<div class="text-xs text-base-content/70 mt-1 mb-1">Rp {r.nominalDibayar.toLocaleString('id')}</div>
 								<div class="text-xs font-mono">{new Date(r.tanggalBayar).toLocaleDateString()}</div>
+								{#if r.keteranganKhusus}
+									<div class="text-xs text-warning mt-1">📌 {r.keteranganKhusus}</div>
+								{/if}
 							</div>
 						</li>
 					{/each}

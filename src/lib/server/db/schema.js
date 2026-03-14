@@ -97,7 +97,8 @@ export const pembayaran = sqliteTable('pembayaran', {
 	tanggalBayar: text('tanggal_bayar').notNull(),
 	nominalDibayar: integer('nominal_dibayar').notNull(),
 	nomorKwitansi: text('nomor_kwitansi').notNull().unique(),
-	inputById: integer('input_by_id').references(() => users.id)
+	inputById: integer('input_by_id').references(() => users.id),
+	keteranganKhusus: text('keterangan_khusus') // for custom/special payments
 });
 
 export const users = sqliteTable('users', {
@@ -139,4 +140,10 @@ export const pengaturanPesantren = sqliteTable('pengaturan_pesantren', {
 	stampUrl: text('stamp_url').default(''),
 	telegramBotToken: text('telegram_bot_token'),
 	telegramChatId: text('telegram_chat_id')
+});
+export const kategoriGratis = sqliteTable('kategori_gratis', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	kategoriId: integer('kategori_id').references(() => kategoriSantri.id).notNull(),
+	jenisPembayaranId: integer('jenis_pembayaran_id').references(() => jenisPembayaran.id).notNull(),
+	nominal: integer('nominal').default(0) // 0 = gratis, null = use default
 });

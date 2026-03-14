@@ -47,18 +47,24 @@ export async function load() {
 		const taEnd   = new Date(taYear, 11, 31);
 		const batasHitung = now < taEnd ? now : taEnd;
 
-		// Ambil SEMUA santri aktif beserta kategori
+		// Ambil SEMUA santri aktif
 		const santris = await db
 			.select({
 				id: schema.santri.id,
 				namaLengkap: schema.santri.namaLengkap,
 				tanggalMasuk: schema.santri.tanggalMasuk,
 				tanggalKeluar: schema.santri.tanggalKeluar,
+				kategoriId: schema.santri.kategoriId,
 				nominalSyahriyah: schema.kategoriSantri.nominalSyahriyah
 			})
 			.from(schema.santri)
 			.leftJoin(schema.kategoriSantri, eq(schema.santri.kategoriId, schema.kategoriSantri.id))
 			.where(sql`${schema.santri.isActive} = 1`);
+
+		// Ambil semua mapping nominal khusus
+		const customNominals = await db.select().from(schema.kategoriGratis);
+		const jenisList = await db.select().from(schema.jenisPembayaran);
+		const syahriyahJenisId = jenisList.find(j => j.tipe === 'bulanan' && /syahriyah|spp/i.test(j.namaPembayaran))?.id;
 
 		// Ambil semua pembayaran di TA aktif (dengan join ke jenis pembayaran untuk tahu tipe)
 		const allPembayaran = await db
@@ -120,7 +126,10 @@ export async function load() {
 
 		// --- Kalkulasi Tunggakan ---
 		for (const santri of santris) {
-			const nominalPerBulan = santri.nominalSyahriyah ?? 0;
+			// Hubungkan dengan nominal khusus jika ada
+			const mapping = syahriyahJenisId ? customNominals.find(cn => cn.kategoriId === santri.kategoriId && cn.jenisPembayaranId === syahriyahJenisId) : null;
+			let nominalPerBulan = (mapping && mapping.nominal !== null) ? mapping.nominal : (santri.nominalSyahriyah ?? 0);
+			
 			if (nominalPerBulan === 0) continue;
 
 			const tglMasuk = santri.tanggalMasuk ? new Date(santri.tanggalMasuk) : taStart;

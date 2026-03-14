@@ -137,8 +137,8 @@
 				</select>
 			</div>
 			<div class="form-control w-full mb-6">
-				<label class="label" for="signatureNew"><span class="label-text">Tanda Tangan (JPG)</span></label>
-				<input type="file" id="signatureNew" name="signatureFile" accept=".jpg,.jpeg,image/jpeg" class="file-input file-input-bordered w-full" />
+				<label class="label" for="signatureNew"><span class="label-text">Tanda Tangan (JPG/PNG)</span></label>
+				<input type="file" id="signatureNew" name="signatureFile" accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="file-input file-input-bordered w-full" />
 			</div>
 			<div class="modal-action">
 				<button type="button" class="btn" onclick={() => modal_add_user.close()}>Batal</button>
@@ -175,8 +175,8 @@
 				</select>
 			</div>
 			<div class="form-control w-full mb-6">
-				<label class="label" for="signatureEdit"><span class="label-text">Tanda Tangan (JPG)</span></label>
-				<input type="file" id="signatureEdit" name="signatureFile" accept=".jpg,.jpeg,image/jpeg" class="file-input file-input-bordered w-full" />
+				<label class="label" for="signatureEdit"><span class="label-text">Tanda Tangan (JPG/PNG)</span></label>
+				<input type="file" id="signatureEdit" name="signatureFile" accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="file-input file-input-bordered w-full" />
 				{#if editUser.signatureUrl}
 					<div class="mt-3 flex items-center gap-3">
 						<img src={editUser.signatureUrl} alt="Tanda tangan saat ini" class="w-20 h-12 object-contain border rounded bg-base-100" />

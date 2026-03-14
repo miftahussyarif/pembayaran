@@ -3,6 +3,12 @@
 	let { data } = $props();
 
 	let hapusJp = $state(null);
+	let editJp = $state(null);
+
+	const getCustomNominal = (jenisId, kategoriId) => {
+		const mapping = data.kategoriGratis.find(g => g.jenisPembayaranId == jenisId && g.kategoriId == kategoriId);
+		return mapping ? mapping.nominal : '';
+	};
 
 	const tipeBadge = {
 		bulanan: { label: 'Bulanan', cls: 'badge-primary' },
@@ -55,6 +61,10 @@
 				<p class="text-2xl font-bold mt-2 text-base-content/80">Rp {jp.nominalDefault.toLocaleString('id-ID')}</p>
 				<p class="text-xs text-base-content/50 mt-1">{tipeKeterangan[jp.tipe] || ''}</p>
 				<div class="card-actions justify-end mt-4">
+					<button class="btn btn-xs btn-primary"
+						onclick={() => { editJp = {...jp}; modal_edit_jp.showModal(); }}>
+						Edit & Nominal Kategori
+					</button>
 					<button class="btn btn-xs btn-outline btn-error"
 						onclick={() => { hapusJp = jp; modal_hapus_jp.showModal(); }}>
 						Hapus
@@ -134,6 +144,79 @@
 				<button type="submit" class="btn btn-primary">Simpan Tagihan</button>
 			</div>
 		</form>
+	</div>
+	<form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Modal Edit Jenis Pembayaran -->
+<dialog id="modal_edit_jp" class="modal">
+	<div class="modal-box max-w-2xl">
+		<h3 class="font-bold text-lg mb-4">Edit Jenis Pembayaran & Nominal Kategori</h3>
+		{#if editJp}
+		<form method="POST" action="?/update" use:enhance={() => {
+			return async ({ update }) => { await update(); modal_edit_jp.close(); editJp = null; };
+		}}>
+			<input type="hidden" name="id" value={editJp.id} />
+			
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+				<div class="form-control w-full">
+					<label class="label" for="editNamaPembayaran"><span class="label-text font-semibold">Nama Tagihan</span></label>
+					<input type="text" id="editNamaPembayaran" name="namaPembayaran" bind:value={editJp.namaPembayaran} class="input input-bordered w-full" required />
+				</div>
+
+				<div class="form-control w-full">
+					<label class="label" for="editTipeTagihan"><span class="label-text font-semibold">Tipe Pembayaran</span></label>
+					<select id="editTipeTagihan" name="tipe" bind:value={editJp.tipe} class="select select-bordered w-full" required>
+						<option value="bulanan">Bulanan</option>
+						<option value="tahunan">Tahunan</option>
+						<option value="sekali">Sekali Bayar</option>
+						<option value="smk_bulanan">SMK Bulanan</option>
+						<option value="smk_tahunan">SMK Tahunan</option>
+						<option value="smk_sekali">SMK Sekali</option>
+						<option value="smp_bulanan">SMP Bulanan</option>
+						<option value="smp_tahunan">SMP Tahunan</option>
+						<option value="smp_sekali">SMP Sekali</option>
+					</select>
+				</div>
+
+				<div class="form-control w-full md:col-span-2">
+					<label class="label" for="editNominalDefault"><span class="label-text font-semibold">Nominal Standar (Rp)</span></label>
+					<input type="number" id="editNominalDefault" name="nominalDefault" bind:value={editJp.nominalDefault} class="input input-bordered w-full font-bold" required />
+					<label class="label"><span class="label-text-alt text-base-content/50 italic">Nominal ini digunakan jika tidak ada pengaturan khusus per kategori di bawah.</span></label>
+				</div>
+			</div>
+
+			<div class="divider text-xs opacity-50 uppercase tracking-widest">Nominal Per Kategori</div>
+			
+			<div class="bg-base-200/50 rounded-xl p-4 mb-6">
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+					{#each data.kategoris as k}
+						<div class="form-control">
+							<label class="label py-1" for="nom_kat_{k.id}">
+								<span class="label-text text-sm">{k.namaKategori}</span>
+								<span class="label-text-alt text-[10px] opacity-50">Kosongkan utk default</span>
+							</label>
+							<div class="relative">
+								<span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs opacity-40">Rp</span>
+								<input type="number" id="nom_kat_{k.id}" name="nominal_kat_{k.id}" 
+									value={getCustomNominal(editJp.id, k.id)}
+									placeholder={editJp.nominalDefault}
+									class="input input-bordered input-sm w-full pl-8 font-medium" />
+							</div>
+							<label class="label py-0 justify-end">
+								<span class="label-text-alt text-[10px] italic">0 = Gratis</span>
+							</label>
+						</div>
+					{/each}
+				</div>
+			</div>
+
+			<div class="modal-action">
+				<button type="button" class="btn" onclick={() => { modal_edit_jp.close(); editJp = null; }}>Batal</button>
+				<button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+			</div>
+		</form>
+		{/if}
 	</div>
 	<form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>

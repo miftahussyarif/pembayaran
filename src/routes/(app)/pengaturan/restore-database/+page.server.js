@@ -79,63 +79,63 @@ export const actions = {
 		const mutasi = asArray(backupData.mutasi);
 		const systemLogs = asArray(backupData.systemLogs);
 
-		const insertInBatches = async (tx, table, rows, batchSize = 100) => {
+		const insertInBatches = (tx, table, rows, batchSize = 100) => {
 			for (let i = 0; i < rows.length; i += batchSize) {
 				const batch = rows.slice(i, i + batchSize);
-				await tx.insert(table).values(batch);
+				tx.insert(table).values(batch).run();
 			}
 		};
 
 		try {
-			await db.transaction(async (tx) => {
-				await tx.delete(schema.pembayaran);
-				await tx.delete(schema.mutasiSaldoBendahara);
-				await tx.delete(schema.systemLogs);
-				await tx.delete(schema.santriSmk);
-				await tx.delete(schema.santriSmp);
-				await tx.delete(schema.santriDetail);
-				await tx.delete(schema.santri);
-				await tx.delete(schema.kategoriSantri);
-				await tx.delete(schema.jenisPembayaran);
-				await tx.delete(schema.tahunAjaran);
-				await tx.delete(schema.pengaturanPesantren);
-				await tx.delete(schema.users);
+			db.transaction((tx) => {
+				tx.delete(schema.pembayaran).run();
+				tx.delete(schema.mutasiSaldoBendahara).run();
+				tx.delete(schema.systemLogs).run();
+				tx.delete(schema.santriSmk).run();
+				tx.delete(schema.santriSmp).run();
+				tx.delete(schema.santriDetail).run();
+				tx.delete(schema.santri).run();
+				tx.delete(schema.kategoriSantri).run();
+				tx.delete(schema.jenisPembayaran).run();
+				tx.delete(schema.tahunAjaran).run();
+				tx.delete(schema.pengaturanPesantren).run();
+				tx.delete(schema.users).run();
 
 				if (users.length) {
-					await insertInBatches(tx, schema.users, users);
+					insertInBatches(tx, schema.users, users);
 				}
 				if (pengaturan.length) {
-					await insertInBatches(tx, schema.pengaturanPesantren, pengaturan);
+					insertInBatches(tx, schema.pengaturanPesantren, pengaturan);
 				}
 				if (tahunAjaran.length) {
-					await insertInBatches(tx, schema.tahunAjaran, tahunAjaran);
+					insertInBatches(tx, schema.tahunAjaran, tahunAjaran);
 				}
 				if (jenisPembayaran.length) {
-					await insertInBatches(tx, schema.jenisPembayaran, jenisPembayaran);
+					insertInBatches(tx, schema.jenisPembayaran, jenisPembayaran);
 				}
 				if (kategoriSantri.length) {
-					await insertInBatches(tx, schema.kategoriSantri, kategoriSantri);
+					insertInBatches(tx, schema.kategoriSantri, kategoriSantri);
 				}
 				if (santri.length) {
-					await insertInBatches(tx, schema.santri, santri);
+					insertInBatches(tx, schema.santri, santri);
 				}
 				if (santriDetail.length) {
-					await insertInBatches(tx, schema.santriDetail, santriDetail);
+					insertInBatches(tx, schema.santriDetail, santriDetail);
 				}
 				if (santriSmk.length) {
-					await insertInBatches(tx, schema.santriSmk, santriSmk);
+					insertInBatches(tx, schema.santriSmk, santriSmk);
 				}
 				if (santriSmp.length) {
-					await insertInBatches(tx, schema.santriSmp, santriSmp);
+					insertInBatches(tx, schema.santriSmp, santriSmp);
 				}
 				if (pembayaran.length) {
-					await insertInBatches(tx, schema.pembayaran, pembayaran);
+					insertInBatches(tx, schema.pembayaran, pembayaran);
 				}
 				if (mutasi.length) {
-					await insertInBatches(tx, schema.mutasiSaldoBendahara, mutasi);
+					insertInBatches(tx, schema.mutasiSaldoBendahara, mutasi);
 				}
 				if (systemLogs.length) {
-					await insertInBatches(tx, schema.systemLogs, systemLogs);
+					insertInBatches(tx, schema.systemLogs, systemLogs);
 				}
 			});
 

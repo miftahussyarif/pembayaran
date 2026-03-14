@@ -8,13 +8,14 @@ import path from 'node:path';
 
 const saveSignature = async (file) => {
 	if (!file || typeof file !== 'object' || !('arrayBuffer' in file) || file.size === 0) return '';
-	const allowed = ['image/jpeg', 'image/jpg'];
+	const allowed = ['image/jpeg', 'image/jpg', 'image/png'];
 	if (!allowed.includes(file.type)) {
-		throw new Error('Format tanda tangan harus JPG/JPEG.');
+		throw new Error('Format tanda tangan harus JPG/JPEG atau PNG.');
 	}
 	const uploadsDir = path.join('static', 'uploads');
 	await mkdir(uploadsDir, { recursive: true });
-	const filename = `signature-${Date.now()}.jpg`;
+	const ext = file.type === 'image/png' ? 'png' : 'jpg';
+	const filename = `signature-${Date.now()}.${ext}`;
 	const filePath = path.join(uploadsDir, filename);
 	const buffer = Buffer.from(await file.arrayBuffer());
 	await writeFile(filePath, buffer);
@@ -55,7 +56,7 @@ export const actions = {
 			});
 			return { type: 'success', message: 'User baru berhasil ditambahkan.' };
 		} catch (e) {
-			if (e?.message?.includes('JPG')) {
+			if (e?.message?.includes('JPG') || e?.message?.includes('PNG')) {
 				return { type: 'error', message: e.message };
 			}
 			return { type: 'error', message: 'Gagal menambah user. Username mungkin sudah ada.' };
@@ -80,7 +81,7 @@ export const actions = {
 				.where(eq(schema.users.id, id));
 			return { type: 'success', message: 'Data user berhasil diperbarui.' };
 		} catch (e) {
-			if (e?.message?.includes('JPG')) {
+			if (e?.message?.includes('JPG') || e?.message?.includes('PNG')) {
 				return { type: 'error', message: e.message };
 			}
 			return { type: 'error', message: 'Gagal memperbarui data user.' };

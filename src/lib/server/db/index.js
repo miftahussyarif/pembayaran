@@ -111,4 +111,10 @@ try {
 	// column may already exist
 }
 
+try {
+	sqlite.exec(`ALTER TABLE pembayaran ADD COLUMN keterangan_khusus TEXT`);
+} catch (e) {
+	// column may already exist
+}
+
 export const db = drizzle(sqlite, { schema });

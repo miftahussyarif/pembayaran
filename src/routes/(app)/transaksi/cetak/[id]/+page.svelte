@@ -80,11 +80,15 @@
 					<tbody>
 						<tr>
 							<td class="font-medium text-base">
+							{#if data.pembayaran.keteranganKhusus}
+								{data.pembayaran.keteranganKhusus}
+							{:else}
 								{data.jenisPembayaran.namaPembayaran}
-								{#if data.pembayaran.bulan}
-									<span class="badge badge-sm badge-outline ml-2">Bulan: {data.pembayaran.bulan}</span>
-								{/if}
-							</td>
+							{/if}
+							{#if data.pembayaran.bulan}
+								<span class="badge badge-sm badge-outline ml-2">Bulan: {data.pembayaran.bulan}</span>
+							{/if}
+						</td>
 							<td class="text-right text-lg font-bold">Rp {data.pembayaran.nominalDibayar.toLocaleString('id-ID')}</td>
 						</tr>
 					</tbody>
@@ -102,28 +106,27 @@
 				</table>
 			</div>
 
-			<div class="grid grid-cols-2 mt-3 pt-2">
-				<div>
-					<!-- Kosong di kiri -->
-				</div>
-				<div class="text-center relative">
-					<p class="mb-16 text-base-content/70">Penerima / Bendahara</p>
+			<div class="flex justify-end mt-1 pt-1">
+				<div class="text-center relative w-64">
+					<p class="mb-1 text-sm text-base-content/70">Penerima / Bendahara</p>
 					{#if $page.data.profilPesantren?.stampUrl}
 						<img
 							src={$page.data.profilPesantren.stampUrl}
 							alt="Stempel lembaga"
-							class="w-28 h-28 object-contain opacity-80 absolute left-1/2 -translate-x-1/2 -top-2"
+							class="w-24 h-24 object-contain opacity-80 absolute -left-6 top-4 mix-blend-multiply pointer-events-none z-20"
 						/>
 					{/if}
-					{#if data.petugasSignatureUrl}
-						<img
-							src={data.petugasSignatureUrl}
-							alt="Tanda tangan"
-							class="w-32 h-16 object-contain mx-auto mb-2 relative"
-						/>
-					{/if}
-					<div class="w-32 border-b border-base-content mx-auto"></div>
-					<p class="mt-2 font-semibold">{data.petugas}</p>
+					<div class="h-20 flex items-center justify-center mb-1 relative z-10">
+						{#if data.petugasSignatureUrl}
+							<img
+								src={data.petugasSignatureUrl}
+								alt="Tanda tangan"
+								class="max-w-full max-h-full object-contain mix-blend-multiply pointer-events-none"
+							/>
+						{/if}
+					</div>
+					<div class="w-48 border-b border-base-content mx-auto relative z-10"></div>
+					<p class="mt-1 text-sm font-semibold relative z-10">{data.petugas}</p>
 				</div>
 			</div>
 

@@ -9,34 +9,32 @@ export async function load() {
 
 export const actions = {
 	create: async ({ request }) => {
-		const data = await request.formData();
-		const namaKategori = data.get('namaKategori')?.toString().trim();
-		const nominalSyahriyah = Number(data.get('nominalSyahriyah') || 0);
-		const nominalKonsumsi = Number(data.get('nominalKonsumsi') || 0);
+		const formData = await request.formData();
+		const namaKategori = formData.get('namaKategori')?.toString().trim();
 
 		if (!namaKategori) return { success: false, error: 'Nama kategori wajib diisi.' };
 
 		try {
-			await db.insert(schema.kategoriSantri).values({ namaKategori, nominalSyahriyah, nominalKonsumsi });
+			await db.insert(schema.kategoriSantri).values({ namaKategori });
 			return { success: true };
 		} catch (error) {
-			return { success: false, error: 'Kategori gagal ditambahkan (mungkin nama sudah ada).' };
+			console.error(error);
+			return { success: false, error: 'Kategori gagal ditambahkan.' };
 		}
 	},
 
 	update: async ({ request, locals, getClientAddress }) => {
-		const data = await request.formData();
-		const id = Number(data.get('id'));
-		const namaKategori = data.get('namaKategori')?.toString().trim();
-		const nominalSyahriyah = Number(data.get('nominalSyahriyah') || 0);
-		const nominalKonsumsi = Number(data.get('nominalKonsumsi') || 0);
+		const formData = await request.formData();
+		const id = Number(formData.get('id'));
+		const namaKategori = formData.get('namaKategori')?.toString().trim();
 
 		if (!namaKategori) return { success: false, error: 'Nama kategori wajib diisi.' };
 
 		try {
 			await db.update(schema.kategoriSantri)
-				.set({ namaKategori, nominalSyahriyah, nominalKonsumsi })
+				.set({ namaKategori })
 				.where(eq(schema.kategoriSantri.id, id));
+
 			try {
 				await db.insert(schema.systemLogs).values({
 					userId: locals.user?.id || null,
@@ -58,9 +56,11 @@ export const actions = {
 	},
 
 	delete: async ({ request, locals, getClientAddress }) => {
-		const data = await request.formData();
-		const id = Number(data.get('id'));
+		const formData = await request.formData();
+		const id = Number(formData.get('id'));
 		try {
+			// Also delete any custom nominals associated with this category
+			await db.delete(schema.kategoriGratis).where(eq(schema.kategoriGratis.kategoriId, id));
 			await db.delete(schema.kategoriSantri).where(eq(schema.kategoriSantri.id, id));
 			try {
 				await db.insert(schema.systemLogs).values({

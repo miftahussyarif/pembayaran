@@ -9,7 +9,7 @@
 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
 	<div>
 		<h2 class="text-2xl font-bold">Kategori Santri</h2>
-		<p class="text-sm text-base-content/60 mt-1">Menentukan besaran syahriyah per bulan berdasarkan kategori</p>
+		<p class="text-sm text-base-content/60 mt-1">Kelola kategori santri dan tentukan jenis pembayaran yang GRATIS</p>
 	</div>
 	<button class="btn btn-sm btn-primary" onclick={() => my_modal_tambah_kategori.showModal()}>
 		<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -28,42 +28,20 @@
 		<table class="table table-zebra w-full">
 			<thead>
 				<tr>
-					<th>No</th>
+					<th class="w-20">No</th>
 					<th>Nama Kategori</th>
-					<th>Syahriyah / Bulan</th>
-					<th>Konsumsi / Bulan</th>
-					<th>Aksi</th>
+					<th class="w-32">Aksi</th>
 				</tr>
 			</thead>
 			<tbody>
 				{#if data.kategoris.length === 0}
-					<tr><td colspan="4" class="text-center py-6 text-base-content/50">Belum ada kategori. Silakan tambahkan kategori baru.</td></tr>
+					<tr><td colspan="3" class="text-center py-6 text-base-content/50">Belum ada kategori. Silakan tambahkan kategori baru.</td></tr>
 				{/if}
 				{#each data.kategoris as k, i}
 					<tr>
 						<td>{i + 1}</td>
 						<td>
 							<span class="font-semibold">{k.namaKategori}</span>
-						</td>
-						<td>
-							{#if k.nominalSyahriyah === 0}
-								<span class="badge badge-success gap-1 font-bold">
-									<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
-									GRATIS
-								</span>
-							{:else}
-								<span class="font-medium text-primary">{formatRupiah(k.nominalSyahriyah)}</span>
-							{/if}
-						</td>
-						<td>
-							{#if k.nominalKonsumsi === 0}
-								<span class="badge badge-success gap-1 font-bold">
-									<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
-									GRATIS
-								</span>
-							{:else}
-								<span class="font-medium text-secondary">{formatRupiah(k.nominalKonsumsi)}</span>
-							{/if}
 						</td>
 						<td class="flex gap-2">
 							<button class="btn btn-xs btn-outline btn-primary" onclick={() => { editKategori = {...k}; my_modal_edit_kategori.showModal(); }}>
@@ -93,28 +71,6 @@
 				<label class="label" for="namaKategori"><span class="label-text font-semibold">Nama Kategori</span></label>
 				<input type="text" id="namaKategori" name="namaKategori" placeholder="Contoh: Reguler, Yatim, Dhuafa..." class="input input-bordered w-full" required />
 			</div>
-			<div class="grid grid-cols-2 gap-4">
-				<div class="form-control w-full mb-6">
-					<label class="label" for="nominalSyahriyah">
-						<span class="label-text font-semibold">Syahriyah</span>
-						<span class="label-text-alt text-base-content/50">0 = GRATIS</span>
-					</label>
-					<div class="relative">
-						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50 text-sm font-medium">Rp</span>
-						<input type="number" id="nominalSyahriyah" name="nominalSyahriyah" value="0" min="0" class="input input-bordered w-full pl-10" required />
-					</div>
-				</div>
-				<div class="form-control w-full mb-6">
-					<label class="label" for="nominalKonsumsi">
-						<span class="label-text font-semibold">Konsumsi</span>
-						<span class="label-text-alt text-base-content/50">0 = GRATIS</span>
-					</label>
-					<div class="relative">
-						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50 text-sm font-medium">Rp</span>
-						<input type="number" id="nominalKonsumsi" name="nominalKonsumsi" value="0" min="0" class="input input-bordered w-full pl-10" required />
-					</div>
-				</div>
-			</div>
 			<div class="modal-action">
 				<button type="button" class="btn" onclick={() => my_modal_tambah_kategori.close()}>Batal</button>
 				<button type="submit" class="btn btn-primary">Simpan</button>
@@ -136,28 +92,6 @@
 			<div class="form-control w-full mb-4">
 				<label class="label" for="editNamaKategori"><span class="label-text font-semibold">Nama Kategori</span></label>
 				<input type="text" id="editNamaKategori" name="namaKategori" value={editKategori.namaKategori} class="input input-bordered w-full" required />
-			</div>
-			<div class="grid grid-cols-2 gap-4">
-				<div class="form-control w-full mb-6">
-					<label class="label" for="editNominalSyahriyah">
-						<span class="label-text font-semibold">Syahriyah</span>
-						<span class="label-text-alt text-base-content/50">0 = GRATIS</span>
-					</label>
-					<div class="relative">
-						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50 text-sm font-medium">Rp</span>
-						<input type="number" id="editNominalSyahriyah" name="nominalSyahriyah" value={editKategori.nominalSyahriyah} min="0" class="input input-bordered w-full pl-10" required />
-					</div>
-				</div>
-				<div class="form-control w-full mb-6">
-					<label class="label" for="editNominalKonsumsi">
-						<span class="label-text font-semibold">Konsumsi</span>
-						<span class="label-text-alt text-base-content/50">0 = GRATIS</span>
-					</label>
-					<div class="relative">
-						<span class="absolute left-3 top-1/2 -translate-y-1/2 text-base-content/50 text-sm font-medium">Rp</span>
-						<input type="number" id="editNominalKonsumsi" name="nominalKonsumsi" value={editKategori.nominalKonsumsi || 0} min="0" class="input input-bordered w-full pl-10" required />
-					</div>
-				</div>
 			</div>
 			<div class="modal-action">
 				<button type="button" class="btn" onclick={() => { my_modal_edit_kategori.close(); editKategori = null; }}>Batal</button>

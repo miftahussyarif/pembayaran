@@ -230,7 +230,7 @@
 				<select id="kategoriId" name="kategoriId" class="select select-bordered w-full">
 					<option value="">-- Pilih Kategori --</option>
 					{#each data.kategoris as kat}
-						<option value={kat.id}>{kat.namaKategori} — {kat.nominalSyahriyah === 0 ? 'GRATIS' : `Rp ${kat.nominalSyahriyah.toLocaleString('id-ID')}/bln`}</option>
+						<option value={kat.id}>{kat.namaKategori}</option>
 					{/each}
 				</select>
 			</div>
@@ -491,7 +491,7 @@
 				<select id="editKategoriId" name="kategoriId" class="select select-bordered w-full">
 					<option value="">-- Pilih Kategori --</option>
 					{#each data.kategoris as kat}
-						<option value={kat.id} selected={kat.id === editSantri.kategoriId}>{kat.namaKategori} — {kat.nominalSyahriyah === 0 ? 'GRATIS' : `Rp ${kat.nominalSyahriyah.toLocaleString('id-ID')}/bln`}</option>
+						<option value={kat.id} selected={kat.id === editSantri.kategoriId}>{kat.namaKategori}</option>
 					{/each}
 				</select>
 			</div>

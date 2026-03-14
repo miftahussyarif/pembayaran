@@ -33,10 +33,11 @@ export async function load({ url }) {
 			id: schema.santri.id,
 			nomorInduk: schema.santri.nomorInduk,
 			namaLengkap: schema.santri.namaLengkap,
+			kategoriId: schema.santri.kategoriId,
 			tanggalMasuk: schema.santri.tanggalMasuk,
 			tanggalKeluar: schema.santri.tanggalKeluar,
 			isActive: schema.santri.isActive,
-			nominalSyahriyah: schema.kategoriSantri.nominalSyahriyah,
+
 			nominalKonsumsi: schema.kategoriSantri.nominalKonsumsi,
 			namaKategori: schema.kategoriSantri.namaKategori
 		})
@@ -58,6 +59,7 @@ export async function load({ url }) {
 			bulan: schema.pembayaran.bulan,
 			nominalDibayar: schema.pembayaran.nominalDibayar,
 			nomorKwitansi: schema.pembayaran.nomorKwitansi,
+			keteranganKhusus: schema.pembayaran.keteranganKhusus,
 			tipe: schema.jenisPembayaran.tipe,
 			namaPembayaran: schema.jenisPembayaran.namaPembayaran
 		})
@@ -75,30 +77,53 @@ export async function load({ url }) {
 
 	const smkBySantriId = new Map(santriSmkList.map(s => [s.santriId, s]));
 	const smpBySantriId = new Map(santriSmpList.map(s => [s.santriId, s]));
+	const gratisList = await db.select().from(schema.kategoriGratis);
 
 	const rekapIndividu = santris.map(s => {
-		const isYatim = /yatim/i.test(s.namaKategori || '');
-		const smkBulananNominalEff = isYatim ? 0 : smkBulananNominal;
-		const smpBulananNominalEff = isYatim ? 0 : smpBulananNominal;
+		// Helper to get nominal with priority: Custom Category -> Category Column -> Default
+		const getNominal = (jenisId, categoryColumnNominal, defaultNominal) => {
+			const mapping = gratisList.find(g => g.kategoriId === s.kategoriId && g.jenisPembayaranId === jenisId);
+			if (mapping && mapping.nominal !== null) return mapping.nominal;
+			
+			// Fallback to legacy category column if provided
+			if (categoryColumnNominal !== undefined && categoryColumnNominal !== null) return categoryColumnNominal;
+			
+			return defaultNominal;
+		};
+
+		const pembayaranSantri = pembayaran.filter(p => p.santriId === s.id);
+
+		// Pisahkan pembayaran khusus (yang punya keteranganKhusus)
+		const pembayaranKhusus = pembayaranSantri
+			.filter(p => !!p.keteranganKhusus)
+			.map(p => ({
+				id: p.id,
+				keterangan: p.keteranganKhusus,
+				nominalDibayar: p.nominalDibayar,
+				tanggalBayar: p.tanggalBayar,
+				nomorKwitansi: p.nomorKwitansi
+			}));
+		const totalKhusus = pembayaranKhusus.reduce((sum, p) => sum + (p.nominalDibayar || 0), 0);
+
+		// Filter pembayaran normal (bukan khusus)
+		const normalPayments = pembayaranSantri.filter(p => !p.keteranganKhusus);
+		const konsumsiPayments = normalPayments.filter(p => p.tipe === 'bulanan' && /konsumsi/i.test(p.namaPembayaran || ''));
+		const smkBulananPayments = normalPayments.filter(p => p.tipe === 'smk_bulanan');
+		const smpBulananPayments = normalPayments.filter(p => p.tipe === 'smp_bulanan');
+		const nonBulananPayments = normalPayments.filter(p => p.tipe !== 'bulanan' && p.tipe !== 'smk_bulanan' && p.tipe !== 'smp_bulanan');
+
+		// Cari ID jenis pembayaran untuk lookup
+		const jenisKonsumsiId = konsumsiPayments[0]?.jenisPembayaranId || jenisList.find(j => j.tipe === 'bulanan' && /konsumsi/i.test(j.namaPembayaran))?.id;
+		const jenisSmkId = jenisSmkBulanan[0]?.id;
+		const jenisSmpId = jenisSmpBulanan[0]?.id;
+
+		const konsumsiNominalEff = getNominal(jenisKonsumsiId, s.nominalKonsumsi, 0);
+		const smkBulananNominalEff = getNominal(jenisSmkId, undefined, smkBulananNominal);
+		const smpBulananNominalEff = getNominal(jenisSmpId, undefined, smpBulananNominal);
+
 		const startDate = s.tanggalMasuk ? new Date(s.tanggalMasuk) : now;
 		const endDate = s.tanggalKeluar ? new Date(s.tanggalKeluar) : now;
 		const monthsRange = startDate <= endDate ? buildMonthRange(startDate, endDate) : [];
-
-		const pembayaranSantri = pembayaran.filter(p => p.santriId === s.id);
-		const bulananPayments = pembayaranSantri.filter(p => p.tipe === 'bulanan' && !/konsumsi/i.test(p.namaPembayaran || ''));
-		const konsumsiPayments = pembayaranSantri.filter(p => p.tipe === 'bulanan' && /konsumsi/i.test(p.namaPembayaran || ''));
-		const smkBulananPayments = pembayaranSantri.filter(p => p.tipe === 'smk_bulanan');
-		const smpBulananPayments = pembayaranSantri.filter(p => p.tipe === 'smp_bulanan');
-		const nonBulananPayments = pembayaranSantri.filter(p => p.tipe !== 'bulanan' && p.tipe !== 'smk_bulanan' && p.tipe !== 'smp_bulanan');
-
-		const bulananByKey = new Map();
-		for (const p of bulananPayments) {
-			if (!p.tanggalBayar || !p.bulan) continue;
-			const tgl = new Date(p.tanggalBayar);
-			const key = `${tgl.getFullYear()}-${p.bulan}`;
-			if (!bulananByKey.has(key)) bulananByKey.set(key, []);
-			bulananByKey.get(key).push(p);
-		}
 
 		const konsumsiByKey = new Map();
 		for (const p of konsumsiPayments) {
@@ -109,21 +134,6 @@ export async function load({ url }) {
 			konsumsiByKey.get(key).push(p);
 		}
 
-		const syahriyah = monthsRange.map(m => {
-			const key = `${m.year}-${m.monthName}`;
-			const paidItems = bulananByKey.get(key) || [];
-			const nominalDibayar = paidItems.reduce((sum, p) => sum + (p.nominalDibayar || 0), 0);
-			return {
-				bulan: m.monthName,
-				tahun: m.year,
-				paid: paidItems.length > 0,
-				nominalTagihan: s.nominalSyahriyah ?? 0,
-				nominalDibayar,
-				tanggalBayar: paidItems[0]?.tanggalBayar || null,
-				nomorKwitansi: paidItems[0]?.nomorKwitansi || null
-			};
-		});
-
 		const konsumsi = monthsRange.map(m => {
 			const key = `${m.year}-${m.monthName}`;
 			const paidItems = konsumsiByKey.get(key) || [];
@@ -132,7 +142,7 @@ export async function load({ url }) {
 				bulan: m.monthName,
 				tahun: m.year,
 				paid: paidItems.length > 0,
-				nominalTagihan: s.nominalKonsumsi ?? 0,
+				nominalTagihan: konsumsiNominalEff,
 				nominalDibayar,
 				tanggalBayar: paidItems[0]?.tanggalBayar || null,
 				nomorKwitansi: paidItems[0]?.nomorKwitansi || null
@@ -141,7 +151,7 @@ export async function load({ url }) {
 
 		const smkInfo = smkBySantriId.get(s.id);
 		let smkBulanan = [];
-		if (smkInfo && !isYatim) {
+		if (smkInfo) {
 			const smkStart = new Date(smkInfo.startYear, (smkInfo.startMonth || 1) - 1, 1);
 			const smkEnd = smkInfo.endYear && smkInfo.endMonth
 				? new Date(smkInfo.endYear, smkInfo.endMonth - 1, 1)
@@ -174,7 +184,7 @@ export async function load({ url }) {
 
 		const smpInfo = smpBySantriId.get(s.id);
 		let smpBulanan = [];
-		if (smpInfo && !isYatim) {
+		if (smpInfo) {
 			const smpStart = new Date(smpInfo.startYear, (smpInfo.startMonth || 1) - 1, 1);
 			const smpEnd = smpInfo.endYear && smpInfo.endMonth
 				? new Date(smpInfo.endYear, smpInfo.endMonth - 1, 1)
@@ -205,47 +215,76 @@ export async function load({ url }) {
 			});
 		}
 
-		const totalTagihanSyahriyah = syahriyah.reduce((sum, m) => sum + (m.nominalTagihan || 0), 0);
-		const totalDibayarSyahriyah = syahriyah.reduce((sum, m) => sum + (m.nominalDibayar || 0), 0);
+
 		const totalTagihanKonsumsi = konsumsi.reduce((sum, m) => sum + (m.nominalTagihan || 0), 0);
 		const totalDibayarKonsumsi = konsumsi.reduce((sum, m) => sum + (m.nominalDibayar || 0), 0);
-		const totalTagihanSmkBulanan = smkBulanan.length * (smkBulananNominalEff || 0);
+		const totalTagihanSmkBulanan = smkBulanan.reduce((sum, m) => sum + (m.nominalTagihan || 0), 0);
 		const totalDibayarSmkBulanan = smkBulanan.reduce((sum, m) => sum + (m.nominalDibayar || 0), 0);
-		const totalTagihanSmpBulanan = smpBulanan.length * (smpBulananNominalEff || 0);
+		const totalTagihanSmpBulanan = smpBulanan.reduce((sum, m) => sum + (m.nominalTagihan || 0), 0);
 		const totalDibayarSmpBulanan = smpBulanan.reduce((sum, m) => sum + (m.nominalDibayar || 0), 0);
 
 		const startYear = (s.tanggalMasuk ? new Date(s.tanggalMasuk) : now).getFullYear();
 		const endYear = (s.tanggalKeluar ? new Date(s.tanggalKeluar) : now).getFullYear();
 		const tahunSpan = startYear <= endYear ? (endYear - startYear + 1) : 0;
 
-		const nonBulananByJenis = jenisNonBulanan.map(j => {
-			const items = nonBulananPayments.filter(p => p.namaPembayaran === j.namaPembayaran && p.tipe === j.tipe);
-			const totalNominal = items.reduce((sum, p) => sum + (p.nominalDibayar || 0), 0);
-			const lastTanggal = items.length ? items[items.length - 1].tanggalBayar : null;
-			const nominalDefault = j.nominalDefault ?? 0;
-			let jumlahTagihan = 0;
-			if (j.tipe === 'tahunan' || j.tipe === 'smk_tahunan' || j.tipe === 'smp_tahunan') jumlahTagihan = tahunSpan;
-			else if (j.tipe === 'sekali' || j.tipe === 'smk_sekali' || j.tipe === 'smp_sekali') jumlahTagihan = 1;
-			const totalTagihan = nominalDefault * jumlahTagihan;
-			const sisa = Math.max(0, totalTagihan - totalNominal);
-			return {
-				namaPembayaran: j.namaPembayaran,
-				tipe: j.tipe,
-				jumlahTransaksi: items.length,
-				totalNominal,
-				totalTagihan,
-				sisa,
-				terakhirBayar: lastTanggal
-			};
-		});
+		let smkTahunSpan = 0;
+		if (smkInfo) {
+			const smpStart = new Date(smkInfo.startYear, 0, 1);
+			const smpEnd = smkInfo.endYear ? new Date(smkInfo.endYear, 0, 1) : now;
+			smkTahunSpan = Math.max(0, smpEnd.getFullYear() - smpStart.getFullYear() + 1);
+		}
+		let smpTahunSpan = 0;
+		if (smpInfo) {
+			const smpStart = new Date(smpInfo.startYear, 0, 1);
+			const smpEnd = smpInfo.endYear ? new Date(smpInfo.endYear, 0, 1) : now;
+			smpTahunSpan = Math.max(0, smpEnd.getFullYear() - smpStart.getFullYear() + 1);
+		}
+
+		const nonBulananByJenis = jenisNonBulanan
+			.filter(j => {
+				if (j.tipe.startsWith('smk_')) return !!smkInfo;
+				if (j.tipe.startsWith('smp_')) return !!smpInfo;
+				return true;
+			})
+			.map(j => {
+				const items = nonBulananPayments.filter(p => p.namaPembayaran === j.namaPembayaran && p.tipe === j.tipe);
+				const totalNominal = items.reduce((sum, p) => sum + (p.nominalDibayar || 0), 0);
+				const lastTanggal = items.length ? items[items.length - 1].tanggalBayar : null;
+				
+				const nominalEff = getNominal(j.id, undefined, j.nominalDefault ?? 0);
+
+				let jumlahTagihan = 0;
+				if (j.tipe === 'tahunan') jumlahTagihan = tahunSpan;
+				else if (j.tipe === 'smk_tahunan') jumlahTagihan = smkTahunSpan;
+				else if (j.tipe === 'smp_tahunan') jumlahTagihan = smpTahunSpan;
+				else if (j.tipe === 'sekali' || j.tipe === 'smk_sekali' || j.tipe === 'smp_sekali') jumlahTagihan = 1;
+				
+				const totalTagihan = nominalEff * jumlahTagihan;
+				const sisa = Math.max(0, totalTagihan - totalNominal);
+				return {
+					namaPembayaran: j.namaPembayaran,
+					tipe: j.tipe,
+					jumlahTransaksi: items.length,
+					totalNominal,
+					totalTagihan,
+					sisa,
+					terakhirBayar: lastTanggal,
+					nominalEff
+				};
+			})
+			.filter(p => p.nominalEff > 0 || p.totalNominal > 0);
 
 		const totalTagihanLain = nonBulananByJenis.reduce((sum, p) => sum + (p.totalTagihan || 0), 0);
 		const totalDibayarLain = nonBulananByJenis.reduce((sum, p) => sum + (p.totalNominal || 0), 0);
-		const totalSisaLain = Math.max(0, totalTagihanLain - totalDibayarLain);
+		const totalSisaLain = totalTagihanLain - totalDibayarLain;
 
 		return {
 			...s,
-			syahriyah,
+
+			konsumsiNominalEff,
+			smkBulananNominalEff,
+			smpBulananNominalEff,
+
 			konsumsi,
 			smkBulanan,
 			totalTagihanSmkBulanan,
@@ -254,8 +293,9 @@ export async function load({ url }) {
 			totalTagihanSmpBulanan,
 			totalDibayarSmpBulanan,
 			pembayaranLain: nonBulananByJenis,
-			totalTagihanSyahriyah,
-			totalDibayarSyahriyah,
+			pembayaranKhusus,
+			totalKhusus,
+
 			totalTagihanKonsumsi,
 			totalDibayarKonsumsi,
 			totalTagihanLain,

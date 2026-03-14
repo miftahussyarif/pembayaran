@@ -146,15 +146,15 @@ export const actions = {
 		};
 
 		try {
-			await db.transaction(async (tx) => {
-				const [newSantri] = await tx
+			db.transaction((tx) => {
+				const newSantri = tx
 					.insert(schema.santri)
 					.values({ nomorInduk, namaLengkap, tanggalMasuk, tanggalKeluar, kategoriId, isActive })
-					.returning();
-				await tx.insert(schema.santriDetail).values({ santriId: newSantri.id, ...detailData });
+					.returning().get();
+				tx.insert(schema.santriDetail).values({ santriId: newSantri.id, ...detailData }).run();
 
 				try {
-					await tx.insert(schema.systemLogs).values({
+					tx.insert(schema.systemLogs).values({
 						userId: locals.user?.id || null,
 						username: locals.user?.username || null,
 						role: locals.user?.role || null,
@@ -163,7 +163,7 @@ export const actions = {
 						keterangan: `Tambah santri: ${namaLengkap} (${nomorInduk})`,
 						ip: getClientAddress(),
 						createdAt: new Date().toISOString()
-					});
+					}).run();
 				} catch (e) {
 					// ignore
 				}
@@ -467,10 +467,10 @@ export const actions = {
 		const skipped = prepared.length - toInsert.length;
 
 		try {
-			await db.transaction(async (tx) => {
+			db.transaction((tx) => {
 				for (const item of toInsert) {
-					const [newSantri] = await tx.insert(schema.santri).values(item.santri).returning();
-					await tx.insert(schema.santriDetail).values({ santriId: newSantri.id, ...item.detail });
+					const newSantri = tx.insert(schema.santri).values(item.santri).returning().get();
+					tx.insert(schema.santriDetail).values({ santriId: newSantri.id, ...item.detail }).run();
 				}
 			});
 		} catch (e) {
