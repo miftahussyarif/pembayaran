@@ -1,6 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
+import { eq } from 'drizzle-orm';
 import { generateBackup, sendBackupToTelegram } from '$lib/server/backup.js';
 
 // Setup Daily Backup Cron (Every Minute Check)
@@ -52,6 +53,26 @@ export const handle = async ({ event, resolve }) => {
 	if (sessionCookie) {
 		try {
 			sessionUser = JSON.parse(sessionCookie);
+			if (sessionUser?.id && sessionUser?.sessionId) {
+				const userInDb = await db.select({ sessionId: schema.users.sessionId }).from(schema.users).where(eq(schema.users.id, sessionUser.id)).limit(1);
+				if (userInDb.length > 0 && userInDb[0].sessionId === sessionUser.sessionId) {
+					// Session valid, perpanjang cookie
+					event.cookies.set('sessionid', sessionCookie, {
+						path: '/',
+						httpOnly: true,
+						sameSite: 'strict',
+						maxAge: 60 * 60 * 6 // 6 jam
+					});
+				} else {
+					// Session tidak valid (Multi login detect / session expired)
+					sessionUser = null;
+					event.cookies.delete('sessionid', { path: '/' });
+				}
+			} else {
+				// Format cookie lama yang belum ada sessionId, suruh relogin
+				sessionUser = null;
+				event.cookies.delete('sessionid', { path: '/' });
+			}
 		} catch (e) {
 			// invalid cookie JSON
 		}

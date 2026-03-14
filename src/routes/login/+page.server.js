@@ -3,6 +3,7 @@ import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { eq, and } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
+import crypto from 'node:crypto';
 
 export const actions = {
 	login: async ({ request, cookies, getClientAddress }) => {
@@ -31,19 +32,27 @@ export const actions = {
 			return { error: 'Password yang Anda masukkan salah.' };
 		}
 
+		const newSessionId = crypto.randomUUID();
+
+		// Update sessionId in database
+		await db.update(schema.users)
+			.set({ sessionId: newSessionId })
+			.where(eq(schema.users.id, user.id));
+
 		// Generate token session / nyimpan ID nRole (Sementara pake cookie biasa HTTP-Only)
 		const sessionData = {
 			id: user.id,
 			username: user.username,
 			role: user.role,
-			namaLengkap: user.namaLengkap
+			namaLengkap: user.namaLengkap,
+			sessionId: newSessionId
 		};
 
 		cookies.set('sessionid', JSON.stringify(sessionData), {
 			path: '/',
 			httpOnly: true,
 			sameSite: 'strict',
-			maxAge: 60 * 60 * 24 // 1 hari
+			maxAge: 60 * 60 * 6 // 6 jam 
 		});
 
 		try {
