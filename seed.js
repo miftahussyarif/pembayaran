@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { db } from './src/lib/server/db/index.js';
 import * as schema from './src/lib/server/db/schema.js';
 
@@ -493,8 +494,8 @@ async function seed() {
 	    "noTelp": "085171543234",
 	    "logoUrl": "/uploads/logo-4-1773303036200.jpg",
 	    "stampUrl": "/uploads/stamp-4-1773494439053.png",
-	    "telegramBotToken": "8446772407:AAGoE1Z9ET8p2d9PwBwO-JYlnSVe78gGL4s",
-	    "telegramChatId": "1768140935"
+	    "telegramBotToken": process.env.TELEGRAM_BOT_TOKEN || null,
+	    "telegramChatId": process.env.TELEGRAM_CHAT_ID || null
 	  }
 	]);
 
