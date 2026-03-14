@@ -24,6 +24,23 @@ Aplikasi pembayaran pesantren berbasis web untuk input transaksi, cetak kwitansi
 - **Pengaturan profil pesantren** + **upload logo** (ditampilkan di sidebar).
 - **Role user** (admin/guru/pengawas) dan menu admin.
 
+### Cuplikan Fitur / Screenshot
+
+**1. Dashboard**
+![Dashboard](assets/1-dashboard.png)
+
+**2. Master Tahun**
+![Master Tahun](assets/2-master-tahun.png)
+
+**3. Data Santri**
+![Data Santri](assets/3-data-santri.png)
+
+**4. Cetak PDF / Laporan**
+![Cetak PDF](assets/4-cetak-data.png)
+
+**5. Kategori Santri**
+![Kategori Santri](assets/5-kategori-santri.png)
+
 ---
 
 ## Struktur & Konfigurasi Penting

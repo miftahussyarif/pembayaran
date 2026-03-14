@@ -148,3 +148,9 @@ export const kategoriGratis = sqliteTable('kategori_gratis', {
 	jenisPembayaranId: integer('jenis_pembayaran_id').references(() => jenisPembayaran.id).notNull(),
 	nominal: integer('nominal').default(0) // 0 = gratis, null = use default
 });
+
+export const loginAttempts = sqliteTable('login_attempts', {
+	ip: text('ip').primaryKey(),
+	attempts: integer('attempts').notNull().default(0),
+	lockUntil: text('lock_until')
+});
