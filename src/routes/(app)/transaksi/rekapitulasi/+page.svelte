@@ -143,6 +143,32 @@
 </div>
 {/if}
 
+{#if data.ringkasanPerKategori.length > 0}
+<div class="card bg-base-100 shadow-sm border border-base-200 mb-5">
+	<div class="card-body p-4">
+		<h3 class="font-bold text-base mb-3">Ringkasan per Kategori Pembayar</h3>
+		<table class="table table-sm w-full">
+			<thead>
+				<tr class="bg-base-200/60">
+					<th>Kategori</th>
+					<th class="text-center">Jumlah Transaksi</th>
+					<th class="text-right">Total</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each data.ringkasanPerKategori as kategori}
+					<tr>
+						<td class="font-medium">{kategori.nama}</td>
+						<td class="text-center">{kategori.jumlahTransaksi} transaksi</td>
+						<td class="text-right font-bold text-success">{formatRupiah(kategori.totalNominal)}</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+</div>
+{/if}
+
 <!-- Detail transaksi lengkap -->
 <div class="card bg-base-100 shadow-sm border border-base-200">
 	<div class="card-body p-4">
@@ -157,7 +183,8 @@
 						<th class="w-8">No</th>
 						<th>Tgl Bayar</th>
 						<th>No. Kwitansi</th>
-						<th>Nama Santri</th>
+						<th>Nama Pembayar</th>
+						<th>Kategori</th>
 						<th>No. Induk</th>
 						<th>Jenis Pembayaran</th>
 						<th>Bulan</th>
@@ -167,7 +194,7 @@
 				<tbody>
 					{#if data.rekap.length === 0}
 						<tr>
-							<td colspan="8" class="text-center py-8 text-base-content/50">
+							<td colspan="9" class="text-center py-8 text-base-content/50">
 								<div class="flex flex-col items-center gap-2">
 									<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
 									<span>Tidak ada data untuk <strong>{data.filterBulan} {data.filterTahun}</strong></span>
@@ -180,7 +207,12 @@
 							<td class="text-base-content/50">{i + 1}</td>
 							<td class="whitespace-nowrap text-sm">{formatTanggal(r.tanggalBayar)}</td>
 							<td class="font-mono text-xs text-base-content/60">{r.nomorKwitansi}</td>
-							<td class="font-semibold text-sm">{r.namaLengkap || '-'}</td>
+							<td class="font-semibold text-sm">{r.namaPembayar}</td>
+							<td>
+								<span class={`badge badge-sm ${r.kategoriRekap === 'Pembayar Umum' ? 'badge-warning badge-outline' : 'badge-primary badge-outline'}`}>
+									{r.kategoriRekap}
+								</span>
+							</td>
 							<td class="text-xs text-base-content/60">{r.nomorInduk || '-'}</td>
 							<td class="text-sm">{r.namaPembayaran || '-'}</td>
 							<td>
@@ -197,7 +229,7 @@
 				{#if data.rekap.length > 0}
 					<tfoot>
 						<tr class="font-bold bg-base-200/40 border-t-2 border-base-300">
-							<td colspan="7" class="text-right py-2">Total Pemasukan:</td>
+							<td colspan="8" class="text-right py-2">Total Pemasukan:</td>
 							<td class="text-right text-success text-base">{formatRupiah(data.totalPemasukan)}</td>
 						</tr>
 					</tfoot>

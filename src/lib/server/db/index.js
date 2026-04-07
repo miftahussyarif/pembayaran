@@ -85,6 +85,11 @@ sqlite.exec(`
 		penghasilan_ibu INTEGER,
 		FOREIGN KEY (santri_id) REFERENCES santri(id)
 	);
+	CREATE TABLE IF NOT EXISTS pembayar_lain (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		nama_pembayar TEXT NOT NULL,
+		created_at TEXT NOT NULL
+	);
 `);
 
 try {
@@ -115,6 +120,60 @@ try {
 	sqlite.exec(`ALTER TABLE pembayaran ADD COLUMN keterangan_khusus TEXT`);
 } catch (e) {
 	// column may already exist
+}
+
+try {
+	sqlite.exec(`ALTER TABLE pembayaran ADD COLUMN pembayar_lain_id INTEGER REFERENCES pembayar_lain(id)`);
+} catch (e) {
+	// column may already exist
+}
+
+try {
+	const pembayaranInfo = sqlite.prepare(`PRAGMA table_info(pembayaran)`).all();
+	const santriIdColumn = pembayaranInfo.find((column) => column.name === 'santri_id');
+	const hasPembayarLainId = pembayaranInfo.some((column) => column.name === 'pembayar_lain_id');
+
+	if (santriIdColumn?.notnull === 1 || !hasPembayarLainId) {
+		sqlite.exec(`
+			BEGIN;
+			CREATE TABLE pembayaran_migrasi (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				santri_id INTEGER,
+				pembayar_lain_id INTEGER,
+				jenis_pembayaran_id INTEGER NOT NULL,
+				tahun_ajaran_id INTEGER NOT NULL,
+				bulan TEXT,
+				tanggal_bayar TEXT NOT NULL,
+				nominal_dibayar INTEGER NOT NULL,
+				nomor_kwitansi TEXT NOT NULL UNIQUE,
+				input_by_id INTEGER,
+				keterangan_khusus TEXT,
+				FOREIGN KEY (santri_id) REFERENCES santri(id),
+				FOREIGN KEY (pembayar_lain_id) REFERENCES pembayar_lain(id),
+				FOREIGN KEY (jenis_pembayaran_id) REFERENCES jenis_pembayaran(id),
+				FOREIGN KEY (tahun_ajaran_id) REFERENCES tahun_ajaran(id),
+				FOREIGN KEY (input_by_id) REFERENCES users(id)
+			);
+			INSERT INTO pembayaran_migrasi (
+				id, santri_id, pembayar_lain_id, jenis_pembayaran_id, tahun_ajaran_id, bulan,
+				tanggal_bayar, nominal_dibayar, nomor_kwitansi, input_by_id, keterangan_khusus
+			)
+			SELECT
+				id, santri_id, pembayar_lain_id, jenis_pembayaran_id, tahun_ajaran_id, bulan,
+				tanggal_bayar, nominal_dibayar, nomor_kwitansi, input_by_id, keterangan_khusus
+			FROM pembayaran;
+			DROP TABLE pembayaran;
+			ALTER TABLE pembayaran_migrasi RENAME TO pembayaran;
+			COMMIT;
+		`);
+	}
+} catch (e) {
+	try {
+		sqlite.exec('ROLLBACK');
+	} catch (rollbackError) {
+		// ignore rollback errors
+	}
+	console.error('Migrasi tabel pembayaran gagal:', e);
 }
 
 export const db = drizzle(sqlite, { schema });

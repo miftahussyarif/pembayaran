@@ -21,7 +21,21 @@ export async function load() {
 	const jenisPembayarans = await db.select().from(schema.jenisPembayaran);
 
 	// Ambil riwayat pembayaran terbaru (10 terakhir) - order by ID descending untuk yang terbaru di atas
-	const riwayatData = await db.select().from(schema.pembayaran).orderBy(desc(schema.pembayaran.id)).limit(10);
+	const riwayatData = await db
+		.select({
+			id: schema.pembayaran.id,
+			nomorKwitansi: schema.pembayaran.nomorKwitansi,
+			nominalDibayar: schema.pembayaran.nominalDibayar,
+			tanggalBayar: schema.pembayaran.tanggalBayar,
+			keteranganKhusus: schema.pembayaran.keteranganKhusus,
+			namaSantri: schema.santri.namaLengkap,
+			namaPembayarLain: schema.pembayarLain.namaPembayar
+		})
+		.from(schema.pembayaran)
+		.leftJoin(schema.santri, eq(schema.pembayaran.santriId, schema.santri.id))
+		.leftJoin(schema.pembayarLain, eq(schema.pembayaran.pembayarLainId, schema.pembayarLain.id))
+		.orderBy(desc(schema.pembayaran.id))
+		.limit(10);
 
 	// Ambil semua pembayaran bulanan untuk validasi status
 	const pembayaranBulanan = await db.select().from(schema.pembayaran).where(isNotNull(schema.pembayaran.bulan));
@@ -62,16 +76,18 @@ export const actions = {
 	create: async ({ request, locals, getClientAddress }) => {
 		try {
 			const formData = await request.formData();
-			const santriId = Number(formData.get('santriId'));
+			const santriIdRaw = formData.get('santriId')?.toString().trim() || '';
+			let santriId = santriIdRaw ? Number(santriIdRaw) : null;
 			const tahunAjaranId = Number(formData.get('tahunAjaranId'));
 			const jenisPembayaranId = Number(formData.get('jenisPembayaranId'));
 			let nominalDibayar = Number(formData.get('nominalDibayar'));
 			const bulan = formData.get('bulan') || null;
 			const keteranganKhusus = formData.get('keteranganKhusus')?.toString().trim() || null;
+			const namaPembayarManual = formData.get('namaPembayarManual')?.toString().trim() || '';
 			const inputById = locals.user?.id || null;
 
 			// Validasi data dasar
-			if (!santriId || !tahunAjaranId || !jenisPembayaranId) {
+			if (!tahunAjaranId || !jenisPembayaranId) {
 				return {
 					success: false,
 					message: 'Data tidak lengkap'
@@ -80,8 +96,23 @@ export const actions = {
 
 			// Jika ini pembayaran khusus, gunakan nominal dari form langsung
 			const isKhusus = !!keteranganKhusus;
+			const isPembayarManual = isKhusus && !santriId;
+
+			if (!santriId && !namaPembayarManual) {
+				return {
+					success: false,
+					message: 'Pilih santri atau isi nama pembayar.'
+				};
+			}
 
 			if (!isKhusus) {
+				if (!santriId) {
+					return {
+						success: false,
+						message: 'Pembayaran reguler harus terhubung ke data santri.'
+					};
+				}
+
 				// Cek aturan kategori santri
 				const [santriRow] = await db
 					.select({
@@ -148,10 +179,38 @@ export const actions = {
 			// Generate No Kwitansi sederhana
 			const nomorKwitansi = `KW-${Date.now()}`;
 			const tanggalBayar = new Date().toISOString();
+			let pembayarLainId = null;
+
+			if (isPembayarManual) {
+				const santriByName = await db.select().from(schema.santri);
+				const normalizedNama = namaPembayarManual.toLocaleLowerCase('id-ID');
+				const santriMatch = santriByName.find((item) => item.namaLengkap.toLocaleLowerCase('id-ID') === normalizedNama);
+
+				if (santriMatch) {
+					santriId = santriMatch.id;
+				}
+			}
+
+			if (isPembayarManual && !santriId) {
+				const existingPembayar = await db.select().from(schema.pembayarLain);
+				const normalizedNama = namaPembayarManual.toLocaleLowerCase('id-ID');
+				const match = existingPembayar.find((item) => item.namaPembayar.toLocaleLowerCase('id-ID') === normalizedNama);
+
+				if (match) {
+					pembayarLainId = match.id;
+				} else {
+					const [newPembayar] = await db.insert(schema.pembayarLain).values({
+						namaPembayar: namaPembayarManual,
+						createdAt: tanggalBayar
+					}).returning();
+					pembayarLainId = newPembayar?.id || null;
+				}
+			}
 
 			// Insert pembayaran baru
 			const pembayaranResult = await db.insert(schema.pembayaran).values({
 				santriId,
+				pembayarLainId,
 				tahunAjaranId,
 				jenisPembayaranId,
 				bulan,
@@ -180,7 +239,7 @@ export const actions = {
 					role: locals.user?.role || null,
 					aksi: 'input',
 					modul: 'transaksi',
-					keterangan: `Input pembayaran ${newTrx.id} untuk santri ${santriId}${keteranganKhusus ? ` (Lain-lain: ${keteranganKhusus})` : ''}`,
+					keterangan: `Input pembayaran ${newTrx.id} untuk ${santriId ? `santri ${santriId}` : `pembayar umum "${namaPembayarManual}"`}${keteranganKhusus ? ` (Lain-lain: ${keteranganKhusus})` : ''}`,
 					ip: getClientAddress(),
 					createdAt: new Date().toISOString()
 				});

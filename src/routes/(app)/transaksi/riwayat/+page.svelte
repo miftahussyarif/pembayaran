@@ -96,7 +96,7 @@
 						<td class="text-sm whitespace-nowrap">{formatTanggal(r.tanggalBayar)}</td>
 						<td class="font-mono text-xs text-base-content/70">{r.nomorKwitansi}</td>
 						<td>
-							<div class="font-semibold text-sm">{r.namaLengkap || '-'}</div>
+							<div class="font-semibold text-sm">{r.namaPembayar || '-'}</div>
 							<div class="text-xs text-base-content/50">{r.nomorInduk || ''}</div>
 						</td>
 						<td class="text-sm">{r.namaPembayaran || '-'}</td>
@@ -161,7 +161,7 @@
 		{#if hapusRiwayat}
 			<p class="text-sm mb-3">Yakin ingin menghapus transaksi ini secara permanen?</p>
 			<div class="bg-base-200 rounded-lg p-3 my-3 text-sm space-y-1">
-				<div><span class="font-semibold">Santri:</span> {hapusRiwayat.namaLengkap}</div>
+				<div><span class="font-semibold">Pembayar:</span> {hapusRiwayat.namaPembayar}</div>
 				<div><span class="font-semibold">No. Kwitansi:</span> <span class="font-mono text-xs">{hapusRiwayat.nomorKwitansi}</span></div>
 				<div><span class="font-semibold">Pembayaran:</span> {hapusRiwayat.namaPembayaran} {hapusRiwayat.bulan ? '— ' + hapusRiwayat.bulan : ''}</div>
 				<div><span class="font-semibold">Nominal:</span> <span class="text-error font-bold">{formatRupiah(hapusRiwayat.nominalDibayar)}</span></div>

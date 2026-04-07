@@ -12,6 +12,7 @@
 	let santriSearch = $state('');
 	let isKhusus = $state(false);
 	let keteranganKhusus = $state('');
+	let namaPembayarManual = $state('');
 	
 	let selectedJenis = $derived(data.jenisPembayarans.find(j => j.id == selectedJenisId) || null);
 	let selectedSantri = $derived(data.santris.find(s => s.id == selectedSantriId) || null);
@@ -50,10 +51,13 @@
 	});
 
 	let isFormValid = $derived.by(() => {
-		if (!selectedSantriId || !selectedTahunAjaranId) return false;
+		if (!selectedTahunAjaranId) return false;
 		if (isKhusus) {
-			return keteranganKhusus.trim().length > 0 && nominal > 0;
+			return (selectedSantriId || namaPembayarManual.trim().length > 0) &&
+				keteranganKhusus.trim().length > 0 &&
+				nominal > 0;
 		}
+		if (!selectedSantriId) return false;
 		return selectedJenisId &&
 			(isGratis ? nominal >= 0 : nominal > 0) &&
 			(!isBulanan || selectedBulan);
@@ -113,6 +117,7 @@
 			keteranganKhusus = '';
 		} else {
 			keteranganKhusus = '';
+			namaPembayarManual = '';
 		}
 	});
 
@@ -155,6 +160,7 @@
 							nominal = 0;
 							isKhusus = false;
 							keteranganKhusus = '';
+							namaPembayarManual = '';
 							await invalidateAll();
 							return;
 						}
@@ -167,8 +173,8 @@
 						<div class="form-control w-full">
 							<label for="santriId" class="label"><span class="label-text font-medium">Santri</span></label>
 							<input type="text" placeholder="Cari nama atau nomor induk..." class="input input-bordered w-full mb-2" bind:value={santriSearch} />
-							<select id="santriId" name="santriId" class="select select-bordered w-full" bind:value={selectedSantriId} required>
-								<option value="" disabled selected>Pilih Santri...</option>
+							<select id="santriId" name="santriId" class="select select-bordered w-full" bind:value={selectedSantriId} required={!isKhusus}>
+								<option value="" selected>Pilih Santri...</option>
 								{#each filteredSantris as santri}
 									<option value={santri.id}>
 										{santri.nomorInduk} - {santri.namaLengkap} ({santri.namaKategori || 'Tanpa Kategori'})
@@ -178,6 +184,11 @@
 							{#if santriSearch && filteredSantris.length === 0}
 								<div class="label pt-2 pb-0">
 									<span class="label-text-alt text-base-content/60">Tidak ada santri yang cocok.</span>
+								</div>
+							{/if}
+							{#if isKhusus}
+								<div class="label pt-2 pb-0">
+									<span class="label-text-alt text-base-content/60">Opsional. Kosongkan jika pembayar tidak ada di daftar santri.</span>
 								</div>
 							{/if}
 						</div>
@@ -206,6 +217,24 @@
 							<input type="hidden" name="jenisPembayaranId" value={data.khususJenisId} />
 
 							<div class="form-control w-full md:col-span-2 bg-warning/5 p-4 rounded-xl border border-warning/20">
+								<label for="namaPembayarManual" class="label"><span class="label-text font-medium text-warning">Nama Pembayar</span></label>
+								<input
+									id="namaPembayarManual"
+									type="text"
+									name="namaPembayarManual"
+									placeholder="Isi jika pembayar tidak ada di daftar santri"
+									class="input input-bordered w-full mb-2"
+									bind:value={namaPembayarManual}
+									disabled={!!selectedSantriId}
+									required={!selectedSantriId}
+								/>
+								<div class="label pt-0 pb-2">
+									<span class="label-text-alt text-base-content/50">
+										{selectedSantriId
+											? 'Transaksi akan memakai nama santri yang dipilih.'
+											: 'Jika nama belum ada di data santri, sistem akan menyimpannya sebagai pembayar umum.'}
+									</span>
+								</div>
 								<label for="keteranganKhusus" class="label"><span class="label-text font-medium text-warning">Untuk Pembayaran</span></label>
 								<input
 									id="keteranganKhusus"
@@ -331,6 +360,7 @@
 						<li class="step step-primary">
 							<div class="text-left py-1">
 								<div class="font-bold text-sm">{r.nomorKwitansi}</div>
+								<div class="text-xs text-base-content/60 mt-1">{r.namaSantri || r.namaPembayarLain || 'Pembayar tidak diketahui'}</div>
 								<div class="text-xs text-base-content/70 mt-1 mb-1">Rp {r.nominalDibayar.toLocaleString('id')}</div>
 								<div class="text-xs font-mono">{new Date(r.tanggalBayar).toLocaleDateString()}</div>
 								{#if r.keteranganKhusus}

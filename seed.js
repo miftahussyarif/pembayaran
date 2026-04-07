@@ -9,6 +9,7 @@ async function seed() {
         await db.delete(schema.systemLogs);
         await db.delete(schema.mutasiSaldoBendahara);
         await db.delete(schema.pembayaran);
+        await db.delete(schema.pembayarLain);
         await db.delete(schema.santriDetail);
         await db.delete(schema.santriSmk);
         await db.delete(schema.santriSmp);

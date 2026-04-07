@@ -9,7 +9,12 @@ export async function load({ params }) {
 	const [pembayaran] = await db.select().from(schema.pembayaran).where(eq(schema.pembayaran.id, trxId));
 	if (!pembayaran) throw error(404, 'Transaksi tidak ditemukan');
 	
-	const [santri] = await db.select().from(schema.santri).where(eq(schema.santri.id, pembayaran.santriId));
+	const [santri] = pembayaran.santriId
+		? await db.select().from(schema.santri).where(eq(schema.santri.id, pembayaran.santriId))
+		: [null];
+	const [pembayarLain] = pembayaran.pembayarLainId
+		? await db.select().from(schema.pembayarLain).where(eq(schema.pembayarLain.id, pembayaran.pembayarLainId))
+		: [null];
 	const [jenisPembayaran] = await db.select().from(schema.jenisPembayaran).where(eq(schema.jenisPembayaran.id, pembayaran.jenisPembayaranId));
 	const [tahunAjaran] = await db.select().from(schema.tahunAjaran).where(eq(schema.tahunAjaran.id, pembayaran.tahunAjaranId));
 	
@@ -26,6 +31,7 @@ export async function load({ params }) {
 	return {
 		pembayaran,
 		santri,
+		pembayarLain,
 		jenisPembayaran,
 		tahunAjaran,
 		petugas,

@@ -59,8 +59,14 @@
 			<div class="grid grid-cols-2 gap-y-2 mb-2 text-sm">
 				<div>
 					<span class="text-base-content/50 block mb-1">Telah Diterima Dari:</span>
-					<span class="font-bold text-lg">{data.santri.namaLengkap}</span>
-					<div class="text-base-content/70 mt-1">No Induk: {data.santri.nomorInduk}</div>
+					<span class="font-bold text-lg">{data.santri?.namaLengkap || data.pembayarLain?.namaPembayar || '-'}</span>
+					<div class="text-base-content/70 mt-1">
+						{#if data.santri?.nomorInduk}
+							No Induk: {data.santri.nomorInduk}
+						{:else}
+							Kategori: Pembayar Umum
+						{/if}
+					</div>
 				</div>
 				<div class="text-right">
 					<span class="text-base-content/50 block mb-1">Tanggal Bayar:</span>

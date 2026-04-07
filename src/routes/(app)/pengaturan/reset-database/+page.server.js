@@ -40,6 +40,7 @@ export const actions = {
 
 		try {
 			await db.delete(schema.pembayaran);
+			await db.delete(schema.pembayarLain);
 			await db.delete(schema.mutasiSaldoBendahara);
 			await db.delete(schema.systemLogs);
 			return { type: 'success', message: 'Database berhasil direset (riwayat pembayaran, mutasi saldo, dan system log).' };

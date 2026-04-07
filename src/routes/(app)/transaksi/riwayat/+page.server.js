@@ -19,19 +19,24 @@ export async function load({ url, locals }) {
 			santriId: schema.pembayaran.santriId,
 			namaLengkap: schema.santri.namaLengkap,
 			nomorInduk: schema.santri.nomorInduk,
+			namaPembayarLain: schema.pembayarLain.namaPembayar,
 			namaPembayaran: schema.jenisPembayaran.namaPembayaran,
 			tahunNama: schema.tahunAjaran.nama
 		})
 		.from(schema.pembayaran)
 		.leftJoin(schema.santri, eq(schema.pembayaran.santriId, schema.santri.id))
+		.leftJoin(schema.pembayarLain, eq(schema.pembayaran.pembayarLainId, schema.pembayarLain.id))
 		.leftJoin(schema.jenisPembayaran, eq(schema.pembayaran.jenisPembayaranId, schema.jenisPembayaran.id))
 		.leftJoin(schema.tahunAjaran, eq(schema.pembayaran.tahunAjaranId, schema.tahunAjaran.id))
 		.orderBy(desc(schema.pembayaran.tanggalBayar));
 
 	// Filter di sisi server setelah query
-	const filtered = riwayat.filter(r => {
+	const filtered = riwayat.map((r) => ({
+		...r,
+		namaPembayar: r.namaLengkap || r.namaPembayarLain || '-'
+	})).filter(r => {
 		const cocokSantri = filterSantri
-			? (r.namaLengkap?.toLowerCase().includes(filterSantri.toLowerCase()) ||
+			? (r.namaPembayar?.toLowerCase().includes(filterSantri.toLowerCase()) ||
 			   r.nomorInduk?.includes(filterSantri))
 			: true;
 		const cocokTahun = filterTahun ? r.tahunNama === filterTahun : true;

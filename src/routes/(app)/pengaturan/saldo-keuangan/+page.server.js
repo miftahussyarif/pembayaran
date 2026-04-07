@@ -3,8 +3,10 @@ import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { eq, sum, desc, isNotNull, inArray } from 'drizzle-orm';
 
+const canAccessSaldoKeuangan = (role) => role === 'admin' || role === 'bendahara';
+
 export const load = async ({ locals }) => {
-	if (locals.user?.role !== 'admin' && locals.user?.role !== 'bendahara') {
+	if (!canAccessSaldoKeuangan(locals.user?.role)) {
 		throw redirect(303, '/');
 	}
 
@@ -82,7 +84,7 @@ export const load = async ({ locals }) => {
 
 export const actions = {
 	createMutasi: async ({ request, locals, getClientAddress }) => {
-		if (locals.user?.role !== 'admin') {
+		if (!canAccessSaldoKeuangan(locals.user?.role)) {
 			throw redirect(303, '/');
 		}
 

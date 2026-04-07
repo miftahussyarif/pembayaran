@@ -88,9 +88,16 @@ export const santriSmp = sqliteTable('santri_smp', {
 	endYear: integer('end_year')
 });
 
+export const pembayarLain = sqliteTable('pembayar_lain', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	namaPembayar: text('nama_pembayar').notNull(),
+	createdAt: text('created_at').notNull()
+});
+
 export const pembayaran = sqliteTable('pembayaran', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
-	santriId: integer('santri_id').references(() => santri.id).notNull(),
+	santriId: integer('santri_id').references(() => santri.id),
+	pembayarLainId: integer('pembayar_lain_id').references(() => pembayarLain.id),
 	jenisPembayaranId: integer('jenis_pembayaran_id').references(() => jenisPembayaran.id).notNull(),
 	tahunAjaranId: integer('tahun_ajaran_id').references(() => tahunAjaran.id).notNull(),
 	bulan: text('bulan'), // e.g. "Januari", "Februari" - Null if 'sekali'

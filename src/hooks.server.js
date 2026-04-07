@@ -115,6 +115,7 @@ export const handle = async ({ event, resolve }) => {
 				path === '/transaksi/riwayat' ||
 				path === '/transaksi/rekapitulasi' ||
 				path === '/transaksi/rekap-individu' ||
+				path === '/transaksi/rekap-petugas' ||
 				path.startsWith('/transaksi/cetak/') ||
 				path === '/logout';
 			
