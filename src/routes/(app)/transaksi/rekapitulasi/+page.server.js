@@ -21,16 +21,22 @@ export async function load({ url }) {
 	const semuaPembayaran = await db
 		.select({
 			id: schema.pembayaran.id,
+			jenisPembayaranId: schema.pembayaran.jenisPembayaranId,
 			nomorKwitansi: schema.pembayaran.nomorKwitansi,
 			tanggalBayar: schema.pembayaran.tanggalBayar,
 			bulan: schema.pembayaran.bulan,
+			tahunTagihan: schema.pembayaran.tahunTagihan,
 			nominalDibayar: schema.pembayaran.nominalDibayar,
 			namaLengkap: schema.santri.namaLengkap,
 			nomorInduk: schema.santri.nomorInduk,
+			santriId: schema.pembayaran.santriId,
+			kategoriId: schema.santri.kategoriId,
 			namaPembayarLain: schema.pembayarLain.namaPembayar,
 			nominalSyahriyah: schema.kategoriSantri.nominalSyahriyah,
+			nominalKonsumsi: schema.kategoriSantri.nominalKonsumsi,
 			namaPembayaran: schema.jenisPembayaran.namaPembayaran,
 			tipe: schema.jenisPembayaran.tipe,
+			nominalDefault: schema.jenisPembayaran.nominalDefault,
 			tahunNama: schema.tahunAjaran.nama,
 			keteranganKhusus: schema.pembayaran.keteranganKhusus
 		})
@@ -40,6 +46,21 @@ export async function load({ url }) {
 		.leftJoin(schema.kategoriSantri, eq(schema.santri.kategoriId, schema.kategoriSantri.id))
 		.leftJoin(schema.jenisPembayaran, eq(schema.pembayaran.jenisPembayaranId, schema.jenisPembayaran.id))
 		.leftJoin(schema.tahunAjaran, eq(schema.pembayaran.tahunAjaranId, schema.tahunAjaran.id));
+
+	const gratisList = await db.select().from(schema.kategoriGratis);
+	const getNominalTagihan = (row) => {
+		const mapping = gratisList.find((item) => item.kategoriId === row.kategoriId && item.jenisPembayaranId === row.jenisPembayaranId);
+		if (mapping && mapping.nominal !== null) return Number(mapping.nominal || 0);
+		if (row.tipe === 'bulanan' && /konsumsi/i.test(row.namaPembayaran || '')) return Number(row.nominalKonsumsi || 0);
+		return Number(row.nominalDefault || 0);
+	};
+
+	const totalTahunanByKey = new Map();
+	for (const row of semuaPembayaran) {
+		if (!row.santriId || !['tahunan', 'smk_tahunan', 'smp_tahunan'].includes(row.tipe || '')) continue;
+		const key = `${row.santriId}:${row.jenisPembayaranId}:${row.tahunNama}`;
+		totalTahunanByKey.set(key, (totalTahunanByKey.get(key) || 0) + Number(row.nominalDibayar || 0));
+	}
 
 	// Filter: tahun yang dipilih, dan bulan yang dipilih (khusus tipe bulanan)
 	// sekali / tahunan: cek di bulan tanggal bayar
@@ -68,7 +89,16 @@ export async function load({ url }) {
 			...p,
 			namaPembayar,
 			kategoriRekap,
-			nominalRekap
+			nominalRekap,
+			statusPelunasan: (() => {
+				if (!p.santriId || p.namaPembayarLain) return 'Lunas';
+				if (['bulanan', 'smk_bulanan', 'smp_bulanan', 'sekali', 'smk_sekali', 'smp_sekali'].includes(p.tipe || '')) return 'Lunas';
+				if (['tahunan', 'smk_tahunan', 'smp_tahunan'].includes(p.tipe || '')) {
+					const key = `${p.santriId}:${p.jenisPembayaranId}:${p.tahunNama}`;
+					return (totalTahunanByKey.get(key) || 0) >= getNominalTagihan(p) ? 'Lunas' : 'Belum Lunas';
+				}
+				return 'Lunas';
+			})()
 		};
 	});
 

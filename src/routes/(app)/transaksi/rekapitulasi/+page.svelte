@@ -188,13 +188,14 @@
 						<th>No. Induk</th>
 						<th>Jenis Pembayaran</th>
 						<th>Bulan</th>
+						<th>Status</th>
 						<th class="text-right">Nominal</th>
 					</tr>
 				</thead>
 				<tbody>
 					{#if data.rekap.length === 0}
 						<tr>
-							<td colspan="9" class="text-center py-8 text-base-content/50">
+							<td colspan="10" class="text-center py-8 text-base-content/50">
 								<div class="flex flex-col items-center gap-2">
 									<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
 									<span>Tidak ada data untuk <strong>{data.filterBulan} {data.filterTahun}</strong></span>
@@ -217,10 +218,15 @@
 							<td class="text-sm">{r.namaPembayaran || '-'}</td>
 							<td>
 								{#if r.bulan}
-									<span class="badge badge-outline badge-sm">{r.bulan}</span>
+									<span class="badge badge-outline badge-sm">{r.bulan}{r.tahunTagihan ? ` ${r.tahunTagihan}` : ''}</span>
 								{:else}
 									<span class="text-xs text-base-content/40">-</span>
 								{/if}
+							</td>
+							<td>
+								<span class={`badge badge-sm ${r.statusPelunasan === 'Lunas' ? 'badge-success' : 'badge-warning badge-outline'}`}>
+									{r.statusPelunasan}
+								</span>
 							</td>
 							<td class="text-right font-bold text-sm text-success">{formatRupiah(r.nominalRekap)}</td>
 						</tr>
@@ -229,7 +235,7 @@
 				{#if data.rekap.length > 0}
 					<tfoot>
 						<tr class="font-bold bg-base-200/40 border-t-2 border-base-300">
-							<td colspan="8" class="text-right py-2">Total Pemasukan:</td>
+							<td colspan="9" class="text-right py-2">Total Pemasukan:</td>
 							<td class="text-right text-success text-base">{formatRupiah(data.totalPemasukan)}</td>
 						</tr>
 					</tfoot>

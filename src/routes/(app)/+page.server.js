@@ -2,13 +2,30 @@ import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { sql, count, sum, eq } from 'drizzle-orm';
 
+const BULAN_NAMES = ['Januari','Februari','Maret','April','Mei','Juni',
+	'Juli','Agustus','September','Oktober','November','Desember'];
+
+function inferTahunTagihan(tahunAjaranNama, bulan, fallbackYear) {
+	const monthIndex = BULAN_NAMES.indexOf(bulan);
+	const normalizedTahun = String(tahunAjaranNama || '').trim();
+	const slashMatch = normalizedTahun.match(/^(\d{4})\s*\/\s*(\d{4})$/);
+	if (slashMatch) {
+		const startYear = Number(slashMatch[1]);
+		const endYear = Number(slashMatch[2]);
+		if (monthIndex >= 0 && monthIndex <= 5) return endYear;
+		if (monthIndex >= 6) return startYear;
+	}
+
+	const directYearMatch = normalizedTahun.match(/(\d{4})/);
+	if (directYearMatch) return Number(directYearMatch[1]);
+
+	return fallbackYear;
+}
+
 export async function load() {
 	const now = new Date(); // 2026-03-12
 	const nowYear = now.getFullYear();
 	const nowMonth = now.getMonth() + 1; // 1-12
-
-	const BULAN_NAMES = ['Januari','Februari','Maret','April','Mei','Juni',
-		'Juli','Agustus','September','Oktober','November','Desember'];
 
 	// 1. Total santri aktif
 	const [{ totalSantri }] = await db
@@ -71,6 +88,7 @@ export async function load() {
 			.select({
 				santriId: schema.pembayaran.santriId,
 				bulan: schema.pembayaran.bulan,
+				tahunTagihan: schema.pembayaran.tahunTagihan,
 				nominalDibayar: schema.pembayaran.nominalDibayar,
 				tipe: schema.jenisPembayaran.tipe
 			})
@@ -114,13 +132,14 @@ export async function load() {
 				const hasPayment = allPembayaran.some(p =>
 					p.santriId === s.id &&
 					p.bulan === namaBulan &&
+					Number(p.tahunTagihan || inferTahunTagihan(taName, p.bulan, taYear)) === bulanDate.getFullYear() &&
 					p.tipe === 'bulanan'
 				);
 				return hasPayment;
 			}).length;
 
 			const persen = Math.round((sudahBayar / totalWajib) * 100);
-			bulanTampil.push({ bulan: namaBulan, tahun: taYear, sudahBayar, totalWajib, persen });
+			bulanTampil.push({ bulan: namaBulan, tahun: bulanDate.getFullYear(), sudahBayar, totalWajib, persen });
 		}
 		progressBulanan = bulanTampil;
 
@@ -143,16 +162,24 @@ export async function load() {
 			let cur = new Date(startHitung.getFullYear(), startHitung.getMonth(), 1);
 			const endMonth = new Date(endHitung.getFullYear(), endHitung.getMonth(), 1);
 			while (cur <= endMonth) {
-				bulanWajib.push(BULAN_NAMES[cur.getMonth()]);
+				bulanWajib.push({
+					bulan: BULAN_NAMES[cur.getMonth()],
+					tahun: cur.getFullYear()
+				});
 				cur.setMonth(cur.getMonth() + 1);
 			}
 
 			const sudahBayarBulan = new Set(
 				allPembayaran
 					.filter(p => p.santriId === santri.id && p.tipe === 'bulanan')
-					.map(p => p.bulan)
+					.map(p => {
+						const tahunTagihan = Number(p.tahunTagihan || inferTahunTagihan(taName, p.bulan, taYear));
+						return `${tahunTagihan}-${p.bulan}`;
+					})
 			);
-			const belumBayar = bulanWajib.filter(b => !sudahBayarBulan.has(b));
+			const belumBayar = bulanWajib.filter((periode) =>
+				!sudahBayarBulan.has(`${periode.tahun}-${periode.bulan}`)
+			);
 			const tunggakanSantri = belumBayar.length * nominalPerBulan;
 
 			if (tunggakanSantri > 0) {

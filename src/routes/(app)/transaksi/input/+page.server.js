@@ -3,6 +3,244 @@ import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { eq, isNotNull, desc, and } from 'drizzle-orm';
 
+const BULAN_NAMES = [
+	'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+	'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
+function inferTahunTagihan(tahunAjaranNama, bulan, tanggalBayar = new Date().toISOString()) {
+	const fallbackYear = tanggalBayar ? new Date(tanggalBayar).getFullYear() : new Date().getFullYear();
+	if (!bulan) return fallbackYear;
+
+	const monthIndex = BULAN_NAMES.indexOf(bulan);
+	const normalizedTahun = String(tahunAjaranNama || '').trim();
+	const slashMatch = normalizedTahun.match(/^(\d{4})\s*\/\s*(\d{4})$/);
+	if (slashMatch) {
+		const startYear = Number(slashMatch[1]);
+		const endYear = Number(slashMatch[2]);
+		if (monthIndex >= 0 && monthIndex <= 5) return endYear;
+		if (monthIndex >= 6) return startYear;
+	}
+
+	const directYearMatch = normalizedTahun.match(/(\d{4})/);
+	if (directYearMatch) return Number(directYearMatch[1]);
+
+	return fallbackYear;
+}
+
+function getEffectiveNominal({ santriRow, jenisRow, customNominalRow }) {
+	const hasCustomNominal = customNominalRow !== undefined;
+	const customNominal = customNominalRow?.nominal;
+	const isGratis = hasCustomNominal && customNominal === 0;
+
+	if (hasCustomNominal && customNominal !== null) {
+		return {
+			nominal: customNominal,
+			isGratis
+		};
+	}
+
+	const isKonsumsi = !!jenisRow?.namaPembayaran && /konsumsi/i.test(jenisRow.namaPembayaran);
+	if (isKonsumsi && santriRow?.nominalKonsumsi !== undefined) {
+		return {
+			nominal: santriRow.nominalKonsumsi,
+			isGratis: santriRow.nominalKonsumsi === 0
+		};
+	}
+
+	return {
+		nominal: jenisRow?.nominalDefault ?? 0,
+		isGratis: (jenisRow?.nominalDefault ?? 0) === 0
+	};
+}
+
+async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItems = []) {
+	const santriId = rawItem.santriId ? Number(rawItem.santriId) : null;
+	const tahunAjaranId = Number(rawItem.tahunAjaranId);
+	const jenisPembayaranId = Number(rawItem.jenisPembayaranId);
+	const bulan = rawItem.bulan || null;
+	const tahunTagihanRaw = rawItem.tahunTagihan ? String(rawItem.tahunTagihan).trim() : '';
+	const keteranganKhusus = rawItem.keteranganKhusus ? String(rawItem.keteranganKhusus).trim() : null;
+	const namaPembayarManual = rawItem.namaPembayarManual ? String(rawItem.namaPembayarManual).trim() : '';
+	let nominalDibayar = Number(rawItem.nominalDibayar);
+
+	if (!tahunAjaranId || !jenisPembayaranId) {
+		return { error: 'Data pembayaran tidak lengkap.' };
+	}
+
+	const isKhusus = !!keteranganKhusus;
+	if (isKhusus) {
+		if (!santriId && !namaPembayarManual) {
+			return { error: 'Pembayaran lain-lain harus memiliki santri atau nama pembayar.' };
+		}
+		if (!nominalDibayar || Number.isNaN(nominalDibayar) || nominalDibayar <= 0) {
+			return { error: 'Nominal pembayaran lain-lain harus lebih dari 0.' };
+		}
+
+		return {
+			row: {
+				santriId,
+				tahunAjaranId,
+				jenisPembayaranId,
+				bulan: null,
+				tahunTagihan: null,
+				nominalDibayar,
+				keteranganKhusus,
+				namaPembayarManual
+			}
+		};
+	}
+
+	if (!santriId) {
+		return { error: 'Pembayaran reguler harus terhubung ke data santri.' };
+	}
+
+	const [santriRow] = await db
+		.select({
+			id: schema.santri.id,
+			kategoriId: schema.santri.kategoriId,
+			nominalKonsumsi: schema.kategoriSantri.nominalKonsumsi,
+			namaKategori: schema.kategoriSantri.namaKategori
+		})
+		.from(schema.santri)
+		.leftJoin(schema.kategoriSantri, eq(schema.santri.kategoriId, schema.kategoriSantri.id))
+		.where(eq(schema.santri.id, santriId));
+
+	const [jenisRow] = await db
+		.select({
+			id: schema.jenisPembayaran.id,
+			tipe: schema.jenisPembayaran.tipe,
+			namaPembayaran: schema.jenisPembayaran.namaPembayaran,
+			nominalDefault: schema.jenisPembayaran.nominalDefault
+		})
+		.from(schema.jenisPembayaran)
+		.where(eq(schema.jenisPembayaran.id, jenisPembayaranId));
+
+	const [tahunAjaranRow] = await db
+		.select({
+			id: schema.tahunAjaran.id,
+			nama: schema.tahunAjaran.nama
+		})
+		.from(schema.tahunAjaran)
+		.where(eq(schema.tahunAjaran.id, tahunAjaranId));
+
+	const [customNominalRow] = await db
+		.select({ nominal: schema.kategoriGratis.nominal })
+		.from(schema.kategoriGratis)
+		.where(and(
+			eq(schema.kategoriGratis.kategoriId, santriRow.kategoriId),
+			eq(schema.kategoriGratis.jenisPembayaranId, jenisPembayaranId)
+		));
+
+	const isBulanan = ['bulanan', 'smk_bulanan', 'smp_bulanan'].includes(jenisRow?.tipe || '');
+	const isTahunan = ['tahunan', 'smk_tahunan', 'smp_tahunan'].includes(jenisRow?.tipe || '');
+	const isSekali = ['sekali', 'smk_sekali', 'smp_sekali'].includes(jenisRow?.tipe || '');
+	const { nominal: nominalTagihan, isGratis } = getEffectiveNominal({
+		santriRow,
+		jenisRow,
+		customNominalRow
+	});
+
+	if (isBulanan && !bulan) {
+		return { error: 'Bulan tagihan wajib dipilih untuk pembayaran bulanan.' };
+	}
+
+	const tahunTagihan = isBulanan
+		? Number(tahunTagihanRaw || inferTahunTagihan(tahunAjaranRow?.nama, bulan, new Date().toISOString()))
+		: null;
+
+	if (isBulanan && (!tahunTagihan || Number.isNaN(tahunTagihan))) {
+		return { error: 'Tahun tagihan wajib dipilih untuk pembayaran bulanan.' };
+	}
+
+	const existingPayments = await db
+		.select({
+			id: schema.pembayaran.id,
+			tahunAjaranId: schema.pembayaran.tahunAjaranId,
+			bulan: schema.pembayaran.bulan,
+			tahunTagihan: schema.pembayaran.tahunTagihan,
+			nominalDibayar: schema.pembayaran.nominalDibayar,
+			keteranganKhusus: schema.pembayaran.keteranganKhusus
+		})
+		.from(schema.pembayaran)
+		.where(and(
+			eq(schema.pembayaran.santriId, santriId),
+			eq(schema.pembayaran.jenisPembayaranId, jenisPembayaranId)
+		));
+
+	const regularExistingPayments = existingPayments.filter((item) => !item.keteranganKhusus);
+
+	if (isBulanan) {
+		const existingPeriodPayments = regularExistingPayments.filter((item) =>
+			item.tahunAjaranId === tahunAjaranId &&
+			item.bulan === bulan &&
+			Number(item.tahunTagihan || 0) === Number(tahunTagihan || 0)
+		);
+
+		if (existingPeriodPayments.length > 0) {
+			return {
+				error: `Tagihan ${jenisRow.namaPembayaran} untuk ${bulan} ${tahunTagihan} sudah terbayar.`
+			};
+		}
+
+		nominalDibayar = nominalTagihan;
+	} else if (isSekali) {
+		const totalSudahDibayar = regularExistingPayments.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0);
+		if (totalSudahDibayar > 0) {
+			return {
+				error: `${jenisRow.namaPembayaran} sudah pernah dibayarkan dan tidak boleh dibayar dua kali.`
+			};
+		}
+
+		nominalDibayar = nominalTagihan;
+	} else if (isTahunan) {
+		const existingYearPayments = regularExistingPayments.filter((item) => item.tahunAjaranId === tahunAjaranId);
+		const totalSudahDibayar = existingYearPayments.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0);
+		
+		// Tambahkan total dari item-item dalam batch yang sama
+		const totalDariItemSebelumnya = previouslyNormalizedItems
+			.filter(item => item.santriId === santriId && item.jenisPembayaranId === jenisPembayaranId && item.tahunAjaranId === tahunAjaranId)
+			.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0);
+		
+		const sisaTagihan = Math.max(0, nominalTagihan - totalSudahDibayar - totalDariItemSebelumnya);
+
+		if (sisaTagihan <= 0) {
+			return {
+				error: `${jenisRow.namaPembayaran} untuk tahun ${tahunAjaranRow?.nama || tahunAjaranId} sudah lunas atau jumlah cicilan melebihi tagihan.`
+			};
+		}
+
+		if (!nominalDibayar || Number.isNaN(nominalDibayar) || nominalDibayar <= 0) {
+			return { error: 'Nominal cicilan harus lebih dari 0.' };
+		}
+
+		if (nominalDibayar > sisaTagihan) {
+			return {
+				error: `Nominal melebihi sisa tagihan. Sisa ${jenisRow.namaPembayaran}: Rp ${sisaTagihan.toLocaleString('id-ID')}.`
+			};
+		}
+	} else {
+		nominalDibayar = nominalTagihan;
+	}
+
+	if (nominalDibayar <= 0 && !isGratis) {
+		return { error: 'Nominal harus lebih dari 0.' };
+	}
+
+	return {
+		row: {
+			santriId,
+			tahunAjaranId,
+			jenisPembayaranId,
+			bulan,
+			tahunTagihan,
+			nominalDibayar,
+			keteranganKhusus: null,
+			namaPembayarManual: ''
+		}
+	};
+}
+
 export async function load() {
 	// Ambil data Dropdown
 	const santris = await db
@@ -37,8 +275,19 @@ export async function load() {
 		.orderBy(desc(schema.pembayaran.id))
 		.limit(10);
 
-	// Ambil semua pembayaran bulanan untuk validasi status
-	const pembayaranBulanan = await db.select().from(schema.pembayaran).where(isNotNull(schema.pembayaran.bulan));
+	// Ambil semua pembayaran reguler untuk validasi status di client
+	const pembayaranReguler = await db
+		.select({
+			id: schema.pembayaran.id,
+			santriId: schema.pembayaran.santriId,
+			tahunAjaranId: schema.pembayaran.tahunAjaranId,
+			jenisPembayaranId: schema.pembayaran.jenisPembayaranId,
+			bulan: schema.pembayaran.bulan,
+			tahunTagihan: schema.pembayaran.tahunTagihan,
+			nominalDibayar: schema.pembayaran.nominalDibayar,
+			keteranganKhusus: schema.pembayaran.keteranganKhusus
+		})
+		.from(schema.pembayaran);
 
 	// Ambil pemetaan kategori gratis
 	const kategoriGratis = await db.select().from(schema.kategoriGratis);
@@ -66,7 +315,7 @@ export async function load() {
 		tahunAjarans,
 		jenisPembayarans,
 		riwayatData,
-		pembayaranBulanan,
+		pembayaranReguler,
 		kategoriGratis,
 		khususJenisId: jenisKhusus?.id || null
 	};
@@ -76,122 +325,70 @@ export const actions = {
 	create: async ({ request, locals, getClientAddress }) => {
 		try {
 			const formData = await request.formData();
-			const santriIdRaw = formData.get('santriId')?.toString().trim() || '';
-			let santriId = santriIdRaw ? Number(santriIdRaw) : null;
-			const tahunAjaranId = Number(formData.get('tahunAjaranId'));
-			const jenisPembayaranId = Number(formData.get('jenisPembayaranId'));
-			let nominalDibayar = Number(formData.get('nominalDibayar'));
-			const bulan = formData.get('bulan') || null;
-			const keteranganKhusus = formData.get('keteranganKhusus')?.toString().trim() || null;
-			const namaPembayarManual = formData.get('namaPembayarManual')?.toString().trim() || '';
+			const paymentItemsJson = formData.get('paymentItemsJson')?.toString().trim() || '';
 			const inputById = locals.user?.id || null;
+			
+			console.log('📨 Backend received form submission');
+			console.log('paymentItemsJson:', paymentItemsJson);
+			
+			const rawItems = paymentItemsJson
+				? JSON.parse(paymentItemsJson)
+				: [{
+					santriId: formData.get('santriId')?.toString().trim() || '',
+					tahunAjaranId: formData.get('tahunAjaranId')?.toString().trim() || '',
+					jenisPembayaranId: formData.get('jenisPembayaranId')?.toString().trim() || '',
+					nominalDibayar: formData.get('nominalDibayar')?.toString().trim() || '',
+					bulan: formData.get('bulan')?.toString().trim() || '',
+					tahunTagihan: formData.get('tahunTagihan')?.toString().trim() || '',
+					keteranganKhusus: formData.get('keteranganKhusus')?.toString().trim() || '',
+					namaPembayarManual: formData.get('namaPembayarManual')?.toString().trim() || ''
+				}];
 
-			// Validasi data dasar
-			if (!tahunAjaranId || !jenisPembayaranId) {
+			console.log('rawItems parsed:', JSON.stringify(rawItems));
+
+			if (!Array.isArray(rawItems) || rawItems.length === 0) {
+				console.log('❌ No payment items provided');
+				return { success: false, message: 'Belum ada item pembayaran yang dipilih.' };
+			}
+
+			const normalizedItems = [];
+			for (const rawItem of rawItems) {
+				console.log('🔍 Validating item:', JSON.stringify(rawItem));
+				const validated = await validateAndNormalizePaymentItem(rawItem, normalizedItems);
+				if (validated.error) {
+					console.log('❌ Validation error:', validated.error);
+					return { success: false, message: validated.error };
+				}
+				console.log('✅ Item valid:', JSON.stringify(validated.row));
+				normalizedItems.push(validated.row);
+			}
+
+			const uniqueSantriIds = new Set(normalizedItems.map((item) => item.santriId || 0));
+			const uniqueTahunAjaranIds = new Set(normalizedItems.map((item) => item.tahunAjaranId));
+			const uniqueManualNames = new Set(normalizedItems.map((item) => (item.namaPembayarManual || '').toLocaleLowerCase('id-ID')).filter(Boolean));
+
+			if (uniqueSantriIds.size > 1 || uniqueTahunAjaranIds.size > 1 || uniqueManualNames.size > 1) {
 				return {
 					success: false,
-					message: 'Data tidak lengkap'
+					message: 'Multi payment harus untuk santri dan tahun ajaran yang sama.'
 				};
 			}
 
-			// Jika ini pembayaran khusus, gunakan nominal dari form langsung
-			const isKhusus = !!keteranganKhusus;
-			const isPembayarManual = isKhusus && !santriId;
-
-			if (!santriId && !namaPembayarManual) {
-				return {
-					success: false,
-					message: 'Pilih santri atau isi nama pembayar.'
-				};
-			}
-
-			if (!isKhusus) {
-				if (!santriId) {
-					return {
-						success: false,
-						message: 'Pembayaran reguler harus terhubung ke data santri.'
-					};
-				}
-
-				// Cek aturan kategori santri
-				const [santriRow] = await db
-					.select({
-						id: schema.santri.id,
-						kategoriId: schema.santri.kategoriId,
-						nominalKonsumsi: schema.kategoriSantri.nominalKonsumsi,
-						namaKategori: schema.kategoriSantri.namaKategori
-					})
-					.from(schema.santri)
-					.leftJoin(schema.kategoriSantri, eq(schema.santri.kategoriId, schema.kategoriSantri.id))
-					.where(eq(schema.santri.id, santriId));
-
-				const [jenisRow] = await db
-					.select({
-						id: schema.jenisPembayaran.id,
-						tipe: schema.jenisPembayaran.tipe,
-						namaPembayaran: schema.jenisPembayaran.namaPembayaran,
-						nominalDefault: schema.jenisPembayaran.nominalDefault
-					})
-					.from(schema.jenisPembayaran)
-					.where(eq(schema.jenisPembayaran.id, jenisPembayaranId));
-
-				// Cek apakah ada nominal khusus untuk kategori santri ini
-				const [customNominalRow] = await db
-					.select({ nominal: schema.kategoriGratis.nominal })
-					.from(schema.kategoriGratis)
-					.where(and(
-						eq(schema.kategoriGratis.kategoriId, santriRow.kategoriId),
-						eq(schema.kategoriGratis.jenisPembayaranId, jenisPembayaranId)
-					));
-
-				const hasCustomNominal = customNominalRow !== undefined;
-				const customNominal = customNominalRow?.nominal;
-				const isGratis = hasCustomNominal && customNominal === 0;
-
-				if (hasCustomNominal && customNominal !== null) {
-					nominalDibayar = customNominal;
-				} else {
-					// Fallback: untuk konsumsi gunakan nominalKonsumsi dari kategori, otherwise nominalDefault
-					const isKonsumsi = !!jenisRow?.namaPembayaran && /konsumsi/i.test(jenisRow.namaPembayaran);
-
-					if (isKonsumsi && santriRow?.nominalKonsumsi !== undefined) {
-						nominalDibayar = santriRow.nominalKonsumsi;
-					} else {
-						nominalDibayar = jenisRow.nominalDefault;
-					}
-				}
-
-				if (nominalDibayar <= 0 && !isGratis) {
-					return {
-						success: false,
-						message: 'Nominal harus lebih dari 0'
-					};
-				}
-			} else {
-				if (nominalDibayar <= 0) {
-					return {
-						success: false,
-						message: 'Nominal pembayaran lain-lain harus lebih dari 0'
-					};
-				}
-			}
-
-			// Generate No Kwitansi sederhana
-			const nomorKwitansi = `KW-${Date.now()}`;
+			// Generate No Kwitansi base (akan ditambahi sequence untuk item > 1)
+			const nomorKwitansiBase = `KW-${Date.now()}`;
 			const tanggalBayar = new Date().toISOString();
 			let pembayarLainId = null;
+			let santriId = normalizedItems[0]?.santriId || null;
+			const namaPembayarManual = normalizedItems[0]?.namaPembayarManual || '';
 
-			if (isPembayarManual) {
+			if (!santriId && namaPembayarManual) {
 				const santriByName = await db.select().from(schema.santri);
 				const normalizedNama = namaPembayarManual.toLocaleLowerCase('id-ID');
 				const santriMatch = santriByName.find((item) => item.namaLengkap.toLocaleLowerCase('id-ID') === normalizedNama);
-
-				if (santriMatch) {
-					santriId = santriMatch.id;
-				}
+				if (santriMatch) santriId = santriMatch.id;
 			}
 
-			if (isPembayarManual && !santriId) {
+			if (!santriId && namaPembayarManual) {
 				const existingPembayar = await db.select().from(schema.pembayarLain);
 				const normalizedNama = namaPembayarManual.toLocaleLowerCase('id-ID');
 				const match = existingPembayar.find((item) => item.namaPembayar.toLocaleLowerCase('id-ID') === normalizedNama);
@@ -207,30 +404,67 @@ export const actions = {
 				}
 			}
 
-			// Insert pembayaran baru
-			const pembayaranResult = await db.insert(schema.pembayaran).values({
-				santriId,
-				pembayarLainId,
-				tahunAjaranId,
-				jenisPembayaranId,
-				bulan,
-				nominalDibayar,
-				tanggalBayar,
-				nomorKwitansi,
-				inputById,
-				keteranganKhusus
-			}).returning();
+			const pembayaranValues = normalizedItems.map((item, index) => {
+				// Generate unique nomorKwitansi untuk setiap item dalam batch
+				// Item pertama: KW-{timestamp}
+				// Item ke-2+: KW-{timestamp}-{index}
+				const nomorKwitansi = index === 0 ? nomorKwitansiBase : `${nomorKwitansiBase}-${index + 1}`;
+				console.log(`  Item ${index + 1} nomorKwitansi:`, nomorKwitansi);
+				
+				return {
+					santriId,
+					pembayarLainId: santriId ? null : pembayarLainId,
+					tahunAjaranId: item.tahunAjaranId,
+					jenisPembayaranId: item.jenisPembayaranId,
+					bulan: item.bulan,
+					tahunTagihan: item.tahunTagihan,
+					nominalDibayar: item.nominalDibayar,
+					tanggalBayar,
+					nomorKwitansi,
+					inputById,
+					keteranganKhusus: item.keteranganKhusus
+				};
+			});
 
-			const newTrx = Array.isArray(pembayaranResult) ? pembayaranResult[0] : pembayaranResult;
+			const pembayaranResult = await db.insert(schema.pembayaran).values(pembayaranValues).returning();
+			console.log('💾 Raw insert result:', pembayaranResult);
+			
+			const insertedRows = Array.isArray(pembayaranResult) ? pembayaranResult : (pembayaranResult ? [pembayaranResult] : []);
+			console.log('💾 insertedRows:', insertedRows);
+			
+			let newTrx = insertedRows[0];
+			console.log('💾 newTrx from returning():', newTrx);
 
+			// Jika returning() tidak mengembalikan data (bug SQLite), query langsung berdasarkan nomorKwitansi item pertama
 			if (!newTrx || !newTrx.id) {
+				console.log('⚠️ returning() tidak mengembalikan id, query langsung dari database');
+				const firstItemNomorKwitansi = nomorKwitansiBase; // Item pertama punya nomorKwitansi yang sama dengan base
+				console.log('  Query by nomorKwitansi:', firstItemNomorKwitansi);
+				const [queryResult] = await db
+					.select()
+					.from(schema.pembayaran)
+					.where(eq(schema.pembayaran.nomorKwitansi, firstItemNomorKwitansi));
+				
+				newTrx = queryResult;
+				console.log('💾 newTrx from query:', newTrx);
+			}
+
+			console.log('💾 Insert result:');
+			console.log('  - insertedRows length:', insertedRows.length);
+			console.log('  - newTrx:', newTrx);
+			console.log('  - newTrx?.id:', newTrx?.id);
+			console.log('  - newTrx?.id type:', typeof newTrx?.id);
+
+			if (!newTrx?.id) {
+				console.log('❌ No transaction id found');
 				return {
 					success: false,
-					message: 'Gagal membuat transaksi'
+					message: 'Gagal mendapatkan ID transaksi'
 				};
 			}
 
 			console.log('✓ Transaksi berhasil disimpan:', newTrx.id);
+			console.log('📤 Returning response with id:', newTrx.id);
 
 			try {
 				await db.insert(schema.systemLogs).values({
@@ -239,19 +473,21 @@ export const actions = {
 					role: locals.user?.role || null,
 					aksi: 'input',
 					modul: 'transaksi',
-					keterangan: `Input pembayaran ${newTrx.id} untuk ${santriId ? `santri ${santriId}` : `pembayar umum "${namaPembayarManual}"`}${keteranganKhusus ? ` (Lain-lain: ${keteranganKhusus})` : ''}`,
+					keterangan: `Input ${insertedRows.length} item pembayaran kwitansi ${nomorKwitansiBase} untuk ${santriId ? `santri ${santriId}` : `pembayar umum "${namaPembayarManual}"`}`,
 					ip: getClientAddress(),
 					createdAt: new Date().toISOString()
 				});
 			} catch (e) {
-				// ignore logging errors
+				console.error('⚠️ Logging error (ignored):', e);
 			}
 
 			// Return data id transaksi agar client yang melakukan navigasi
-			return {
+			const response = {
 				success: true,
-				id: newTrx.id
+				id: Number(newTrx.id)
 			};
+			console.log('📤 Response object:', JSON.stringify(response));
+			return response;
 		} catch (error) {
 			console.error('❌ Error dalam create action:', error);
 			

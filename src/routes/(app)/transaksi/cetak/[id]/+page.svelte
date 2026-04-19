@@ -84,28 +84,32 @@
 						</tr>
 					</thead>
 					<tbody>
-						<tr>
-							<td class="font-medium text-base">
-							{#if data.pembayaran.keteranganKhusus}
-								{data.pembayaran.keteranganKhusus}
-							{:else}
-								{data.jenisPembayaran.namaPembayaran}
-							{/if}
-							{#if data.pembayaran.bulan}
-								<span class="badge badge-sm badge-outline ml-2">Bulan: {data.pembayaran.bulan}</span>
-							{/if}
-						</td>
-							<td class="text-right text-lg font-bold">Rp {data.pembayaran.nominalDibayar.toLocaleString('id-ID')}</td>
-						</tr>
+						{#each data.pembayaranList as item}
+							<tr>
+								<td class="font-medium text-base">
+									{#if item.keteranganKhusus}
+										{item.keteranganKhusus}
+									{:else}
+										{item.namaPembayaran || 'Pembayaran'}
+									{/if}
+									{#if item.bulan}
+										<span class="badge badge-sm badge-outline ml-2">
+											Bulan: {item.bulan}{item.tahunTagihan ? ` ${item.tahunTagihan}` : ''}
+										</span>
+									{/if}
+								</td>
+								<td class="text-right text-lg font-bold">Rp {item.nominalDibayar.toLocaleString('id-ID')}</td>
+							</tr>
+						{/each}
 					</tbody>
 					<tfoot>
 						<tr class="bg-primary/5 text-primary">
 							<td class="text-right font-bold text-lg">TOTAL</td>
-							<td class="text-right font-bold text-xl">Rp {data.pembayaran.nominalDibayar.toLocaleString('id-ID')}</td>
+							<td class="text-right font-bold text-xl">Rp {data.totalNominal.toLocaleString('id-ID')}</td>
 						</tr>
 						<tr>
 							<td colspan="2" class="text-left text-sm italic text-base-content/70 py-1">
-								Terbilang: {terbilang(data.pembayaran.nominalDibayar)} rupiah
+								Terbilang: {terbilang(data.totalNominal)} rupiah
 							</td>
 						</tr>
 					</tfoot>

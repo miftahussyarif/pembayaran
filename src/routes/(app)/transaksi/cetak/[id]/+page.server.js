@@ -1,13 +1,40 @@
 import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
 
 export async function load({ params }) {
 	const trxId = Number(params.id);
 	
-	const [pembayaran] = await db.select().from(schema.pembayaran).where(eq(schema.pembayaran.id, trxId));
-	if (!pembayaran) throw error(404, 'Transaksi tidak ditemukan');
+	const [pembayaranAwal] = await db.select().from(schema.pembayaran).where(eq(schema.pembayaran.id, trxId));
+	if (!pembayaranAwal) throw error(404, 'Transaksi tidak ditemukan');
+
+	// Query SEMUA pembayaran dengan santri, tahun ajaran, dan tanggal bayar yang SAMA
+	// Ini untuk menggabungkan batch payments menjadi 1 kwitansi
+	const pembayaranList = await db
+		.select({
+			id: schema.pembayaran.id,
+			santriId: schema.pembayaran.santriId,
+			pembayarLainId: schema.pembayaran.pembayarLainId,
+			jenisPembayaranId: schema.pembayaran.jenisPembayaranId,
+			tahunAjaranId: schema.pembayaran.tahunAjaranId,
+			bulan: schema.pembayaran.bulan,
+			tahunTagihan: schema.pembayaran.tahunTagihan,
+			tanggalBayar: schema.pembayaran.tanggalBayar,
+			nominalDibayar: schema.pembayaran.nominalDibayar,
+			nomorKwitansi: schema.pembayaran.nomorKwitansi,
+			inputById: schema.pembayaran.inputById,
+			keteranganKhusus: schema.pembayaran.keteranganKhusus,
+			namaPembayaran: schema.jenisPembayaran.namaPembayaran
+		})
+		.from(schema.pembayaran)
+		.leftJoin(schema.jenisPembayaran, eq(schema.pembayaran.jenisPembayaranId, schema.jenisPembayaran.id))
+		.where(and(
+			eq(schema.pembayaran.santriId, pembayaranAwal.santriId),
+			eq(schema.pembayaran.tahunAjaranId, pembayaranAwal.tahunAjaranId),
+			eq(schema.pembayaran.tanggalBayar, pembayaranAwal.tanggalBayar)
+		));
+	const pembayaran = pembayaranList[0];
 	
 	const [santri] = pembayaran.santriId
 		? await db.select().from(schema.santri).where(eq(schema.santri.id, pembayaran.santriId))
@@ -30,6 +57,8 @@ export async function load({ params }) {
 	
 	return {
 		pembayaran,
+		pembayaranList,
+		totalNominal: pembayaranList.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0),
 		santri,
 		pembayarLain,
 		jenisPembayaran,

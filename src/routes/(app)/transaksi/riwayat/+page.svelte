@@ -3,9 +3,19 @@
 	let { data, form } = $props();
 
 	let hapusRiwayat = $state(null); // transaksi yang akan dihapus
+	let expandedKwitansi = $state(new Set()); // track which kwitansi rows are expanded
 
 	const formatRupiah = (n) => 'Rp ' + (n || 0).toLocaleString('id-ID');
 	const formatTanggal = (t) => t ? new Date(t).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+
+	function toggleKwitansi(nomorKwitansi) {
+		if (expandedKwitansi.has(nomorKwitansi)) {
+			expandedKwitansi.delete(nomorKwitansi);
+		} else {
+			expandedKwitansi.add(nomorKwitansi);
+		}
+		expandedKwitansi = expandedKwitansi; // trigger reactivity
+	}
 </script>
 
 <svelte:head>
@@ -15,7 +25,7 @@
 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
 	<div>
 		<h2 class="text-2xl font-bold">Riwayat Pembayaran</h2>
-		<p class="text-sm text-base-content/60 mt-1">Total {data.riwayat.length} transaksi ditemukan</p>
+		<p class="text-sm text-base-content/60 mt-1">Total {data.riwayat.length} {data.mode === 'per-kwitansi' ? 'kwitansi' : 'transaksi'} ditemukan</p>
 	</div>
 	{#if data.isAdmin}
 		<div class="badge badge-warning badge-outline gap-1 py-3 px-3 text-xs">
@@ -49,13 +59,20 @@
 					{/each}
 				</select>
 			</div>
+			<div class="form-control">
+				<label class="label py-1" for="filterMode"><span class="label-text text-xs">Tampilan</span></label>
+				<select id="filterMode" name="mode" class="select select-sm select-bordered">
+					<option value="detail" selected={data.mode === 'detail'}>Detail</option>
+					<option value="per-kwitansi" selected={data.mode === 'per-kwitansi'}>Per Kwitansi</option>
+				</select>
+			</div>
 			<div class="flex gap-2">
 				<button type="submit" class="btn btn-sm btn-primary">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
 					Filter
 				</button>
 				{#if data.filterSantri || data.filterTahun}
-					<a href="/transaksi/riwayat" class="btn btn-sm btn-ghost">Reset</a>
+					<a href="/transaksi/riwayat?mode={data.mode}" class="btn btn-sm btn-ghost">Reset</a>
 				{/if}
 			</div>
 		</form>
@@ -65,6 +82,92 @@
 <!-- Tabel Riwayat -->
 <div class="card bg-base-100 shadow-sm border border-base-200">
 	<div class="overflow-x-auto">
+		{#if data.mode === 'per-kwitansi'}
+		<!-- Per Kwitansi View -->
+		<table class="table table-zebra table-sm w-full">
+			<thead>
+				<tr>
+					<th>No</th>
+					<th>Tgl Bayar</th>
+					<th>No. Kwitansi</th>
+					<th>Detail Pembayaran</th>
+					<th>Tahun</th>
+					<th class="text-right">Total Nominal</th>
+					<th class="text-center">Aksi</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#if data.riwayat.length === 0}
+					<tr>
+						<td colspan="7" class="text-center py-8 text-base-content/50">
+							<div class="flex flex-col items-center gap-2">
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+								<span>Belum ada data pembayaran</span>
+							</div>
+						</td>
+					</tr>
+				{/if}
+				{#each data.riwayat as r, i}
+					<tr class="cursor-pointer hover:bg-base-200/30" onclick={() => toggleKwitansi(r.nomorKwitansi)}>
+						<td class="text-base-content/50">{i + 1}</td>
+						<td class="text-sm whitespace-nowrap">{formatTanggal(r.tanggalBayar)}</td>
+						<td class="font-mono text-xs text-base-content/70">{r.nomorKwitansi}</td>
+						<td class="text-sm">
+							<div class="font-semibold">{r.items?.length || 0} item{(r.items?.length || 0) !== 1 ? 's' : ''}</div>
+							<div class="text-xs text-base-content/50 max-w-xs truncate">{r.items?.map(item => item.namaPembayaran).join(', ') || '-'}</div>
+						</td>
+						<td class="text-sm font-medium">{r.tahunNama || '-'}</td>
+						<td class="text-right font-bold text-sm text-success">{formatRupiah(r.totalNominal)}</td>
+						<td class="text-center">
+							<button type="button" class="btn btn-xs btn-ghost" 
+								onclick={(e) => { e.stopPropagation(); toggleKwitansi(r.nomorKwitansi); }}>
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" class:rotate-180={expandedKwitansi.has(r.nomorKwitansi)} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+							</button>
+						</td>
+					</tr>
+					{#if expandedKwitansi.has(r.nomorKwitansi)}
+						{#each r.items as item}
+							<tr class="bg-base-200/30 text-sm">
+								<td colspan="2"></td>
+								<td class="font-mono text-xs text-base-content/50"></td>
+								<td class="pl-8">
+									<div class="font-semibold text-xs">{item.namaPembayaran}</div>
+									{#if item.bulan}
+										<div class="text-xs text-base-content/60">{item.bulan}{item.tahunTagihan ? ` ${item.tahunTagihan}` : ''}</div>
+									{/if}
+								</td>
+								<td class="text-xs text-base-content/60"></td>
+								<td class="text-right font-semibold text-sm text-success">{formatRupiah(item.nominalDibayar)}</td>
+								<td class="text-center">
+									{#if data.isAdmin}
+										<button class="btn btn-xs btn-ghost text-error"
+											onclick={() => { hapusRiwayat = item; modal_hapus_riwayat.showModal(); }}
+											title="Hapus item ini">
+											<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+											</svg>
+										</button>
+									{/if}
+								</td>
+							</tr>
+						{/each}
+					{/if}
+				{/each}
+			</tbody>
+			{#if data.riwayat.length > 0}
+				<tfoot>
+					<tr class="font-bold bg-base-200/50">
+						<td colspan="5" class="text-right">Total Pemasukan:</td>
+						<td class="text-right text-success">
+							{formatRupiah(data.riwayat.reduce((sum, r) => sum + (r.totalNominal || 0), 0))}
+						</td>
+						<td></td>
+					</tr>
+				</tfoot>
+			{/if}
+		</table>
+		{:else}
+		<!-- Detail View (Original) -->
 		<table class="table table-zebra table-sm w-full">
 			<thead>
 				<tr>
@@ -75,6 +178,7 @@
 					<th>Jenis Pembayaran</th>
 					<th>Bulan</th>
 					<th>Tahun</th>
+					<th>Status</th>
 					<th class="text-right">Nominal</th>
 					<th class="text-center">Aksi</th>
 				</tr>
@@ -82,7 +186,7 @@
 			<tbody>
 				{#if data.riwayat.length === 0}
 					<tr>
-						<td colspan="9" class="text-center py-8 text-base-content/50">
+						<td colspan="10" class="text-center py-8 text-base-content/50">
 							<div class="flex flex-col items-center gap-2">
 								<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
 								<span>Belum ada data pembayaran</span>
@@ -102,12 +206,17 @@
 						<td class="text-sm">{r.namaPembayaran || '-'}</td>
 						<td>
 							{#if r.bulan}
-								<span class="badge badge-outline badge-sm">{r.bulan}</span>
+								<span class="badge badge-outline badge-sm">{r.bulan}{r.tahunTagihan ? ` ${r.tahunTagihan}` : ''}</span>
 							{:else}
 								<span class="text-base-content/40 text-xs">-</span>
 							{/if}
 						</td>
 						<td class="text-sm font-medium">{r.tahunNama || '-'}</td>
+						<td>
+							<span class={`badge badge-sm ${r.statusPelunasan === 'Lunas' ? 'badge-success' : 'badge-warning badge-outline'}`}>
+								{r.statusPelunasan}
+							</span>
+						</td>
 						<td class="text-right font-bold text-sm text-success">{formatRupiah(r.nominalDibayar)}</td>
 						<td class="text-center">
 							<div class="flex gap-1 justify-center">
@@ -135,7 +244,7 @@
 			{#if data.riwayat.length > 0}
 				<tfoot>
 					<tr class="font-bold bg-base-200/50">
-						<td colspan="7" class="text-right">Total Pemasukan:</td>
+						<td colspan="8" class="text-right">Total Pemasukan:</td>
 						<td class="text-right text-success">
 							{formatRupiah(data.riwayat.reduce((sum, r) => sum + (r.nominalDibayar || 0), 0))}
 						</td>
@@ -144,6 +253,7 @@
 				</tfoot>
 			{/if}
 		</table>
+		{/if}
 	</div>
 </div>
 
@@ -163,7 +273,7 @@
 			<div class="bg-base-200 rounded-lg p-3 my-3 text-sm space-y-1">
 				<div><span class="font-semibold">Pembayar:</span> {hapusRiwayat.namaPembayar}</div>
 				<div><span class="font-semibold">No. Kwitansi:</span> <span class="font-mono text-xs">{hapusRiwayat.nomorKwitansi}</span></div>
-				<div><span class="font-semibold">Pembayaran:</span> {hapusRiwayat.namaPembayaran} {hapusRiwayat.bulan ? '— ' + hapusRiwayat.bulan : ''}</div>
+				<div><span class="font-semibold">Pembayaran:</span> {hapusRiwayat.namaPembayaran} {hapusRiwayat.bulan ? `— ${hapusRiwayat.bulan}${hapusRiwayat.tahunTagihan ? ` ${hapusRiwayat.tahunTagihan}` : ''}` : ''}</div>
 				<div><span class="font-semibold">Nominal:</span> <span class="text-error font-bold">{formatRupiah(hapusRiwayat.nominalDibayar)}</span></div>
 			</div>
 			<p class="text-xs text-error mb-4">⚠️ Data yang sudah dihapus tidak dapat dikembalikan.</p>

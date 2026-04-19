@@ -7,6 +7,8 @@ const BULAN_NAMES = [
 	'Juli','Agustus','September','Oktober','November','Desember'
 ];
 
+const BULAN_INDEX = new Map(BULAN_NAMES.map((bulan, index) => [bulan, index]));
+
 function buildMonthRange(startDate, endDate) {
 	const months = [];
 	const start = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
@@ -21,6 +23,87 @@ function buildMonthRange(startDate, endDate) {
 		cur.setMonth(cur.getMonth() + 1);
 	}
 	return months;
+}
+
+function buildMonthlyPaymentMap(payments) {
+	const byKey = new Map();
+
+	for (const payment of payments) {
+		if (!payment.tanggalBayar) continue;
+
+		const paidDate = new Date(payment.tanggalBayar);
+		if (Number.isNaN(paidDate.getTime())) continue;
+
+		const monthName = payment.bulan || BULAN_NAMES[paidDate.getMonth()];
+		const monthIndex = BULAN_INDEX.get(monthName);
+		if (monthIndex === undefined) continue;
+		const paymentYear = Number(payment.tahunTagihan || paidDate.getFullYear());
+		if (!paymentYear || Number.isNaN(paymentYear)) continue;
+
+		const key = `${paymentYear}-${monthIndex}`;
+		if (!byKey.has(key)) {
+			byKey.set(key, {
+				year: paymentYear,
+				monthIndex,
+				monthName,
+				items: []
+			});
+		}
+
+		byKey.get(key).items.push(payment);
+	}
+
+	return byKey;
+}
+
+function mergeMonthlyRekap(expectedMonths, paymentMap, nominalTagihan) {
+	const merged = [];
+	const expectedKeys = new Set();
+
+	for (const month of expectedMonths) {
+		const key = `${month.year}-${month.monthIndex}`;
+		expectedKeys.add(key);
+
+		const paidBucket = paymentMap.get(key);
+		const paidItems = paidBucket?.items || [];
+		const nominalDibayar = paidItems.reduce((sum, item) => sum + (item.nominalDibayar || 0), 0);
+
+		merged.push({
+			bulan: month.monthName,
+			tahun: month.year,
+			monthIndex: month.monthIndex,
+			paid: nominalDibayar > 0,
+			nominalTagihan,
+			nominalDibayar,
+			tanggalBayar: paidItems[0]?.tanggalBayar || null,
+			nomorKwitansi: paidItems[0]?.nomorKwitansi || null,
+			isTambahanDariPembayaran: false
+		});
+	}
+
+	for (const [key, paidBucket] of paymentMap.entries()) {
+		if (expectedKeys.has(key)) continue;
+
+		const paidItems = paidBucket.items || [];
+		const nominalDibayar = paidItems.reduce((sum, item) => sum + (item.nominalDibayar || 0), 0);
+
+		merged.push({
+			bulan: paidBucket.monthName,
+			tahun: paidBucket.year,
+			monthIndex: paidBucket.monthIndex,
+			paid: nominalDibayar > 0,
+			nominalTagihan: 0,
+			nominalDibayar,
+			tanggalBayar: paidItems[0]?.tanggalBayar || null,
+			nomorKwitansi: paidItems[0]?.nomorKwitansi || null,
+			isTambahanDariPembayaran: true
+		});
+	}
+
+	return merged.sort((a, b) => {
+		if (a.tahun !== b.tahun) return a.tahun - b.tahun;
+		return a.monthIndex - b.monthIndex;
+	});
 }
 
 export async function load({ url }) {
@@ -55,8 +138,10 @@ export async function load({ url }) {
 		.select({
 			id: schema.pembayaran.id,
 			santriId: schema.pembayaran.santriId,
+			jenisPembayaranId: schema.pembayaran.jenisPembayaranId,
 			tanggalBayar: schema.pembayaran.tanggalBayar,
 			bulan: schema.pembayaran.bulan,
+			tahunTagihan: schema.pembayaran.tahunTagihan,
 			nominalDibayar: schema.pembayaran.nominalDibayar,
 			nomorKwitansi: schema.pembayaran.nomorKwitansi,
 			keteranganKhusus: schema.pembayaran.keteranganKhusus,
@@ -124,30 +209,11 @@ export async function load({ url }) {
 		const startDate = s.tanggalMasuk ? new Date(s.tanggalMasuk) : now;
 		const endDate = s.tanggalKeluar ? new Date(s.tanggalKeluar) : now;
 		const monthsRange = startDate <= endDate ? buildMonthRange(startDate, endDate) : [];
-
-		const konsumsiByKey = new Map();
-		for (const p of konsumsiPayments) {
-			if (!p.tanggalBayar || !p.bulan) continue;
-			const tgl = new Date(p.tanggalBayar);
-			const key = `${tgl.getFullYear()}-${p.bulan}`;
-			if (!konsumsiByKey.has(key)) konsumsiByKey.set(key, []);
-			konsumsiByKey.get(key).push(p);
-		}
-
-		const konsumsi = monthsRange.map(m => {
-			const key = `${m.year}-${m.monthName}`;
-			const paidItems = konsumsiByKey.get(key) || [];
-			const nominalDibayar = paidItems.reduce((sum, p) => sum + (p.nominalDibayar || 0), 0);
-			return {
-				bulan: m.monthName,
-				tahun: m.year,
-				paid: paidItems.length > 0,
-				nominalTagihan: konsumsiNominalEff,
-				nominalDibayar,
-				tanggalBayar: paidItems[0]?.tanggalBayar || null,
-				nomorKwitansi: paidItems[0]?.nomorKwitansi || null
-			};
-		});
+		const konsumsi = mergeMonthlyRekap(
+			monthsRange,
+			buildMonthlyPaymentMap(konsumsiPayments),
+			konsumsiNominalEff
+		);
 
 		const smkInfo = smkBySantriId.get(s.id);
 		let smkBulanan = [];
@@ -158,28 +224,13 @@ export async function load({ url }) {
 				: now;
 			const smkMonthsRange = smkStart <= smkEnd ? buildMonthRange(smkStart, smkEnd) : [];
 
-			const smkByKey = new Map();
-			for (const p of smkBulananPayments) {
-				if (!p.tanggalBayar || !p.bulan) continue;
-				const tgl = new Date(p.tanggalBayar);
-				const key = `${tgl.getFullYear()}-${p.bulan}`;
-				if (!smkByKey.has(key)) smkByKey.set(key, []);
-				smkByKey.get(key).push(p);
-			}
-
-			smkBulanan = smkMonthsRange.map(m => {
-				const key = `${m.year}-${m.monthName}`;
-				const paidItems = smkByKey.get(key) || [];
-				const nominalDibayar = paidItems.reduce((sum, p) => sum + (p.nominalDibayar || 0), 0);
-				return {
-					bulan: m.monthName,
-					tahun: m.year,
-					paid: paidItems.length > 0,
-					nominalTagihan: smkBulananNominalEff,
-					nominalDibayar,
-					tanggalBayar: paidItems[0]?.tanggalBayar || null
-				};
-			});
+			smkBulanan = mergeMonthlyRekap(
+				smkMonthsRange,
+				buildMonthlyPaymentMap(smkBulananPayments),
+				smkBulananNominalEff
+			);
+		} else if (smkBulananPayments.length > 0) {
+			smkBulanan = mergeMonthlyRekap([], buildMonthlyPaymentMap(smkBulananPayments), 0);
 		}
 
 		const smpInfo = smpBySantriId.get(s.id);
@@ -191,28 +242,13 @@ export async function load({ url }) {
 				: now;
 			const smpMonthsRange = smpStart <= smpEnd ? buildMonthRange(smpStart, smpEnd) : [];
 
-			const smpByKey = new Map();
-			for (const p of smpBulananPayments) {
-				if (!p.tanggalBayar || !p.bulan) continue;
-				const tgl = new Date(p.tanggalBayar);
-				const key = `${tgl.getFullYear()}-${p.bulan}`;
-				if (!smpByKey.has(key)) smpByKey.set(key, []);
-				smpByKey.get(key).push(p);
-			}
-
-			smpBulanan = smpMonthsRange.map(m => {
-				const key = `${m.year}-${m.monthName}`;
-				const paidItems = smpByKey.get(key) || [];
-				const nominalDibayar = paidItems.reduce((sum, p) => sum + (p.nominalDibayar || 0), 0);
-				return {
-					bulan: m.monthName,
-					tahun: m.year,
-					paid: paidItems.length > 0,
-					nominalTagihan: smpBulananNominalEff,
-					nominalDibayar,
-					tanggalBayar: paidItems[0]?.tanggalBayar || null
-				};
-			});
+			smpBulanan = mergeMonthlyRekap(
+				smpMonthsRange,
+				buildMonthlyPaymentMap(smpBulananPayments),
+				smpBulananNominalEff
+			);
+		} else if (smpBulananPayments.length > 0) {
+			smpBulanan = mergeMonthlyRekap([], buildMonthlyPaymentMap(smpBulananPayments), 0);
 		}
 
 
@@ -240,43 +276,62 @@ export async function load({ url }) {
 			smpTahunSpan = Math.max(0, smpEnd.getFullYear() - smpStart.getFullYear() + 1);
 		}
 
-		const nonBulananByJenis = jenisNonBulanan
-			.filter(j => {
-				if (j.tipe.startsWith('smk_')) return !!smkInfo;
-				if (j.tipe.startsWith('smp_')) return !!smpInfo;
-				return true;
-			})
-			.map(j => {
-				const items = nonBulananPayments.filter(p => p.namaPembayaran === j.namaPembayaran && p.tipe === j.tipe);
+		const jenisNonBulananAktif = jenisNonBulanan.filter(j => {
+			if (j.tipe.startsWith('smk_')) return !!smkInfo;
+			if (j.tipe.startsWith('smp_')) return !!smpInfo;
+			return true;
+		});
+
+		const nonBulananByJenis = Array.from(new Set([
+			...jenisNonBulananAktif.map(j => j.id),
+			...nonBulananPayments.map(p => p.jenisPembayaranId).filter(Boolean)
+		])).map(jenisId => {
+				const jenis = jenisList.find(j => j.id === jenisId) || null;
+				const samplePayment = nonBulananPayments.find(p => p.jenisPembayaranId === jenisId) || null;
+				const items = nonBulananPayments.filter(p => p.jenisPembayaranId === jenisId);
 				const totalNominal = items.reduce((sum, p) => sum + (p.nominalDibayar || 0), 0);
 				const lastTanggal = items.length ? items[items.length - 1].tanggalBayar : null;
-				
-				const nominalEff = getNominal(j.id, undefined, j.nominalDefault ?? 0);
+
+				const nominalEff = jenis ? getNominal(jenis.id, undefined, jenis.nominalDefault ?? 0) : 0;
 
 				let jumlahTagihan = 0;
-				if (j.tipe === 'tahunan') jumlahTagihan = tahunSpan;
-				else if (j.tipe === 'smk_tahunan') jumlahTagihan = smkTahunSpan;
-				else if (j.tipe === 'smp_tahunan') jumlahTagihan = smpTahunSpan;
-				else if (j.tipe === 'sekali' || j.tipe === 'smk_sekali' || j.tipe === 'smp_sekali') jumlahTagihan = 1;
-				
+				if (jenis?.tipe === 'tahunan') jumlahTagihan = tahunSpan;
+				else if (jenis?.tipe === 'smk_tahunan') jumlahTagihan = smkTahunSpan;
+				else if (jenis?.tipe === 'smp_tahunan') jumlahTagihan = smpTahunSpan;
+				else if (
+					jenis?.tipe === 'sekali' ||
+					jenis?.tipe === 'smk_sekali' ||
+					jenis?.tipe === 'smp_sekali'
+				) jumlahTagihan = 1;
+
 				const totalTagihan = nominalEff * jumlahTagihan;
 				const sisa = Math.max(0, totalTagihan - totalNominal);
 				return {
-					namaPembayaran: j.namaPembayaran,
-					tipe: j.tipe,
+					namaPembayaran: jenis?.namaPembayaran || samplePayment?.namaPembayaran || '-',
+					tipe: jenis?.tipe || samplePayment?.tipe || '-',
 					jumlahTransaksi: items.length,
 					totalNominal,
 					totalTagihan,
 					sisa,
 					terakhirBayar: lastTanggal,
-					nominalEff
+					nominalEff,
+					isTambahanDariPembayaran: !jenis || !jenisNonBulananAktif.some(j => j.id === jenisId)
 				};
 			})
 			.filter(p => p.nominalEff > 0 || p.totalNominal > 0);
 
 		const totalTagihanLain = nonBulananByJenis.reduce((sum, p) => sum + (p.totalTagihan || 0), 0);
 		const totalDibayarLain = nonBulananByJenis.reduce((sum, p) => sum + (p.totalNominal || 0), 0);
-		const totalSisaLain = totalTagihanLain - totalDibayarLain;
+		const totalSisaLain = nonBulananByJenis.reduce((sum, p) => sum + (p.sisa || 0), 0);
+		const totalSisaKonsumsi = Math.max(0, totalTagihanKonsumsi - totalDibayarKonsumsi);
+		const totalSisaSmkBulanan = Math.max(0, totalTagihanSmkBulanan - totalDibayarSmkBulanan);
+		const totalSisaSmpBulanan = Math.max(0, totalTagihanSmpBulanan - totalDibayarSmpBulanan);
+		const totalTagihanKeseluruhan =
+			totalTagihanKonsumsi + totalTagihanSmkBulanan + totalTagihanSmpBulanan + totalTagihanLain;
+		const totalDibayarKeseluruhan =
+			totalDibayarKonsumsi + totalDibayarSmkBulanan + totalDibayarSmpBulanan + totalDibayarLain + totalKhusus;
+		const totalBelumTerbayarKeseluruhan =
+			totalSisaKonsumsi + totalSisaSmkBulanan + totalSisaSmpBulanan + totalSisaLain;
 
 		return {
 			...s,
@@ -298,9 +353,15 @@ export async function load({ url }) {
 
 			totalTagihanKonsumsi,
 			totalDibayarKonsumsi,
+			totalSisaKonsumsi,
 			totalTagihanLain,
 			totalDibayarLain,
-			totalSisaLain
+			totalSisaLain,
+			totalSisaSmkBulanan,
+			totalSisaSmpBulanan,
+			totalTagihanKeseluruhan,
+			totalDibayarKeseluruhan,
+			totalBelumTerbayarKeseluruhan
 		};
 	});
 

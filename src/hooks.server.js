@@ -108,9 +108,15 @@ export const handle = async ({ event, resolve }) => {
 		}
 		
 		if (sessionUser.role === 'petugas') {
-			// Petugas hanya boleh akses dashboard dan menu transaksi tertentu
+			// Petugas boleh akses dashboard, menu transaksi tertentu, dan data master
 			const isAllowedForPetugas =
 				path === '/' ||
+				path === '/master/santri' ||
+				path.startsWith('/master/santri/') ||
+				path === '/master/data-siswa-smk' ||
+				path.startsWith('/master/data-siswa-smk/') ||
+				path === '/master/data-siswa-smp' ||
+				path.startsWith('/master/data-siswa-smp/') ||
 				path === '/transaksi/input' ||
 				path === '/transaksi/riwayat' ||
 				path === '/transaksi/rekapitulasi' ||

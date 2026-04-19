@@ -101,6 +101,7 @@ export const pembayaran = sqliteTable('pembayaran', {
 	jenisPembayaranId: integer('jenis_pembayaran_id').references(() => jenisPembayaran.id).notNull(),
 	tahunAjaranId: integer('tahun_ajaran_id').references(() => tahunAjaran.id).notNull(),
 	bulan: text('bulan'), // e.g. "Januari", "Februari" - Null if 'sekali'
+	tahunTagihan: integer('tahun_tagihan'),
 	tanggalBayar: text('tanggal_bayar').notNull(),
 	nominalDibayar: integer('nominal_dibayar').notNull(),
 	nomorKwitansi: text('nomor_kwitansi').notNull().unique(),
