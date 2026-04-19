@@ -186,13 +186,29 @@ async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItem
 		nominalDibayar = nominalTagihan;
 	} else if (isSekali) {
 		const totalSudahDibayar = regularExistingPayments.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0);
-		if (totalSudahDibayar > 0) {
+
+		// Tambahkan total dari item-item dalam batch yang sama
+		const totalDariItemSebelumnya = previouslyNormalizedItems
+			.filter(item => item.santriId === santriId && item.jenisPembayaranId === jenisPembayaranId)
+			.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0);
+
+		const sisaTagihan = Math.max(0, nominalTagihan - totalSudahDibayar - totalDariItemSebelumnya);
+
+		if (sisaTagihan <= 0) {
 			return {
-				error: `${jenisRow.namaPembayaran} sudah pernah dibayarkan dan tidak boleh dibayar dua kali.`
+				error: `${jenisRow.namaPembayaran} sudah lunas atau jumlah cicilan melebihi tagihan.`
 			};
 		}
 
-		nominalDibayar = nominalTagihan;
+		if (!nominalDibayar || Number.isNaN(nominalDibayar) || nominalDibayar <= 0) {
+			return { error: 'Nominal cicilan harus lebih dari 0.' };
+		}
+
+		if (nominalDibayar > sisaTagihan) {
+			return {
+				error: `Nominal melebihi sisa tagihan. Sisa ${jenisRow.namaPembayaran}: Rp ${sisaTagihan.toLocaleString('id-ID')}.`
+			};
+		}
 	} else if (isTahunan) {
 		const existingYearPayments = regularExistingPayments.filter((item) => item.tahunAjaranId === tahunAjaranId);
 		const totalSudahDibayar = existingYearPayments.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0);

@@ -138,7 +138,7 @@
 				totalTagihan: nominalEfektif,
 				totalDibayar,
 				sisa: Math.max(0, nominalEfektif - totalDibayar),
-				isLunas: totalDibayar > 0
+				isLunas: totalDibayar >= nominalEfektif && nominalEfektif >= 0
 			};
 		}
 
@@ -206,7 +206,7 @@
 			return;
 		}
 
-		if (isTahunan && selectedPaymentStatus) {
+		if ((isTahunan || isSekali) && selectedPaymentStatus) {
 			nominal = selectedPaymentStatus.sisa;
 			return;
 		}
@@ -619,8 +619,8 @@
 								bind:value={nominal}
 								class="input input-bordered w-full font-bold text-lg"
 								min={isGratis ? 0 : 1}
-								max={isTahunan && selectedPaymentStatus ? selectedPaymentStatus.sisa : undefined}
-								readonly={!isKhusus && !isTahunan}
+								max={(isTahunan || isSekali) && selectedPaymentStatus ? selectedPaymentStatus.sisa : undefined}
+								readonly={!isKhusus && !isTahunan && !isSekali}
 							/>
 							{#if nominal <= 0 && !isGratis && !isKhusus && paymentItems.length === 0}
 								<div class="label pt-2 pb-0">
@@ -642,9 +642,13 @@
 									<span class="label-text-alt text-base-content/60">Nominal bulanan mengikuti tagihan tetap dan tidak bisa dibayar dua kali.</span>
 								</div>
 							{/if}
-							{#if !isKhusus && isSekali}
+							{#if !isKhusus && isSekali && selectedPaymentStatus}
 								<div class="label pt-2 pb-0">
-									<span class="label-text-alt text-base-content/60">Jenis sekali bayar hanya bisa dibayar satu kali penuh.</span>
+									<span class={`label-text-alt font-medium ${selectedPaymentStatus.isLunas ? 'text-success' : 'text-base-content/70'}`}>
+										Tagihan: {selectedPaymentStatus.totalTagihan.toLocaleString('id-ID')} ·
+										Sudah dibayar: {selectedPaymentStatus.totalDibayar.toLocaleString('id-ID')} ·
+										Sisa: {selectedPaymentStatus.sisa.toLocaleString('id-ID')}
+									</span>
 								</div>
 							{/if}
 							{#if !isKhusus && isTahunan && selectedPaymentStatus}
