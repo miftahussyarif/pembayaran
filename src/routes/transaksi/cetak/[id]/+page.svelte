@@ -132,6 +132,12 @@
 				<p class="sign-name">{data.petugas}</p>
 			</div>
 		</div>
+
+		<!-- Garis potong -->
+		<div class="cut-guide">
+			<div class="cut-line"></div>
+			<span class="cut-icon">✂</span>
+		</div>
 	</div>
 
 	<!-- Action Buttons (hidden on print) -->
@@ -378,6 +384,29 @@
 		z-index: 10;
 	}
 
+	/* Cut Guide */
+	.cut-guide {
+		position: relative;
+		width: 100%;
+		margin-top: 16px;
+		padding-top: 4px;
+		display: flex;
+		align-items: center;
+	}
+	.cut-line {
+		flex: 1;
+		border-top: 2px dashed #c0c0c0;
+	}
+	.cut-icon {
+		position: absolute;
+		left: -4px;
+		top: 50%;
+		transform: translateY(-50%);
+		font-size: 14px;
+		color: #9ca3af;
+		line-height: 1;
+	}
+
 	/* Action Buttons */
 	.action-buttons {
 		display: flex;
@@ -550,6 +579,19 @@
 		}
 		.signature-box {
 			width: 100px;
+		}
+
+		/* Cut guide print */
+		.cut-guide {
+			margin-top: 8pt;
+			padding-top: 2pt;
+		}
+		.cut-line {
+			border-top: 1px dashed #999;
+		}
+		.cut-icon {
+			font-size: 8pt;
+			color: #999;
 		}
 
 		/* Colors for print */
