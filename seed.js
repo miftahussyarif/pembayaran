@@ -3,7 +3,7 @@ import fs from 'node:fs/promises';
 import { db } from './src/lib/server/db/index.js';
 import * as schema from './src/lib/server/db/schema.js';
 
-const DEFAULT_BACKUP_PATH = '/home/dell/Downloads/backup-2026-04-20 (1).json';
+const DEFAULT_BACKUP_PATH = '/backupdb.json';
 
 function getBackupPath() {
 	return process.env.SEED_BACKUP_PATH || process.argv[2] || DEFAULT_BACKUP_PATH;
