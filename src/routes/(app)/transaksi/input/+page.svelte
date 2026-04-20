@@ -68,13 +68,21 @@
 			selectedJenis?.tipe === 'smp_sekali'
 		)
 	);
+
 	let isGratis = $derived.by(() => {
 		if (isKhusus) return false;
 		if (!selectedSantriId || !selectedJenisId) return false;
-		return data.kategoriGratis.some(g => 
-			g.kategoriId == selectedSantri?.kategoriId && 
+		// Cari mapping kategoriGratis yang cocok
+		const mapping = data.kategoriGratis.find(g =>
+			g.kategoriId == selectedSantri?.kategoriId &&
 			g.jenisPembayaranId == selectedJenisId
 		);
+		// Hanya gratis jika mapping ada dan nominal === 0
+		if (mapping && Number(mapping.nominal) === 0) return true;
+		// Jika tidak ada mapping, cek default nominal jenis pembayaran
+		const jenis = data.jenisPembayarans.find(j => j.id == selectedJenisId);
+		if (jenis && Number(jenis.nominalDefault) === 0) return true;
+		return false;
 	});
 
 	let nominalEfektif = $derived.by(() => {
@@ -823,7 +831,7 @@
 	<div class="lg:col-span-1">
 		<!-- Preview Pembayaran yang Akan Dicetak -->
 		{#if paymentItems.length > 0}
-		<div class="card bg-gradient-to-br from-primary/10 to-primary/5 shadow-md border-2 border-primary mb-4 sticky top-24">
+		<div class="card bg-linear-to-br from-primary/10 to-primary/5 shadow-md border-2 border-primary mb-4 sticky top-24">
 			<div class="card-body">
 				<h3 class="card-title text-lg mb-3 flex items-center gap-2">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
