@@ -109,6 +109,23 @@ export const pembayaran = sqliteTable('pembayaran', {
 	keteranganKhusus: text('keterangan_khusus') // for custom/special payments
 });
 
+export const tunggakanImport = sqliteTable('tunggakan_import', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	santriId: integer('santri_id').references(() => santri.id),
+	pembayarLainId: integer('pembayar_lain_id').references(() => pembayarLain.id),
+	tahunAjaranId: integer('tahun_ajaran_id').references(() => tahunAjaran.id).notNull(),
+	jenisPembayaranId: integer('jenis_pembayaran_id').references(() => jenisPembayaran.id).notNull(),
+	bulan: text('bulan'),
+	tahunTagihan: integer('tahun_tagihan'),
+	nominalAsalTagihan: integer('nominal_asal_tagihan'),
+	nominalTagihan: integer('nominal_tagihan').notNull(),
+	keteranganKhusus: text('keterangan_khusus'),
+	catatan: text('catatan'),
+	signatureKey: text('signature_key').notNull().unique(),
+	createdAt: text('created_at').notNull(),
+	updatedAt: text('updated_at').notNull()
+});
+
 export const users = sqliteTable('users', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	username: text('username').notNull().unique(),

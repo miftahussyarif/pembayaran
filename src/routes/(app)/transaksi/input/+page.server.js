@@ -54,6 +54,38 @@ function getEffectiveNominal({ santriRow, jenisRow, customNominalRow }) {
 	};
 }
 
+const normalizeText = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+async function getImportedTagihan({
+	santriId,
+	tahunAjaranId,
+	jenisPembayaranId,
+	bulan = null,
+	tahunTagihan = null,
+	keteranganKhusus = null
+}) {
+	const rows = await db
+		.select({
+			nominalTagihan: schema.tunggakanImport.nominalTagihan,
+			bulan: schema.tunggakanImport.bulan,
+			tahunTagihan: schema.tunggakanImport.tahunTagihan,
+			keteranganKhusus: schema.tunggakanImport.keteranganKhusus
+		})
+		.from(schema.tunggakanImport)
+		.where(and(
+			eq(schema.tunggakanImport.santriId, santriId),
+			eq(schema.tunggakanImport.tahunAjaranId, tahunAjaranId),
+			eq(schema.tunggakanImport.jenisPembayaranId, jenisPembayaranId)
+		));
+
+	return rows.filter((item) => {
+		const sameBulan = String(item.bulan || '') === String(bulan || '');
+		const sameTahun = String(item.tahunTagihan || '') === String(tahunTagihan || '');
+		const sameKeterangan = normalizeText(item.keteranganKhusus) === normalizeText(keteranganKhusus);
+		return sameBulan && sameTahun && sameKeterangan;
+	});
+}
+
 async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItems = []) {
 	const santriId = rawItem.santriId ? Number(rawItem.santriId) : null;
 	const tahunAjaranId = Number(rawItem.tahunAjaranId);
@@ -75,6 +107,51 @@ async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItem
 		}
 		if (!nominalDibayar || Number.isNaN(nominalDibayar) || nominalDibayar <= 0) {
 			return { error: 'Nominal pembayaran lain-lain harus lebih dari 0.' };
+		}
+
+		if (santriId) {
+			const importedRows = await getImportedTagihan({
+				santriId,
+				tahunAjaranId,
+				jenisPembayaranId,
+				keteranganKhusus
+			});
+			const importedTotal = importedRows.reduce((sum, item) => sum + Number(item.nominalTagihan || 0), 0);
+			if (importedTotal > 0) {
+				const existingSpecialPayments = await db
+					.select({
+						nominalDibayar: schema.pembayaran.nominalDibayar,
+						keteranganKhusus: schema.pembayaran.keteranganKhusus
+					})
+					.from(schema.pembayaran)
+					.where(and(
+						eq(schema.pembayaran.santriId, santriId),
+						eq(schema.pembayaran.tahunAjaranId, tahunAjaranId),
+						eq(schema.pembayaran.jenisPembayaranId, jenisPembayaranId)
+					));
+
+				const totalSudahDibayar = existingSpecialPayments
+					.filter((item) => normalizeText(item.keteranganKhusus) === normalizeText(keteranganKhusus))
+					.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0);
+				const totalDariBatch = previouslyNormalizedItems
+					.filter((item) =>
+						item.santriId === santriId &&
+						item.tahunAjaranId === tahunAjaranId &&
+						item.jenisPembayaranId === jenisPembayaranId &&
+						normalizeText(item.keteranganKhusus) === normalizeText(keteranganKhusus)
+					)
+					.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0);
+				const sisaTagihan = Math.max(0, importedTotal - totalSudahDibayar - totalDariBatch);
+
+				if (sisaTagihan <= 0) {
+					return { error: `Tagihan custom "${keteranganKhusus}" sudah lunas.` };
+				}
+				if (nominalDibayar > sisaTagihan) {
+					return {
+						error: `Nominal melebihi sisa tagihan custom. Sisa ${keteranganKhusus}: Rp ${sisaTagihan.toLocaleString('id-ID')}.`
+					};
+				}
+			}
 		}
 
 		return {
@@ -169,6 +246,15 @@ async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItem
 		));
 
 	const regularExistingPayments = existingPayments.filter((item) => !item.keteranganKhusus);
+	const importedRows = await getImportedTagihan({
+		santriId,
+		tahunAjaranId,
+		jenisPembayaranId,
+		bulan: isBulanan ? bulan : null,
+		tahunTagihan: isBulanan ? tahunTagihan : null
+	});
+	const importedTotal = importedRows.reduce((sum, item) => sum + Number(item.nominalTagihan || 0), 0);
+	const totalTagihan = importedTotal > 0 ? importedTotal : nominalTagihan;
 
 	if (isBulanan) {
 		const existingPeriodPayments = regularExistingPayments.filter((item) =>
@@ -176,14 +262,25 @@ async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItem
 			item.bulan === bulan &&
 			Number(item.tahunTagihan || 0) === Number(tahunTagihan || 0)
 		);
+		const totalSudahDibayar = existingPeriodPayments.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0);
+		const totalDariItemSebelumnya = previouslyNormalizedItems
+			.filter((item) =>
+				item.santriId === santriId &&
+				item.jenisPembayaranId === jenisPembayaranId &&
+				item.tahunAjaranId === tahunAjaranId &&
+				item.bulan === bulan &&
+				Number(item.tahunTagihan || 0) === Number(tahunTagihan || 0)
+			)
+			.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0);
+		const sisaTagihan = Math.max(0, totalTagihan - totalSudahDibayar - totalDariItemSebelumnya);
 
-		if (existingPeriodPayments.length > 0) {
+		if (sisaTagihan <= 0) {
 			return {
-				error: `Tagihan ${jenisRow.namaPembayaran} untuk ${bulan} ${tahunTagihan} sudah terbayar.`
+				error: `Tagihan ${jenisRow.namaPembayaran} untuk ${bulan} ${tahunTagihan} sudah lunas.`
 			};
 		}
 
-		nominalDibayar = nominalTagihan;
+		nominalDibayar = sisaTagihan;
 	} else if (isSekali) {
 		const totalSudahDibayar = regularExistingPayments.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0);
 
@@ -192,7 +289,7 @@ async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItem
 			.filter(item => item.santriId === santriId && item.jenisPembayaranId === jenisPembayaranId)
 			.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0);
 
-		const sisaTagihan = Math.max(0, nominalTagihan - totalSudahDibayar - totalDariItemSebelumnya);
+		const sisaTagihan = Math.max(0, totalTagihan - totalSudahDibayar - totalDariItemSebelumnya);
 
 		if (sisaTagihan <= 0) {
 			return {
@@ -218,7 +315,7 @@ async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItem
 			.filter(item => item.santriId === santriId && item.jenisPembayaranId === jenisPembayaranId && item.tahunAjaranId === tahunAjaranId)
 			.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0);
 		
-		const sisaTagihan = Math.max(0, nominalTagihan - totalSudahDibayar - totalDariItemSebelumnya);
+		const sisaTagihan = Math.max(0, totalTagihan - totalSudahDibayar - totalDariItemSebelumnya);
 
 		if (sisaTagihan <= 0) {
 			return {
@@ -236,7 +333,7 @@ async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItem
 			};
 		}
 	} else {
-		nominalDibayar = nominalTagihan;
+		nominalDibayar = totalTagihan;
 	}
 
 	if (nominalDibayar <= 0 && !isGratis) {
@@ -307,6 +404,7 @@ export async function load() {
 
 	// Ambil pemetaan kategori gratis
 	const kategoriGratis = await db.select().from(schema.kategoriGratis);
+	const tunggakanImport = await db.select().from(schema.tunggakanImport);
 
 	// Cari/buat jenisPembayaran "Lain-lain" untuk pembayaran khusus
 	let jenisKhusus = jenisPembayarans.find(j => j.tipe === 'sekali' && j.namaPembayaran === 'Pembayaran Lain-lain');
@@ -333,6 +431,7 @@ export async function load() {
 		riwayatData,
 		pembayaranReguler,
 		kategoriGratis,
+		tunggakanImport,
 		khususJenisId: jenisKhusus?.id || null
 	};
 }

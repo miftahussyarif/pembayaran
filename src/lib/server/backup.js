@@ -44,6 +44,7 @@ export const generateBackup = async () => {
 	const santriDetail = await db.select().from(schema.santriDetail);
 	const santriSmk = await db.select().from(schema.santriSmk);
 	const santriSmp = await db.select().from(schema.santriSmp);
+	const tunggakanImport = await db.select().from(schema.tunggakanImport);
 	const uploadUrls = [
 		...pengaturan.map((p) => p.logoUrl).filter(Boolean),
 		...pengaturan.map((p) => p.stampUrl).filter(Boolean),
@@ -53,7 +54,7 @@ export const generateBackup = async () => {
 
 	return {
 		type: 'pesantren-backup',
-		version: 3,
+		version: 4,
 		exportedAt: new Date().toISOString(),
 		data: {
 			users,
@@ -65,6 +66,7 @@ export const generateBackup = async () => {
 			santriDetail,
 			santriSmk,
 			santriSmp,
+			tunggakanImport,
 			pembayarLain,
 			pembayaran,
 			mutasi,

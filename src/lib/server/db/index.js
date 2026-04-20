@@ -115,6 +115,26 @@ sqlite.exec(`
 		nama_pembayar TEXT NOT NULL,
 		created_at TEXT NOT NULL
 	);
+	CREATE TABLE IF NOT EXISTS tunggakan_import (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		santri_id INTEGER,
+		pembayar_lain_id INTEGER,
+		tahun_ajaran_id INTEGER NOT NULL,
+		jenis_pembayaran_id INTEGER NOT NULL,
+		bulan TEXT,
+		tahun_tagihan INTEGER,
+		nominal_asal_tagihan INTEGER,
+		nominal_tagihan INTEGER NOT NULL,
+		keterangan_khusus TEXT,
+		catatan TEXT,
+		signature_key TEXT NOT NULL UNIQUE,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL,
+		FOREIGN KEY (santri_id) REFERENCES santri(id),
+		FOREIGN KEY (pembayar_lain_id) REFERENCES pembayar_lain(id),
+		FOREIGN KEY (tahun_ajaran_id) REFERENCES tahun_ajaran(id),
+		FOREIGN KEY (jenis_pembayaran_id) REFERENCES jenis_pembayaran(id)
+	);
 `);
 
 try {
@@ -206,6 +226,57 @@ try {
 	sqlite.exec(`ALTER TABLE pembayaran ADD COLUMN tahun_tagihan INTEGER`);
 } catch (e) {
 	// column may already exist
+}
+
+try {
+	const tunggakanInfo = sqlite.prepare(`PRAGMA table_info(tunggakan_import)`).all();
+	const santriIdColumn = tunggakanInfo.find((column) => column.name === 'santri_id');
+	const hasPembayarLainId = tunggakanInfo.some((column) => column.name === 'pembayar_lain_id');
+	const hasNominalAsalTagihan = tunggakanInfo.some((column) => column.name === 'nominal_asal_tagihan');
+
+	if (tunggakanInfo.length && (santriIdColumn?.notnull === 1 || !hasPembayarLainId || !hasNominalAsalTagihan)) {
+		sqlite.exec(`
+			BEGIN;
+			CREATE TABLE tunggakan_import_migrasi (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				santri_id INTEGER,
+				pembayar_lain_id INTEGER,
+				tahun_ajaran_id INTEGER NOT NULL,
+				jenis_pembayaran_id INTEGER NOT NULL,
+				bulan TEXT,
+				tahun_tagihan INTEGER,
+				nominal_asal_tagihan INTEGER,
+				nominal_tagihan INTEGER NOT NULL,
+				keterangan_khusus TEXT,
+				catatan TEXT,
+				signature_key TEXT NOT NULL UNIQUE,
+				created_at TEXT NOT NULL,
+				updated_at TEXT NOT NULL,
+				FOREIGN KEY (santri_id) REFERENCES santri(id),
+				FOREIGN KEY (pembayar_lain_id) REFERENCES pembayar_lain(id),
+				FOREIGN KEY (tahun_ajaran_id) REFERENCES tahun_ajaran(id),
+				FOREIGN KEY (jenis_pembayaran_id) REFERENCES jenis_pembayaran(id)
+			);
+			INSERT INTO tunggakan_import_migrasi (
+				id, santri_id, tahun_ajaran_id, jenis_pembayaran_id, bulan, tahun_tagihan,
+				nominal_asal_tagihan, nominal_tagihan, keterangan_khusus, catatan, signature_key, created_at, updated_at
+			)
+			SELECT
+				id, santri_id, tahun_ajaran_id, jenis_pembayaran_id, bulan, tahun_tagihan,
+				nominal_tagihan, nominal_tagihan, keterangan_khusus, catatan, signature_key, created_at, updated_at
+			FROM tunggakan_import;
+			DROP TABLE tunggakan_import;
+			ALTER TABLE tunggakan_import_migrasi RENAME TO tunggakan_import;
+			COMMIT;
+		`);
+	}
+} catch (e) {
+	try {
+		sqlite.exec('ROLLBACK');
+	} catch (rollbackError) {
+		// ignore rollback errors
+	}
+	console.error('Migrasi tabel tunggakan_import gagal:', e);
 }
 
 try {

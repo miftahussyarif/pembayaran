@@ -15,6 +15,7 @@
 		page.url.pathname.includes('/transaksi/rekapitulasi') ? 'Rekapitulasi Pembayaran' :
 		page.url.pathname.includes('/transaksi/rekap-individu') ? 'Rekapitulasi Individu' :
 		page.url.pathname.includes('/transaksi/rekap-petugas') ? 'Rekapitulasi Petugas' :
+		page.url.pathname.includes('/pengaturan/import-tunggakan') ? 'Import Tunggakan' :
 		'Pembayaran App'
 	);
 	const currentYear = new Date().getFullYear();

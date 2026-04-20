@@ -30,11 +30,16 @@ export async function load({ params }) {
 		.from(schema.pembayaran)
 		.leftJoin(schema.jenisPembayaran, eq(schema.pembayaran.jenisPembayaranId, schema.jenisPembayaran.id))
 		.where(and(
-			eq(schema.pembayaran.santriId, pembayaranAwal.santriId),
 			eq(schema.pembayaran.tahunAjaranId, pembayaranAwal.tahunAjaranId),
 			eq(schema.pembayaran.tanggalBayar, pembayaranAwal.tanggalBayar)
 		));
-	const pembayaran = pembayaranList[0];
+	const pembayaranListFiltered = pembayaranList.filter((item) => {
+		if (pembayaranAwal.santriId) {
+			return item.santriId === pembayaranAwal.santriId;
+		}
+		return item.pembayarLainId === pembayaranAwal.pembayarLainId;
+	});
+	const pembayaran = pembayaranListFiltered[0];
 	
 	const [santri] = pembayaran.santriId
 		? await db.select().from(schema.santri).where(eq(schema.santri.id, pembayaran.santriId))
@@ -57,8 +62,8 @@ export async function load({ params }) {
 	
 	return {
 		pembayaran,
-		pembayaranList,
-		totalNominal: pembayaranList.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0),
+		pembayaranList: pembayaranListFiltered,
+		totalNominal: pembayaranListFiltered.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0),
 		santri,
 		pembayarLain,
 		jenisPembayaran,

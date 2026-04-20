@@ -75,6 +75,7 @@ export const actions = {
 		const santriDetail = asArray(backupData.santriDetail);
 		const santriSmk = asArray(backupData.santriSmk);
 		const santriSmp = asArray(backupData.santriSmp);
+		const tunggakanImport = asArray(backupData.tunggakanImport);
 		const pembayarLain = asArray(backupData.pembayarLain);
 		const pembayaran = asArray(backupData.pembayaran);
 		const mutasi = asArray(backupData.mutasi);
@@ -89,6 +90,7 @@ export const actions = {
 
 		try {
 			db.transaction((tx) => {
+				tx.delete(schema.tunggakanImport).run();
 				tx.delete(schema.pembayaran).run();
 				tx.delete(schema.pembayarLain).run();
 				tx.delete(schema.mutasiSaldoBendahara).run();
@@ -130,6 +132,9 @@ export const actions = {
 				if (santriSmp.length) {
 					insertInBatches(tx, schema.santriSmp, santriSmp);
 				}
+				if (tunggakanImport.length) {
+					insertInBatches(tx, schema.tunggakanImport, tunggakanImport);
+				}
 				if (pembayarLain.length) {
 					insertInBatches(tx, schema.pembayarLain, pembayarLain);
 				}
@@ -162,7 +167,7 @@ export const actions = {
 					role: locals.user?.role || null,
 					aksi: 'restore',
 					modul: 'backup-restore',
-					keterangan: `Restore backup: master(users=${users.length}, santri=${santri.length}, santri_detail=${santriDetail.length}, smk=${santriSmk.length}, smp=${santriSmp.length}, pembayar_lain=${pembayarLain.length}), pembayaran=${pembayaran.length}, mutasi=${mutasi.length}, files=${backupFiles.length}`,
+					keterangan: `Restore backup: master(users=${users.length}, santri=${santri.length}, santri_detail=${santriDetail.length}, smk=${santriSmk.length}, smp=${santriSmp.length}, tunggakan_import=${tunggakanImport.length}, pembayar_lain=${pembayarLain.length}), pembayaran=${pembayaran.length}, mutasi=${mutasi.length}, files=${backupFiles.length}`,
 					ip: getClientAddress(),
 					createdAt: new Date().toISOString()
 				});

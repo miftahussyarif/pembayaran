@@ -28,6 +28,7 @@
 	let selectedSantri = $derived(data.santris.find(s => s.id == selectedSantriId) || null);
 	let selectedTahunAjaran = $derived(data.tahunAjarans.find((ta) => ta.id == selectedTahunAjaranId) || null);
 	let regularPayments = $derived((data.pembayaranReguler || []).filter((p) => !p.keteranganKhusus));
+	let importedTunggakan = $derived(data.tunggakanImport || []);
 	let filteredSantris = $derived.by(() => {
 		const query = santriSearch.trim().toLowerCase();
 		let list = data.santris;
@@ -104,6 +105,17 @@
 			p.jenisPembayaranId == selectedJenisId
 		);
 
+		const importedTotal = importedTunggakan
+			.filter((item) =>
+				item.santriId == selectedSantriId &&
+				item.tahunAjaranId == selectedTahunAjaranId &&
+				item.jenisPembayaranId == selectedJenisId &&
+				String(item.bulan || '') === String(isBulanan ? selectedBulan : '') &&
+				String(item.tahunTagihan || '') === String(isBulanan ? selectedTahunTagihan : '')
+			)
+			.reduce((sum, item) => sum + Number(item.nominalTagihan || 0), 0);
+		const totalTagihan = importedTotal > 0 ? importedTotal : nominalEfektif;
+
 		if (isBulanan) {
 			if (!selectedBulan || !selectedTahunTagihan || !selectedTahunAjaranId) return null;
 			const periodPayments = relevantPayments.filter((p) =>
@@ -113,10 +125,10 @@
 			);
 			const totalDibayar = periodPayments.reduce((sum, p) => sum + Number(p.nominalDibayar || 0), 0);
 			return {
-				totalTagihan: nominalEfektif,
+				totalTagihan,
 				totalDibayar,
-				sisa: Math.max(0, nominalEfektif - totalDibayar),
-				isLunas: periodPayments.length > 0
+				sisa: Math.max(0, totalTagihan - totalDibayar),
+				isLunas: totalDibayar >= totalTagihan && totalTagihan >= 0
 			};
 		}
 
@@ -125,20 +137,20 @@
 			const yearPayments = relevantPayments.filter((p) => p.tahunAjaranId == selectedTahunAjaranId);
 			const totalDibayar = yearPayments.reduce((sum, p) => sum + Number(p.nominalDibayar || 0), 0);
 			return {
-				totalTagihan: nominalEfektif,
+				totalTagihan,
 				totalDibayar,
-				sisa: Math.max(0, nominalEfektif - totalDibayar),
-				isLunas: totalDibayar >= nominalEfektif && nominalEfektif >= 0
+				sisa: Math.max(0, totalTagihan - totalDibayar),
+				isLunas: totalDibayar >= totalTagihan && totalTagihan >= 0
 			};
 		}
 
 		if (isSekali) {
 			const totalDibayar = relevantPayments.reduce((sum, p) => sum + Number(p.nominalDibayar || 0), 0);
 			return {
-				totalTagihan: nominalEfektif,
+				totalTagihan,
 				totalDibayar,
-				sisa: Math.max(0, nominalEfektif - totalDibayar),
-				isLunas: totalDibayar >= nominalEfektif && nominalEfektif >= 0
+				sisa: Math.max(0, totalTagihan - totalDibayar),
+				isLunas: totalDibayar >= totalTagihan && totalTagihan >= 0
 			};
 		}
 
@@ -195,6 +207,46 @@
 	}
 
 	let tahunTagihanOptions = $derived.by(() => getTahunTagihanOptions(selectedTahunAjaran?.nama));
+	let importedCustomOptions = $derived.by(() => {
+		if (!selectedSantriId || !selectedTahunAjaranId || !data.khususJenisId) return [];
+
+		const grouped = new Map();
+		for (const item of importedTunggakan) {
+			if (
+				item.santriId != selectedSantriId ||
+				item.tahunAjaranId != selectedTahunAjaranId ||
+				item.jenisPembayaranId != data.khususJenisId ||
+				!item.keteranganKhusus
+			) {
+				continue;
+			}
+
+			const key = item.keteranganKhusus.trim().toLowerCase();
+			if (!grouped.has(key)) {
+				grouped.set(key, { label: item.keteranganKhusus, totalTagihan: 0 });
+			}
+			grouped.get(key).totalTagihan += Number(item.nominalTagihan || 0);
+		}
+
+		return Array.from(grouped.values())
+			.map((item) => {
+				const totalDibayar = (data.pembayaranReguler || [])
+					.filter((payment) =>
+						payment.santriId == selectedSantriId &&
+						payment.tahunAjaranId == selectedTahunAjaranId &&
+						payment.jenisPembayaranId == data.khususJenisId &&
+						String(payment.keteranganKhusus || '').trim().toLowerCase() === item.label.trim().toLowerCase()
+					)
+					.reduce((sum, payment) => sum + Number(payment.nominalDibayar || 0), 0);
+				return {
+					...item,
+					totalDibayar,
+					sisa: Math.max(0, item.totalTagihan - totalDibayar)
+				};
+			})
+			.filter((item) => item.sisa > 0)
+			.sort((a, b) => a.label.localeCompare(b.label, 'id'));
+	});
 
 	// Auto-fill nominal ketika memilih jenis pembayaran & santri
 	$effect(() => {
@@ -206,7 +258,7 @@
 			return;
 		}
 
-		if ((isTahunan || isSekali) && selectedPaymentStatus) {
+		if ((isBulanan || isTahunan || isSekali) && selectedPaymentStatus) {
 			nominal = selectedPaymentStatus.sisa;
 			return;
 		}
@@ -529,6 +581,25 @@
 								<div class="label pt-2 pb-0">
 									<span class="label-text-alt text-base-content/50">Tuliskan deskripsi untuk pembayaran ini</span>
 								</div>
+								{#if importedCustomOptions.length > 0}
+									<div class="mt-4">
+										<div class="text-xs font-semibold text-base-content/70 mb-2">Referensi tunggakan custom yang masih tersisa</div>
+										<div class="flex flex-wrap gap-2">
+											{#each importedCustomOptions as item}
+												<button
+													type="button"
+													class="btn btn-xs btn-outline btn-warning"
+													onclick={() => {
+														keteranganKhusus = item.label;
+														nominal = item.sisa;
+													}}
+												>
+													{item.label} · {formatRupiah(item.sisa)}
+												</button>
+											{/each}
+										</div>
+									</div>
+								{/if}
 							</div>
 						{:else}
 							<!-- Pilih Jenis Tagihan (Mode Normal) -->
@@ -599,7 +670,7 @@
 										</div>
 									{:else}
 										<div class="label pt-2 pb-0">
-											<span class="label-text-alt text-base-content/60">Status pembayaran: Belum dibayar untuk periode ini</span>
+											<span class="label-text-alt text-base-content/60">Status pembayaran: masih ada sisa tagihan untuk periode ini</span>
 										</div>
 									{/if}
 								{:else}
@@ -639,7 +710,16 @@
 							{/if}
 							{#if !isKhusus && isBulanan}
 								<div class="label pt-2 pb-0">
-									<span class="label-text-alt text-base-content/60">Nominal bulanan mengikuti tagihan tetap dan tidak bisa dibayar dua kali.</span>
+									<span class="label-text-alt text-base-content/60">Nominal bulanan otomatis mengikuti sisa tagihan bulan ini, termasuk hasil import tunggakan.</span>
+								</div>
+							{/if}
+							{#if !isKhusus && isBulanan && selectedPaymentStatus}
+								<div class="label pt-1 pb-0">
+									<span class={`label-text-alt font-medium ${selectedPaymentStatus.isLunas ? 'text-success' : 'text-base-content/70'}`}>
+										Tagihan: {selectedPaymentStatus.totalTagihan.toLocaleString('id-ID')} ·
+										Sudah dibayar: {selectedPaymentStatus.totalDibayar.toLocaleString('id-ID')} ·
+										Sisa: {selectedPaymentStatus.sisa.toLocaleString('id-ID')}
+									</span>
 								</div>
 							{/if}
 							{#if !isKhusus && isSekali && selectedPaymentStatus}
