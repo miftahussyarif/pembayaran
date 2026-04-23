@@ -21,13 +21,13 @@
 			<input type="hidden" name="id" value={data.profilPesantren?.id || 1} />
 
 			<div class="form-control w-full mb-4">
-				<label class="label"><span class="label-text font-bold uppercase text-xs tracking-wider">Nama Pesantren/Instansi</span></label>
-				<input type="text" name="namaPesantren" value={data.profilPesantren?.namaPesantren || ''} class="input input-bordered w-full" required />
+				<label class="label" for="namaPesantren"><span class="label-text font-bold uppercase text-xs tracking-wider">Nama Pesantren/Instansi</span></label>
+				<input id="namaPesantren" type="text" name="namaPesantren" value={data.profilPesantren?.namaPesantren || ''} class="input input-bordered w-full" required />
 			</div>
 
 			<div class="form-control w-full mb-4">
-				<label class="label"><span class="label-text font-bold uppercase text-xs tracking-wider">Logo Lembaga (Upload)</span></label>
-				<input type="file" name="logoFile" accept="image/*" class="file-input file-input-bordered w-full" />
+				<label class="label" for="logoFile"><span class="label-text font-bold uppercase text-xs tracking-wider">Logo Lembaga (Upload)</span></label>
+				<input id="logoFile" type="file" name="logoFile" accept="image/*" class="file-input file-input-bordered w-full" />
 				{#if data.profilPesantren?.logoUrl}
 					<div class="mt-3 flex items-center gap-3">
 						<img src={data.profilPesantren.logoUrl} alt="Logo saat ini" class="w-12 h-12 rounded-md object-cover border" />
@@ -37,8 +37,8 @@
 			</div>
 
 			<div class="form-control w-full mb-4">
-				<label class="label"><span class="label-text font-bold uppercase text-xs tracking-wider">Stempel Lembaga (Upload)</span></label>
-				<input type="file" name="stampFile" accept="image/*" class="file-input file-input-bordered w-full" />
+				<label class="label" for="stampFile"><span class="label-text font-bold uppercase text-xs tracking-wider">Stempel Lembaga (Upload)</span></label>
+				<input id="stampFile" type="file" name="stampFile" accept="image/*" class="file-input file-input-bordered w-full" />
 				{#if data.profilPesantren?.stampUrl}
 					<div class="mt-3 flex items-center gap-3">
 						<img src={data.profilPesantren.stampUrl} alt="Stempel saat ini" class="w-12 h-12 rounded-md object-cover border" />
@@ -48,13 +48,13 @@
 			</div>
 
 			<div class="form-control w-full mb-4">
-				<label class="label"><span class="label-text font-bold uppercase text-xs tracking-wider">Alamat Lengkap</span></label>
-				<textarea name="alamat" class="textarea textarea-bordered h-24" required>{data.profilPesantren?.alamat || ''}</textarea>
+				<label class="label" for="alamatPesantren"><span class="label-text font-bold uppercase text-xs tracking-wider">Alamat Lengkap</span></label>
+				<textarea id="alamatPesantren" name="alamat" class="textarea textarea-bordered h-24" required>{data.profilPesantren?.alamat || ''}</textarea>
 			</div>
 
 			<div class="form-control w-full mb-6">
-				<label class="label"><span class="label-text font-bold uppercase text-xs tracking-wider">No. Telepon / WhatsApp</span></label>
-				<input type="text" name="noTelp" value={data.profilPesantren?.noTelp || ''} class="input input-bordered w-full" required />
+				<label class="label" for="noTelpPesantren"><span class="label-text font-bold uppercase text-xs tracking-wider">No. Telepon / WhatsApp</span></label>
+				<input id="noTelpPesantren" type="text" name="noTelp" value={data.profilPesantren?.noTelp || ''} class="input input-bordered w-full" required />
 			</div>
 
 			<div class="divider"></div>

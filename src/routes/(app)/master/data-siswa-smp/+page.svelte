@@ -92,7 +92,7 @@
 		}}>
 			<div class="form-control w-full mb-3">
 				<label class="label" for="santriId"><span class="label-text">Pilih Santri</span></label>
-				<input type="text" class="input input-sm input-bordered mb-2" placeholder="Cari nama / NIS..." bind:value={searchSantri} />
+				<input id="searchSantriSmp" name="searchSantri" type="text" class="input input-sm input-bordered mb-2" placeholder="Cari nama / NIS..." bind:value={searchSantri} />
 				<select id="santriId" name="santriId" class="select select-sm select-bordered w-full" required>
 					<option value="" disabled selected>Pilih Santri...</option>
 					{#each filteredSantri as s}
@@ -148,8 +148,8 @@
 		}}>
 			<input type="hidden" name="id" value={editSmp.id} />
 			<div class="form-control w-full mb-3">
-				<label class="label"><span class="label-text">Santri</span></label>
-				<input type="text" class="input input-sm input-bordered w-full bg-base-200" value={`${editSmp.nomorInduk} - ${editSmp.namaLengkap}`} disabled />
+				<label class="label" for="editSmpSantriInfo"><span class="label-text">Santri</span></label>
+				<input id="editSmpSantriInfo" name="santriInfo" type="text" class="input input-sm input-bordered w-full bg-base-200" value={`${editSmp.nomorInduk} - ${editSmp.namaLengkap}`} disabled />
 			</div>
 			<div class="grid grid-cols-2 gap-3">
 				<div class="form-control w-full">

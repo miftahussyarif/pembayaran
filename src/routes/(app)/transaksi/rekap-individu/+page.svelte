@@ -54,6 +54,8 @@
 			<div class="form-control">
 				<label class="label py-1" for="filterSantri"><span class="label-text text-xs font-medium">Santri</span></label>
 				<input
+					id="searchSantriRekap"
+					name="searchSantri"
 					type="text"
 					class="input input-sm input-bordered mb-2"
 					placeholder="Ketik nama atau NIS..."

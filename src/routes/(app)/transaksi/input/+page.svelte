@@ -514,7 +514,7 @@
 						<!-- Pilih Santri -->
 						<div class="form-control w-full">
 							<label for="santriId" class="label"><span class="label-text font-medium">Santri</span></label>
-							<input type="text" placeholder="Cari nama atau nomor induk..." class="input input-bordered w-full mb-2" bind:value={santriSearch} />
+							<input id="santriSearch" name="santriSearch" type="text" placeholder="Cari nama atau nomor induk..." class="input input-bordered w-full mb-2" bind:value={santriSearch} />
 							<select id="santriId" name="santriId" class="select select-bordered w-full" bind:value={selectedSantriId}>
 								<option value="" selected>Pilih Santri...</option>
 								{#each filteredSantris as santri}
@@ -547,8 +547,8 @@
 
 						<!-- Toggle Pembayaran Lain-lain -->
 						<div class="form-control w-full md:col-span-2">
-							<label class="label cursor-pointer justify-start gap-3">
-								<input type="checkbox" class="toggle toggle-warning" bind:checked={isKhusus} />
+							<label class="label cursor-pointer justify-start gap-3" for="isKhusus">
+								<input id="isKhusus" name="isKhusus" type="checkbox" class="toggle toggle-warning" bind:checked={isKhusus} />
 								<span class="label-text font-medium">Pembayaran Lain-lain</span>
 								<span class="label-text-alt text-base-content/50">(Tentukan sendiri jenis & nominal)</span>
 							</label>

@@ -182,7 +182,7 @@
 				<div class="form-control w-full md:col-span-2">
 					<label class="label" for="editNominalDefault"><span class="label-text font-semibold">Nominal Standar (Rp)</span></label>
 					<input type="number" id="editNominalDefault" name="nominalDefault" bind:value={editJp.nominalDefault} class="input input-bordered w-full font-bold" required />
-					<label class="label"><span class="label-text-alt text-base-content/50 italic">Nominal ini digunakan jika tidak ada pengaturan khusus per kategori di bawah.</span></label>
+					<div class="label"><span class="label-text-alt text-base-content/50 italic">Nominal ini digunakan jika tidak ada pengaturan khusus per kategori di bawah.</span></div>
 				</div>
 			</div>
 
@@ -203,9 +203,9 @@
 									placeholder={editJp.nominalDefault}
 									class="input input-bordered input-sm w-full pl-8 font-medium" />
 							</div>
-							<label class="label py-0 justify-end">
+							<div class="label py-0 justify-end">
 								<span class="label-text-alt text-[10px] italic">0 = Gratis</span>
-							</label>
+							</div>
 						</div>
 					{/each}
 				</div>

@@ -118,3 +118,28 @@ export const sendBackupToTelegram = async (token, chatId, backupData) => {
 		throw error;
 	}
 };
+
+export const sendTelegramTextMessage = async (token, chatId, text) => {
+	const url = `https://api.telegram.org/bot${token}/sendMessage`;
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), 10000);
+
+	try {
+		const response = await fetch(url, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				chat_id: chatId,
+				text
+			}),
+			signal: controller.signal
+		});
+		clearTimeout(timeout);
+		return await response.json();
+	} catch (error) {
+		clearTimeout(timeout);
+		throw error;
+	}
+};

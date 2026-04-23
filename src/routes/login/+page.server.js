@@ -11,10 +11,18 @@ import {
 	isValidUsername,
 	normalizeUsername
 } from '$lib/server/auth.js';
+import { sendTelegramTextMessage } from '$lib/server/backup.js';
 
 export const actions = {
 	login: async ({ request, cookies, getClientAddress }) => {
 		const ipAddress = getClientAddress();
+		const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+		const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+		const requestUrl = new URL(request.url);
+		const loginOrigin = forwardedProto && forwardedHost
+			? `${forwardedProto}://${forwardedHost}`
+			: requestUrl.origin;
+		const loginUrl = `${loginOrigin}/login`;
 		const data = await request.formData();
 		const username = normalizeUsername(data.get('username') ?? '');
 		const password = data.get('password')?.toString() || '';
@@ -112,6 +120,37 @@ export const actions = {
 			});
 		} catch (e) {
 			// ignore logging errors
+		}
+
+		try {
+			const [pengaturan] = await db.select().from(schema.pengaturanPesantren).limit(1);
+			if (pengaturan?.telegramBotToken && pengaturan?.telegramChatId) {
+				const userAgent = request.headers.get('user-agent')?.trim() || 'Tidak diketahui';
+				const loginTime = new Date().toLocaleString('id-ID', {
+					dateStyle: 'medium',
+					timeStyle: 'medium'
+				});
+				const message = [
+					'🔐 Login user berhasil',
+					`URL Login: ${loginUrl}`,
+					`Nama: ${user.namaLengkap}`,
+					`Username: ${user.username}`,
+					`Role: ${user.role}`,
+					`IP: ${ipAddress}`,
+					`Waktu: ${loginTime}`,
+					`User-Agent: ${userAgent.slice(0, 180)}`
+				].join('\n');
+
+				void sendTelegramTextMessage(
+					pengaturan.telegramBotToken,
+					pengaturan.telegramChatId,
+					message
+				).catch((error) => {
+					console.error('[Auth] Gagal mengirim notifikasi login ke Telegram:', error.message);
+				});
+			}
+		} catch (error) {
+			console.error('[Auth] Gagal membaca konfigurasi Telegram:', error.message);
 		}
 
 		throw redirect(303, '/');

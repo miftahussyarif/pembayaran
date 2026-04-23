@@ -192,7 +192,7 @@
 				<tr>
 					{#if isAdmin}
 						<th>
-							<input type="checkbox" class="checkbox checkbox-sm"
+							<input id="selectAllSantri" type="checkbox" class="checkbox checkbox-sm"
 								checked={selectedSantris.length > 0 && selectedSantris.length === sortedSantris.length}
 								onchange={(e) => {
 									if (e.target.checked) selectedSantris = sortedSantris.map(s => s.id);
@@ -220,7 +220,7 @@
 					<tr>
 						{#if isAdmin}
 							<td>
-								<input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+								<input id={`selectSantri-${santri.id}`} type="checkbox" class="checkbox checkbox-sm checkbox-primary"
 									checked={selectedSantris.includes(santri.id)}
 									onchange={(e) => {
 										if (e.target.checked) selectedSantris = [...selectedSantris, santri.id];
@@ -340,14 +340,14 @@
 		<input type="hidden" name="kategoriTahunJson" value={JSON.stringify(addKategoriRows.filter(r => r.tahunAjaranId && r.kategoriIds.length))} />
 		<div class="mb-4">
 			<div class="flex items-center justify-between mb-2">
-				<label class="label-text font-semibold text-primary">Kategori per Tahun Ajaran</label>
+				<p class="label-text font-semibold text-primary">Kategori per Tahun Ajaran</p>
 				<button type="button" class="btn btn-xs btn-outline btn-primary" onclick={addKategoriRow}>+ Tambah Tahun</button>
 			</div>
 			{#each addKategoriRows as row, rowIdx}
 				<div class="border border-base-200 rounded-lg p-3 mb-2">
 					<div class="flex gap-2 items-center mb-2">
 						<div class="form-control flex-1">
-							<select class="select select-sm select-bordered w-full" bind:value={row.tahunAjaranId}>
+							<select id={`addKategoriTahun-${rowIdx}`} class="select select-sm select-bordered w-full" bind:value={row.tahunAjaranId}>
 								<option value="">-- Pilih Tahun Ajaran --</option>
 								{#each data.tahunAjarans as ta}
 									<option value={ta.id}>{ta.nama}</option>
@@ -361,7 +361,7 @@
 					<div class="flex flex-wrap gap-2">
 						{#each data.kategoris as kat}
 							<label class="flex items-center gap-1 cursor-pointer">
-								<input type="checkbox"
+								<input id={`addKategori-${rowIdx}-${kat.id}`} type="checkbox"
 									class="checkbox checkbox-sm checkbox-primary"
 									checked={row.kategoriIds.includes(kat.id)}
 									onchange={() => toggleAddKategori(rowIdx, kat.id)} />
@@ -629,14 +629,14 @@
 			<input type="hidden" name="kategoriTahunJson" value={JSON.stringify(editKategoriRows.filter(r => r.tahunAjaranId && r.kategoriIds.length))} />
 			<div class="mb-4">
 				<div class="flex items-center justify-between mb-2">
-					<label class="label-text font-semibold text-primary">Kategori per Tahun Ajaran</label>
+					<p class="label-text font-semibold text-primary">Kategori per Tahun Ajaran</p>
 					<button type="button" class="btn btn-xs btn-outline btn-primary" onclick={addEditKategoriRow}>+ Tambah Tahun</button>
 				</div>
 				{#each editKategoriRows as row, rowIdx}
 					<div class="border border-base-200 rounded-lg p-3 mb-2">
 						<div class="flex gap-2 items-center mb-2">
 							<div class="form-control flex-1">
-								<select class="select select-sm select-bordered w-full" bind:value={row.tahunAjaranId}>
+								<select id={`editKategoriTahun-${rowIdx}`} class="select select-sm select-bordered w-full" bind:value={row.tahunAjaranId}>
 									<option value="">-- Pilih Tahun Ajaran --</option>
 									{#each data.tahunAjarans as ta}
 										<option value={ta.id}>{ta.nama}</option>
@@ -650,7 +650,7 @@
 						<div class="flex flex-wrap gap-2">
 							{#each data.kategoris as kat}
 								<label class="flex items-center gap-1 cursor-pointer">
-									<input type="checkbox"
+									<input id={`editKategori-${rowIdx}-${kat.id}`} type="checkbox"
 										class="checkbox checkbox-sm checkbox-primary"
 										checked={row.kategoriIds.includes(kat.id)}
 										onchange={() => toggleEditKategori(rowIdx, kat.id)} />

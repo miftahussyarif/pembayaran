@@ -9,7 +9,10 @@
 <div class="min-h-screen flex items-center justify-center bg-base-200 p-4 font-sans relative overflow-hidden">
 	<!-- Background pattern/gradient -->
 	<div class="absolute inset-0 bg-gradient-to-br from-blue-700 to-blue-900 z-0"></div>
-	<div class="absolute inset-0 opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMSI+PC9yZWN0Pgo8cGF0aCBkPSJNMCAwTDggOFoiIHN0cm9rZT0iI2ZmZiIHN0cm9rZS13aWR0aD0iMSIgc3Ryb2tlLW9wYWNpdHk9IjAuMSI+PC9wYXRoPgo8L3N2Zz4=')]"></div>
+	<div
+		class="absolute inset-0 opacity-10"
+		style={"background-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8'%3E%3Crect width='8' height='8' fill='%23fff' fill-opacity='0.1'/%3E%3Cpath d='M0 0L8 8' stroke='%23fff' stroke-width='1' stroke-opacity='0.1'/%3E%3C/svg%3E\");"}
+	></div>
 
 	<div class="card w-full max-w-md bg-base-100 shadow-2xl relative z-10 rounded-[2rem] border border-white/10 m-4">
 		
@@ -33,7 +36,7 @@
 					<label class="label pb-1" for="username">
 						<span class="label-text text-sm font-semibold text-base-content/70">Username</span>
 					</label>
-					<input type="text" id="username" name="username" placeholder="Masukkan Username..." class="input input-bordered w-full focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary rounded-xl" required />
+					<input type="text" id="username" name="username" autocomplete="username" placeholder="Masukkan Username..." class="input input-bordered w-full focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary rounded-xl" required />
 				</div>
 
 				<div class="form-control w-full mb-6">
@@ -41,7 +44,7 @@
 						<span class="label-text text-sm font-semibold text-base-content/70">Password</span>
 					</label>
 					<div class="relative w-full">
-						<input type="password" id="password" name="password" placeholder="••••••••" class="input input-bordered w-full focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary rounded-xl pr-12" required />
+						<input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••" class="input input-bordered w-full focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary rounded-xl pr-12" required />
 						<div class="absolute right-4 top-1/2 -translate-y-1/2 text-base-content/40">
 							<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
 						</div>
