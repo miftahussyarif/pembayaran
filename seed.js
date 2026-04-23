@@ -80,6 +80,7 @@ async function seed() {
 		mutasiSaldoBendahara: ensureArray(data.mutasiSaldoBendahara ?? data.mutasi),
 		systemLogs: ensureArray(data.systemLogs),
 		loginAttempts: ensureArray(data.loginAttempts)
+    santriKategoriTahun: ensureArray(data.santriKategoriTahun),
 	};
 
 	await safeDelete(schema.loginAttempts, 'login_attempts');
@@ -99,6 +100,9 @@ async function seed() {
 	await safeDelete(schema.users, 'users');
 	await safeDelete(schema.pengaturanPesantren, 'pengaturan_pesantren');
 
+  // Hapus tabel relasi baru
+  await safeDelete(schema.santriKategoriTahun, 'santri_kategori_tahun');
+
 	await insertIfAny(schema.users, normalized.users, 'users');
 	await insertIfAny(schema.pengaturanPesantren, normalized.pengaturanPesantren, 'pengaturan_pesantren');
 	await insertIfAny(schema.tahunAjaran, normalized.tahunAjaran, 'tahun_ajaran');
@@ -115,6 +119,9 @@ async function seed() {
 	await insertIfAny(schema.mutasiSaldoBendahara, normalized.mutasiSaldoBendahara, 'mutasi_saldo_bendahara');
 	await insertIfAny(schema.systemLogs, normalized.systemLogs, 'system_logs');
 	await insertIfAny(schema.loginAttempts, normalized.loginAttempts, 'login_attempts');
+
+  // Insert tabel relasi baru
+  await insertIfAny(schema.santriKategoriTahun, normalized.santriKategoriTahun, 'santri_kategori_tahun');
 
 	console.log('✅ Database seeded!');
 	process.exit(0);

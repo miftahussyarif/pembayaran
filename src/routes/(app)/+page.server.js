@@ -83,6 +83,14 @@ export async function load() {
 		const jenisList = await db.select().from(schema.jenisPembayaran);
 		const syahriyahJenisId = jenisList.find(j => j.tipe === 'bulanan' && /syahriyah|spp/i.test(j.namaPembayaran))?.id;
 
+		// Query kategori per santri dari tabel relasi
+		const kategoriTahunRows = await db.select().from(schema.santriKategoriTahun);
+		const kategoriIdsBySantriId = new Map();
+		for (const row of kategoriTahunRows) {
+			if (!kategoriIdsBySantriId.has(row.santriId)) kategoriIdsBySantriId.set(row.santriId, new Set());
+			kategoriIdsBySantriId.get(row.santriId).add(row.kategoriId);
+		}
+
 		// Ambil semua pembayaran di TA aktif (dengan join ke jenis pembayaran untuk tahu tipe)
 		const allPembayaran = await db
 			.select({
@@ -145,9 +153,18 @@ export async function load() {
 
 		// --- Kalkulasi Tunggakan ---
 		for (const santri of santris) {
-			// Hubungkan dengan nominal khusus jika ada
-			const mapping = syahriyahJenisId ? customNominals.find(cn => cn.kategoriId === santri.kategoriId && cn.jenisPembayaranId === syahriyahJenisId) : null;
-			let nominalPerBulan = (mapping && mapping.nominal !== null) ? mapping.nominal : (santri.nominalSyahriyah ?? 0);
+			// Kumpulkan semua kategoriId santri ini
+			const allKategoriIds = new Set(kategoriIdsBySantriId.get(santri.id) || []);
+			if (santri.kategoriId) allKategoriIds.add(santri.kategoriId);
+
+			// Cek mapping gratis/nominal khusus (pakai kategori pertama yang cocok)
+			let nominalPerBulan = santri.nominalSyahriyah ?? 0;
+			if (syahriyahJenisId) {
+				for (const katId of allKategoriIds) {
+					const mapping = customNominals.find(cn => cn.kategoriId === katId && cn.jenisPembayaranId === syahriyahJenisId);
+					if (mapping && mapping.nominal !== null) { nominalPerBulan = mapping.nominal; break; }
+				}
+			}
 			
 			if (nominalPerBulan === 0) continue;
 

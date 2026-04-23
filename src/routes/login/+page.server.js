@@ -1,16 +1,24 @@
-import { error, redirect } from '@sveltejs/kit';
+import { redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
-import crypto from 'node:crypto';
+import {
+	buildSessionCookieValue,
+	createSessionToken,
+	getSessionCookieName,
+	getSessionCookieOptions,
+	isValidUsername,
+	normalizeUsername
+} from '$lib/server/auth.js';
 
 export const actions = {
 	login: async ({ request, cookies, getClientAddress }) => {
 		const ipAddress = getClientAddress();
 		const data = await request.formData();
-		const username = data.get('username')?.toString() || '';
+		const username = normalizeUsername(data.get('username') ?? '');
 		const password = data.get('password')?.toString() || '';
+		const invalidCredentialsMessage = 'Username atau password tidak valid.';
 
 		const [attemptRecord] = await db.select().from(schema.loginAttempts).where(eq(schema.loginAttempts.ip, ipAddress));
 		if (attemptRecord) {
@@ -21,6 +29,10 @@ export const actions = {
 
 		if (!username || !password) {
 			return { error: 'Username dan Password wajib diisi!' };
+		}
+
+		if (!isValidUsername(username)) {
+			return { error: invalidCredentialsMessage };
 		}
 
 		const handleFailedLogin = async () => {
@@ -58,7 +70,7 @@ export const actions = {
 
 		if (!user) {
 			await handleFailedLogin();
-			return { error: 'Username tidak ditemukan' };
+			return { error: invalidCredentialsMessage };
 		}
 
 		// Validasi passsword Hash
@@ -66,14 +78,14 @@ export const actions = {
 		
 		if (!isValidPW) {
 			await handleFailedLogin();
-			return { error: 'Password yang Anda masukkan salah.' };
+			return { error: invalidCredentialsMessage };
 		}
 
 		if (attemptRecord) {
 			await db.delete(schema.loginAttempts).where(eq(schema.loginAttempts.ip, ipAddress));
 		}
 
-		const newSessionId = crypto.randomUUID();
+		const newSessionId = createSessionToken();
 
 		// Update sessionId in database
 		await db.update(schema.users)
@@ -81,20 +93,11 @@ export const actions = {
 			.where(eq(schema.users.id, user.id));
 
 		// Generate token session / nyimpan ID nRole (Sementara pake cookie biasa HTTP-Only)
-		const sessionData = {
-			id: user.id,
-			username: user.username,
-			role: user.role,
-			namaLengkap: user.namaLengkap,
-			sessionId: newSessionId
-		};
-
-		cookies.set('sessionid', JSON.stringify(sessionData), {
-			path: '/',
-			httpOnly: true,
-			sameSite: 'strict',
-			maxAge: 60 * 60 * 6 // 6 jam 
-		});
+		cookies.set(
+			getSessionCookieName(),
+			buildSessionCookieValue({ userId: user.id, sessionId: newSessionId }),
+			getSessionCookieOptions()
+		);
 
 		try {
 			await db.insert(schema.systemLogs).values({

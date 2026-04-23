@@ -600,6 +600,19 @@ export const actions = {
 						}
 						item.santriId = resolvedSantri.id;
 
+						if (item.kategoriId) {
+							const existsKat = tx.select().from(schema.santriKategoriTahun).where(
+								eq(schema.santriKategoriTahun.santriId, resolvedSantri.id)
+							).all().find(k => k.tahunAjaranId === item.tahunAjaranId && k.kategoriId === item.kategoriId);
+							if (!existsKat) {
+								tx.insert(schema.santriKategoriTahun).values({
+									santriId: resolvedSantri.id,
+									tahunAjaranId: item.tahunAjaranId,
+									kategoriId: item.kategoriId
+								}).run();
+							}
+						}
+
 						const smkMeta = smkMetaByNomor.get(item.nomorInduk);
 						if (smkMeta && !smkBySantriId.has(resolvedSantri.id)) {
 							const insertedSmk = tx.insert(schema.santriSmk).values({
@@ -641,6 +654,19 @@ export const actions = {
 								.where(eq(schema.santri.id, resolvedSantri.id))
 								.run();
 							santriRowByNomor.set(item.nomorInduk, { ...resolvedSantri, ...nextFields });
+						}
+
+						if (item.kategoriId) {
+							const existsKat = tx.select().from(schema.santriKategoriTahun).where(
+								eq(schema.santriKategoriTahun.santriId, item.santriId)
+							).all().find(k => k.tahunAjaranId === item.tahunAjaranId && k.kategoriId === item.kategoriId);
+							if (!existsKat) {
+								tx.insert(schema.santriKategoriTahun).values({
+									santriId: item.santriId,
+									tahunAjaranId: item.tahunAjaranId,
+									kategoriId: item.kategoriId
+								}).run();
+							}
 						}
 
 						const smkMeta = smkMetaByNomor.get(item.nomorInduk);

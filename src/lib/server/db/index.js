@@ -110,6 +110,15 @@ sqlite.exec(`
 		penghasilan_ibu INTEGER,
 		FOREIGN KEY (santri_id) REFERENCES santri(id)
 	);
+	CREATE TABLE IF NOT EXISTS santri_kategori_tahun (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		santri_id INTEGER NOT NULL,
+		tahun_ajaran_id INTEGER NOT NULL,
+		kategori_id INTEGER NOT NULL,
+		FOREIGN KEY (santri_id) REFERENCES santri(id),
+		FOREIGN KEY (tahun_ajaran_id) REFERENCES tahun_ajaran(id),
+		FOREIGN KEY (kategori_id) REFERENCES kategori_santri(id)
+	);
 	CREATE TABLE IF NOT EXISTS pembayar_lain (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		nama_pembayar TEXT NOT NULL,

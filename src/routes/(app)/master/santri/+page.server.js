@@ -1,6 +1,6 @@
 import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
 
 const parseCsv = (text) => {
@@ -81,9 +81,27 @@ export async function load() {
 	const santris = await db.select().from(schema.santri);
 	const santriDetails = await db.select().from(schema.santriDetail);
 	const kategoris = await db.select().from(schema.kategoriSantri).orderBy(schema.kategoriSantri.namaKategori);
+	const tahunAjarans = await db.select().from(schema.tahunAjaran);
+	const kategoriTahunRows = await db.select().from(schema.santriKategoriTahun);
+
 	const detailBySantriId = new Map(santriDetails.map((d) => [d.santriId, d]));
-	const santrisWithDetail = santris.map((s) => ({ ...s, detail: detailBySantriId.get(s.id) || null }));
-	return { santris: santrisWithDetail, kategoris };
+
+	// Group kategori-tahun per santri
+	const kategoriTahunBySantriId = new Map();
+	for (const row of kategoriTahunRows) {
+		if (!kategoriTahunBySantriId.has(row.santriId)) {
+			kategoriTahunBySantriId.set(row.santriId, []);
+		}
+		kategoriTahunBySantriId.get(row.santriId).push(row);
+	}
+
+	const santrisWithDetail = santris.map((s) => ({
+		...s,
+		detail: detailBySantriId.get(s.id) || null,
+		kategoriTahun: kategoriTahunBySantriId.get(s.id) || []
+	}));
+
+	return { santris: santrisWithDetail, kategoris, tahunAjarans };
 }
 
 export const actions = {
@@ -93,8 +111,13 @@ export const actions = {
 		const namaLengkap = data.get('namaLengkap');
 		const tanggalMasuk = data.get('tanggalMasuk') || null;
 		const tanggalKeluar = data.get('tanggalKeluar') || null;
-		const kategoriId = data.get('kategoriId') ? Number(data.get('kategoriId')) : null;
 		const isActive = data.get('isActive') === 'on';
+		// Parsing multi-kategori per tahun ajaran dari JSON field
+		let kategoriTahunList = [];
+		try {
+			const raw = data.get('kategoriTahunJson');
+			if (raw) kategoriTahunList = JSON.parse(raw);
+		} catch (e) { kategoriTahunList = []; }
 
 		const toText = (value) => {
 			if (value === null || value === undefined) return null;
@@ -149,9 +172,21 @@ export const actions = {
 			db.transaction((tx) => {
 				const newSantri = tx
 					.insert(schema.santri)
-					.values({ nomorInduk, namaLengkap, tanggalMasuk, tanggalKeluar, kategoriId, isActive })
+					.values({ nomorInduk, namaLengkap, tanggalMasuk, tanggalKeluar, isActive })
 					.returning().get();
 				tx.insert(schema.santriDetail).values({ santriId: newSantri.id, ...detailData }).run();
+
+				// Insert relasi multi-kategori per tahun ajaran
+				for (const entry of kategoriTahunList) {
+					const tahunAjaranId = Number(entry.tahunAjaranId);
+					const kategoriIds = Array.isArray(entry.kategoriIds) ? entry.kategoriIds : [];
+					for (const kategoriId of kategoriIds) {
+						const kid = Number(kategoriId);
+						if (tahunAjaranId && kid) {
+							tx.insert(schema.santriKategoriTahun).values({ santriId: newSantri.id, tahunAjaranId, kategoriId: kid }).run();
+						}
+					}
+				}
 
 				try {
 					tx.insert(schema.systemLogs).values({
@@ -182,8 +217,13 @@ export const actions = {
 		const namaLengkap = data.get('namaLengkap')?.toString().trim();
 		const tanggalMasuk = data.get('tanggalMasuk') || null;
 		const tanggalKeluar = data.get('tanggalKeluar') || null;
-		const kategoriId = data.get('kategoriId') ? Number(data.get('kategoriId')) : null;
 		const isActive = data.get('isActive') === 'on';
+		// Parsing multi-kategori per tahun ajaran
+		let kategoriTahunList = [];
+		try {
+			const raw = data.get('kategoriTahunJson');
+			if (raw) kategoriTahunList = JSON.parse(raw);
+		} catch (e) { kategoriTahunList = []; }
 		const toText = (value) => {
 			if (value === null || value === undefined) return null;
 			const text = value.toString().trim();
@@ -234,7 +274,7 @@ export const actions = {
 
 		try {
 			await db.update(schema.santri)
-				.set({ nomorInduk, namaLengkap, tanggalMasuk, tanggalKeluar, kategoriId, isActive })
+				.set({ nomorInduk, namaLengkap, tanggalMasuk, tanggalKeluar, isActive })
 				.where(eq(schema.santri.id, id));
 			const [currentDetail] = await db
 				.select()
@@ -247,6 +287,20 @@ export const actions = {
 			} else {
 				await db.insert(schema.santriDetail).values({ santriId: id, ...detailData });
 			}
+
+			// Reset dan insert ulang relasi kategori-tahun
+			await db.delete(schema.santriKategoriTahun).where(eq(schema.santriKategoriTahun.santriId, id));
+			for (const entry of kategoriTahunList) {
+				const tahunAjaranId = Number(entry.tahunAjaranId);
+				const kategoriIds = Array.isArray(entry.kategoriIds) ? entry.kategoriIds : [];
+				for (const kategoriId of kategoriIds) {
+					const kid = Number(kategoriId);
+					if (tahunAjaranId && kid) {
+						await db.insert(schema.santriKategoriTahun).values({ santriId: id, tahunAjaranId, kategoriId: kid });
+					}
+				}
+			}
+
 			try {
 				await db.insert(schema.systemLogs).values({
 					userId: locals.user?.id || null,
@@ -295,6 +349,8 @@ export const actions = {
 	delete: async ({ request, locals, getClientAddress }) => {
 		const data = await request.formData();
 		const id = Number(data.get('id'));
+		// Hapus relasi kategori-tahun dulu
+		await db.delete(schema.santriKategoriTahun).where(eq(schema.santriKategoriTahun.santriId, id));
 		await db.delete(schema.santriDetail).where(eq(schema.santriDetail.santriId, id));
 		await db.delete(schema.santri).where(eq(schema.santri.id, id));
 		try {
@@ -305,6 +361,38 @@ export const actions = {
 				aksi: 'delete',
 				modul: 'master-santri',
 				keterangan: `Hapus santri id=${id}`,
+				ip: getClientAddress(),
+				createdAt: new Date().toISOString()
+			});
+		} catch (e) {
+			// ignore logging errors
+		}
+		return { success: true };
+	},
+
+	bulkDelete: async ({ request, locals, getClientAddress }) => {
+		if (locals.user?.role !== 'admin') return { success: false, error: 'Unauthorized' };
+		const data = await request.formData();
+		let ids = [];
+		try {
+			ids = JSON.parse(data.get('ids'));
+		} catch (e) {}
+
+		if (!Array.isArray(ids) || ids.length === 0) return { success: false, error: 'Tidak ada santri yang dipilih.' };
+
+		// Hapus relasi kategori-tahun dulu
+		await db.delete(schema.santriKategoriTahun).where(inArray(schema.santriKategoriTahun.santriId, ids));
+		await db.delete(schema.santriDetail).where(inArray(schema.santriDetail.santriId, ids));
+		await db.delete(schema.santri).where(inArray(schema.santri.id, ids));
+		
+		try {
+			await db.insert(schema.systemLogs).values({
+				userId: locals.user?.id || null,
+				username: locals.user?.username || null,
+				role: locals.user?.role || null,
+				aksi: 'delete',
+				modul: 'master-santri',
+				keterangan: `Bulk delete ${ids.length} santri`,
 				ip: getClientAddress(),
 				createdAt: new Date().toISOString()
 			});
@@ -371,39 +459,51 @@ export const actions = {
 		const prepared = [];
 		const seenNomor = new Set();
 
+		// Ambil data tahun ajaran
+		const tahunAjarans = await db.select().from(schema.tahunAjaran);
+		const tahunAjaranByName = new Map(tahunAjarans.map((t) => [t.nama, t.id]));
+
+		// Untuk multi-kategori per tahun ajaran
 		for (let i = 0; i < rows.length; i++) {
 			const row = rows[i];
 			const nomorInduk = String(pick(row, 'nomor_induk') || '').trim();
 			const namaLengkap = String(pick(row, 'nama_lengkap') || '').trim();
 			const tanggalMasuk = String(pick(row, 'tanggal_masuk') || '').trim() || null;
 			const tanggalKeluar = String(pick(row, 'tanggal_keluar') || '').trim() || null;
-			const kategoriIdRaw = String(pick(row, 'kategori_id') || '').trim();
+			const tahunAjaranRaw = String(pick(row, 'tahun_ajaran') || '').trim();
 			const kategoriRaw = String(pick(row, 'kategori') || '').trim();
 			const isActive = toBool(pick(row, 'is_active'), true);
+			const tanggalMulaiSmp = String(pick(row, 'tanggal_mulai_smp') || '').trim() || null;
+			const tanggalMulaiSmk = String(pick(row, 'tanggal_mulai_smk') || '').trim() || null;
 
 			if (!nomorInduk || !namaLengkap) {
 				errors.push(`Baris ${i + 2}: nomor_induk dan nama_lengkap wajib diisi.`);
 				continue;
 			}
 
-			if (seenNomor.has(nomorInduk)) {
+			// Tidak perlu skip jika nomorInduk sudah pernah, karena bisa multi tahun/kategori
+
+			// Validasi tahun ajaran
+			const tahunAjaranId = tahunAjaranByName.get(tahunAjaranRaw);
+			if (!tahunAjaranId) {
+				errors.push(`Baris ${i + 2}: tahun_ajaran "${tahunAjaranRaw}" tidak ditemukan.`);
 				continue;
 			}
-			seenNomor.add(nomorInduk);
 
-			let kategoriId = null;
-			if (kategoriIdRaw) {
-				kategoriId = kategoriById.get(kategoriIdRaw);
-				if (!kategoriId) {
-					errors.push(`Baris ${i + 2}: kategori_id ${kategoriIdRaw} tidak ditemukan.`);
+			// Multi kategori (pisah koma)
+			const kategoriList = kategoriRaw.split(',').map((k) => k.trim()).filter(Boolean);
+			if (!kategoriList.length) {
+				errors.push(`Baris ${i + 2}: kategori wajib diisi.`);
+				continue;
+			}
+			const kategoriIds = [];
+			for (const kat of kategoriList) {
+				const katId = kategoriByName.get(kat.toLowerCase());
+				if (!katId) {
+					errors.push(`Baris ${i + 2}: kategori "${kat}" tidak ditemukan.`);
 					continue;
 				}
-			} else if (kategoriRaw) {
-				kategoriId = kategoriByName.get(kategoriRaw.toLowerCase());
-				if (!kategoriId) {
-					errors.push(`Baris ${i + 2}: kategori "${kategoriRaw}" tidak ditemukan.`);
-					continue;
-				}
+				kategoriIds.push(katId);
 			}
 
 			const detailData = {
@@ -450,10 +550,13 @@ export const actions = {
 					namaLengkap,
 					tanggalMasuk,
 					tanggalKeluar,
-					kategoriId,
 					isActive
 				},
-				detail: detailData
+				detail: detailData,
+				tahunAjaranId,
+				kategoriIds,
+				tanggalMulaiSmp,
+				tanggalMulaiSmk
 			});
 		}
 
@@ -461,16 +564,68 @@ export const actions = {
 			return { type: 'error', message: 'Tidak ada data valid untuk diimport.' };
 		}
 
-		const existing = await db.select({ nomorInduk: schema.santri.nomorInduk }).from(schema.santri);
-		const existingSet = new Set(existing.map((row) => row.nomorInduk));
-		const toInsert = prepared.filter((p) => !existingSet.has(p.santri.nomorInduk));
-		const skipped = prepared.length - toInsert.length;
+
+		// Cek santri yang sudah ada berdasarkan nomor induk
+		const existing = await db.select({ id: schema.santri.id, nomorInduk: schema.santri.nomorInduk }).from(schema.santri);
+		const existingMap = new Map(existing.map((row) => [row.nomorInduk, row.id]));
+		// Ambil relasi kategori-tahun yang sudah ada untuk cek duplikat
+		const existingKatTahun = await db.select().from(schema.santriKategoriTahun);
+		// Set untuk lookup cepat: 'santriId:tahunAjaranId:kategoriId'
+		const existingKatTahunSet = new Set(
+			existingKatTahun.map((r) => `${r.santriId}:${r.tahunAjaranId}:${r.kategoriId}`)
+		);
+		let insertedSantri = 0;
+		let insertedKategoriTahun = 0;
+		let skippedKategoriTahun = 0;
+		let skipped = 0;
 
 		try {
 			db.transaction((tx) => {
-				for (const item of toInsert) {
-					const newSantri = tx.insert(schema.santri).values(item.santri).returning().get();
-					tx.insert(schema.santriDetail).values({ santriId: newSantri.id, ...item.detail }).run();
+				for (const item of prepared) {
+					let santriId = existingMap.get(item.santri.nomorInduk);
+					if (!santriId) {
+						// Insert santri baru
+						const newSantri = tx.insert(schema.santri).values(item.santri).returning().get();
+						santriId = newSantri.id;
+						tx.insert(schema.santriDetail).values({ santriId, ...item.detail }).run();
+						insertedSantri++;
+					} else {
+						skipped++;
+					}
+					// Insert ke tabel relasi kategori-tahun (skip duplikat)
+					for (const kategoriId of item.kategoriIds) {
+						const key = `${santriId}:${item.tahunAjaranId}:${kategoriId}`;
+						if (existingKatTahunSet.has(key)) {
+							skippedKategoriTahun++;
+							continue;
+						}
+						tx.insert(schema.santriKategoriTahun).values({ santriId, tahunAjaranId: item.tahunAjaranId, kategoriId }).run();
+						existingKatTahunSet.add(key); // update set agar batch yang sama juga ter-deduplikasi
+						insertedKategoriTahun++;
+					}
+
+					// Process santriSmp
+					if (item.tanggalMulaiSmp) {
+						const dSmp = new Date(item.tanggalMulaiSmp);
+						if (!isNaN(dSmp)) {
+							tx.insert(schema.santriSmp).values({
+								santriId,
+								startMonth: dSmp.getMonth() + 1,
+								startYear: dSmp.getFullYear()
+							}).onConflictDoNothing().run();
+						}
+					}
+					// Process santriSmk
+					if (item.tanggalMulaiSmk) {
+						const dSmk = new Date(item.tanggalMulaiSmk);
+						if (!isNaN(dSmk)) {
+							tx.insert(schema.santriSmk).values({
+								santriId,
+								startMonth: dSmk.getMonth() + 1,
+								startYear: dSmk.getFullYear()
+							}).onConflictDoNothing().run();
+						}
+					}
 				}
 			});
 		} catch (e) {
@@ -485,7 +640,7 @@ export const actions = {
 				role: locals.user?.role || null,
 				aksi: 'create',
 				modul: 'master-santri',
-				keterangan: `Import santri: ditambah=${toInsert.length}, duplikat=${skipped}, error=${errors.length}`,
+				keterangan: `Import santri: ditambah=${insertedSantri}, kategori-tahun=${insertedKategoriTahun}, duplikat-santri=${skipped}, duplikat-kategori=${skippedKategoriTahun}, error=${errors.length}`,
 				ip: getClientAddress(),
 				createdAt: new Date().toISOString()
 			});
@@ -493,7 +648,7 @@ export const actions = {
 			// ignore logging errors
 		}
 
-		let message = `Import selesai. Ditambahkan ${toInsert.length} santri, dilewati ${skipped} duplikat.`;
+		let message = `Import selesai. Ditambahkan ${insertedSantri} santri, relasi kategori-tahun: ${insertedKategoriTahun}, dilewati ${skipped} duplikat.`;
 		if (errors.length) {
 			message += ` Error ${errors.length} baris (contoh: ${errors.slice(0, 3).join(' | ')}).`;
 		}

@@ -139,6 +139,7 @@ export async function load({ url }) {
 			id: schema.pembayaran.id,
 			santriId: schema.pembayaran.santriId,
 			jenisPembayaranId: schema.pembayaran.jenisPembayaranId,
+			tahunAjaranId: schema.pembayaran.tahunAjaranId,
 			tanggalBayar: schema.pembayaran.tanggalBayar,
 			bulan: schema.pembayaran.bulan,
 			tahunTagihan: schema.pembayaran.tahunTagihan,
@@ -163,17 +164,63 @@ export async function load({ url }) {
 	const smkBySantriId = new Map(santriSmkList.map(s => [s.santriId, s]));
 	const smpBySantriId = new Map(santriSmpList.map(s => [s.santriId, s]));
 	const gratisList = await db.select().from(schema.kategoriGratis);
+	// Query santriKategoriTahun dan bangun map: santriId -> Map<tahunAjaranId, Set<kategoriId>>
+	const kategoriTahunRows = await db.select().from(schema.santriKategoriTahun);
+	const tahunAjarans = await db.select().from(schema.tahunAjaran);
+
+	// kategoriByTahun[santriId][tahunAjaranId] = Set<kategoriId>
+	const kategoriByTahun = new Map(); // santriId -> Map<tahunAjaranId, Set<kategoriId>>
+	for (const row of kategoriTahunRows) {
+		if (!kategoriByTahun.has(row.santriId)) kategoriByTahun.set(row.santriId, new Map());
+		const tahunMap = kategoriByTahun.get(row.santriId);
+		if (!tahunMap.has(row.tahunAjaranId)) tahunMap.set(row.tahunAjaranId, new Set());
+		tahunMap.get(row.tahunAjaranId).add(row.kategoriId);
+	}
 
 	const rekapIndividu = santris.map(s => {
-		// Helper to get nominal with priority: Custom Category -> Category Column -> Default
-		const getNominal = (jenisId, categoryColumnNominal, defaultNominal) => {
-			const mapping = gratisList.find(g => g.kategoriId === s.kategoriId && g.jenisPembayaranId === jenisId);
-			if (mapping && mapping.nominal !== null) return mapping.nominal;
-			
-			// Fallback to legacy category column if provided
+		// Helper: dapatkan kategoriIds santri untuk tahun ajaran tertentu
+		// Jika tahunAjaranId tidak diketahui, fallback ke semua kategori (union)
+		const getKategoriIdsForTahun = (tahunAjaranId) => {
+			const tahunMap = kategoriByTahun.get(s.id);
+			if (tahunMap && tahunAjaranId && tahunMap.has(tahunAjaranId)) {
+				return tahunMap.get(tahunAjaranId);
+			}
+			// Fallback: union semua kategori + kolom lama
+			const all = new Set();
+			if (tahunMap) for (const ids of tahunMap.values()) for (const id of ids) all.add(id);
+			if (s.kategoriId) all.add(s.kategoriId);
+			return all;
+		};
+
+		// Helper: cek gratisList dengan kategori yang berlaku untuk tahun tertentu
+		const getNominal = (jenisId, categoryColumnNominal, defaultNominal, tahunAjaranId = null) => {
+			const katIds = getKategoriIdsForTahun(tahunAjaranId);
+			for (const katId of katIds) {
+				const mapping = gratisList.find(g => g.kategoriId === katId && g.jenisPembayaranId === jenisId);
+				if (mapping && mapping.nominal !== null) return mapping.nominal;
+			}
+			// Fallback ke kolom lama jika ada (mis. nominalKonsumsi dari kategoriSantri)
 			if (categoryColumnNominal !== undefined && categoryColumnNominal !== null) return categoryColumnNominal;
-			
 			return defaultNominal;
+		};
+
+		// Helper khusus untuk konsumsi per bulan (pakai tahun kalender pembayaran)
+		// Karena konsumsi bulanan, kita perlu lookup tahunAjaranId dari pembayaran itu sendiri
+		// atau fallback berdasarkan tahun kalender → cari tahunAjaran yang cover bulan tersebut
+		const getNominalForMonth = (jenisId, defaultNominal, tahunKalender) => {
+			// Cari tahunAjaranId yang namanya mengandung tahun kalender tsb
+			// Tahun ajaran "2024/2025": bulan Juli-Des = 2024, Jan-Jun = 2025
+			const matchedTahun = tahunAjarans.find(t => {
+				const nama = t.nama || '';
+				const slash = nama.match(/^(\d{4})\s*\/\s*(\d{4})$/);
+				if (slash) {
+					const y1 = Number(slash[1]);
+					const y2 = Number(slash[2]);
+					return tahunKalender === y1 || tahunKalender === y2;
+				}
+				return nama.includes(String(tahunKalender));
+			});
+			return getNominal(jenisId, null, defaultNominal, matchedTahun?.id || null);
 		};
 
 		const pembayaranSantri = pembayaran.filter(p => p.santriId === s.id);
@@ -197,11 +244,11 @@ export async function load({ url }) {
 		const smpBulananPayments = normalPayments.filter(p => p.tipe === 'smp_bulanan');
 		const nonBulananPayments = normalPayments.filter(p => p.tipe !== 'bulanan' && p.tipe !== 'smk_bulanan' && p.tipe !== 'smp_bulanan');
 
-		// Cari ID jenis pembayaran untuk lookup
 		const jenisKonsumsiId = konsumsiPayments[0]?.jenisPembayaranId || jenisList.find(j => j.tipe === 'bulanan' && /konsumsi/i.test(j.namaPembayaran))?.id;
 		const jenisSmkId = jenisSmkBulanan[0]?.id;
 		const jenisSmpId = jenisSmpBulanan[0]?.id;
 
+		// Nominal fallback (union semua tahun) untuk summary
 		const konsumsiNominalEff = getNominal(jenisKonsumsiId, s.nominalKonsumsi, 0);
 		const smkBulananNominalEff = getNominal(jenisSmkId, undefined, smkBulananNominal);
 		const smpBulananNominalEff = getNominal(jenisSmpId, undefined, smpBulananNominal);
@@ -209,11 +256,47 @@ export async function load({ url }) {
 		const startDate = s.tanggalMasuk ? new Date(s.tanggalMasuk) : now;
 		const endDate = s.tanggalKeluar ? new Date(s.tanggalKeluar) : now;
 		const monthsRange = startDate <= endDate ? buildMonthRange(startDate, endDate) : [];
-		const konsumsi = mergeMonthlyRekap(
-			monthsRange,
-			buildMonthlyPaymentMap(konsumsiPayments),
-			konsumsiNominalEff
-		);
+
+		// Konsumsi: hitung nominal per bulan berdasarkan tahun kalender bulan tersebut
+		const konsumsiPaymentMap = buildMonthlyPaymentMap(konsumsiPayments);
+		const konsumsi = monthsRange.map(month => {
+			const key = `${month.year}-${month.monthIndex}`;
+			const paidBucket = konsumsiPaymentMap.get(key);
+			const paidItems = paidBucket?.items || [];
+			const nominalDibayar = paidItems.reduce((sum, item) => sum + (item.nominalDibayar || 0), 0);
+			// Cek apakah ada pembayaran yang punya tahunAjaranId (ambil dari pembayaran langsung)
+			const tahunAjaranIdDariPembayaran = paidItems[0]?.tahunAjaranId || null;
+			const nominalTagihan = jenisKonsumsiId
+				? (tahunAjaranIdDariPembayaran
+					? getNominal(jenisKonsumsiId, s.nominalKonsumsi, 0, tahunAjaranIdDariPembayaran)
+					: getNominalForMonth(jenisKonsumsiId, s.nominalKonsumsi ?? 0, month.year))
+				: 0;
+			return {
+				bulan: month.monthName,
+				tahun: month.year,
+				monthIndex: month.monthIndex,
+				paid: nominalDibayar > 0,
+				nominalTagihan,
+				nominalDibayar,
+				tanggalBayar: paidItems[0]?.tanggalBayar || null,
+				nomorKwitansi: paidItems[0]?.nomorKwitansi || null,
+				isTambahanDariPembayaran: false
+			};
+		});
+		// Tambahkan bulan yang ada pembayaran tapi di luar range
+		const konsumsiExpectedKeys = new Set(monthsRange.map(m => `${m.year}-${m.monthIndex}`));
+		for (const [key, bucket] of konsumsiPaymentMap.entries()) {
+			if (konsumsiExpectedKeys.has(key)) continue;
+			const paidItems = bucket.items || [];
+			const nominalDibayar = paidItems.reduce((sum, item) => sum + (item.nominalDibayar || 0), 0);
+			konsumsi.push({
+				bulan: bucket.monthName, tahun: bucket.year, monthIndex: bucket.monthIndex,
+				paid: nominalDibayar > 0, nominalTagihan: 0, nominalDibayar,
+				tanggalBayar: paidItems[0]?.tanggalBayar || null,
+				nomorKwitansi: paidItems[0]?.nomorKwitansi || null, isTambahanDariPembayaran: true
+			});
+		}
+		konsumsi.sort((a, b) => a.tahun !== b.tahun ? a.tahun - b.tahun : a.monthIndex - b.monthIndex);
 
 		const smkInfo = smkBySantriId.get(s.id);
 		let smkBulanan = [];
@@ -223,12 +306,28 @@ export async function load({ url }) {
 				? new Date(smkInfo.endYear, smkInfo.endMonth - 1, 1)
 				: now;
 			const smkMonthsRange = smkStart <= smkEnd ? buildMonthRange(smkStart, smkEnd) : [];
-
-			smkBulanan = mergeMonthlyRekap(
-				smkMonthsRange,
-				buildMonthlyPaymentMap(smkBulananPayments),
-				smkBulananNominalEff
-			);
+			const smkPaymentMap = buildMonthlyPaymentMap(smkBulananPayments);
+			smkBulanan = smkMonthsRange.map(month => {
+				const key = `${month.year}-${month.monthIndex}`;
+				const paidBucket = smkPaymentMap.get(key);
+				const paidItems = paidBucket?.items || [];
+				const nominalDibayar = paidItems.reduce((sum, item) => sum + (item.nominalDibayar || 0), 0);
+				const tahunAjaranIdDariPembayaran = paidItems[0]?.tahunAjaranId || null;
+				const nominalTagihan = jenisSmkId
+					? (tahunAjaranIdDariPembayaran
+						? getNominal(jenisSmkId, undefined, smkBulananNominal, tahunAjaranIdDariPembayaran)
+						: getNominalForMonth(jenisSmkId, smkBulananNominal, month.year))
+					: 0;
+				return { bulan: month.monthName, tahun: month.year, monthIndex: month.monthIndex, paid: nominalDibayar > 0, nominalTagihan, nominalDibayar, tanggalBayar: paidItems[0]?.tanggalBayar || null, nomorKwitansi: paidItems[0]?.nomorKwitansi || null, isTambahanDariPembayaran: false };
+			});
+			const smkExpectedKeys = new Set(smkMonthsRange.map(m => `${m.year}-${m.monthIndex}`));
+			for (const [key, bucket] of smkPaymentMap.entries()) {
+				if (smkExpectedKeys.has(key)) continue;
+				const paidItems = bucket.items || [];
+				const nominalDibayar = paidItems.reduce((sum, item) => sum + (item.nominalDibayar || 0), 0);
+				smkBulanan.push({ bulan: bucket.monthName, tahun: bucket.year, monthIndex: bucket.monthIndex, paid: nominalDibayar > 0, nominalTagihan: 0, nominalDibayar, tanggalBayar: paidItems[0]?.tanggalBayar || null, nomorKwitansi: paidItems[0]?.nomorKwitansi || null, isTambahanDariPembayaran: true });
+			}
+			smkBulanan.sort((a, b) => a.tahun !== b.tahun ? a.tahun - b.tahun : a.monthIndex - b.monthIndex);
 		} else if (smkBulananPayments.length > 0) {
 			smkBulanan = mergeMonthlyRekap([], buildMonthlyPaymentMap(smkBulananPayments), 0);
 		}
@@ -241,12 +340,28 @@ export async function load({ url }) {
 				? new Date(smpInfo.endYear, smpInfo.endMonth - 1, 1)
 				: now;
 			const smpMonthsRange = smpStart <= smpEnd ? buildMonthRange(smpStart, smpEnd) : [];
-
-			smpBulanan = mergeMonthlyRekap(
-				smpMonthsRange,
-				buildMonthlyPaymentMap(smpBulananPayments),
-				smpBulananNominalEff
-			);
+			const smpPaymentMap = buildMonthlyPaymentMap(smpBulananPayments);
+			smpBulanan = smpMonthsRange.map(month => {
+				const key = `${month.year}-${month.monthIndex}`;
+				const paidBucket = smpPaymentMap.get(key);
+				const paidItems = paidBucket?.items || [];
+				const nominalDibayar = paidItems.reduce((sum, item) => sum + (item.nominalDibayar || 0), 0);
+				const tahunAjaranIdDariPembayaran = paidItems[0]?.tahunAjaranId || null;
+				const nominalTagihan = jenisSmpId
+					? (tahunAjaranIdDariPembayaran
+						? getNominal(jenisSmpId, undefined, smpBulananNominal, tahunAjaranIdDariPembayaran)
+						: getNominalForMonth(jenisSmpId, smpBulananNominal, month.year))
+					: 0;
+				return { bulan: month.monthName, tahun: month.year, monthIndex: month.monthIndex, paid: nominalDibayar > 0, nominalTagihan, nominalDibayar, tanggalBayar: paidItems[0]?.tanggalBayar || null, nomorKwitansi: paidItems[0]?.nomorKwitansi || null, isTambahanDariPembayaran: false };
+			});
+			const smpExpectedKeys = new Set(smpMonthsRange.map(m => `${m.year}-${m.monthIndex}`));
+			for (const [key, bucket] of smpPaymentMap.entries()) {
+				if (smpExpectedKeys.has(key)) continue;
+				const paidItems = bucket.items || [];
+				const nominalDibayar = paidItems.reduce((sum, item) => sum + (item.nominalDibayar || 0), 0);
+				smpBulanan.push({ bulan: bucket.monthName, tahun: bucket.year, monthIndex: bucket.monthIndex, paid: nominalDibayar > 0, nominalTagihan: 0, nominalDibayar, tanggalBayar: paidItems[0]?.tanggalBayar || null, nomorKwitansi: paidItems[0]?.nomorKwitansi || null, isTambahanDariPembayaran: true });
+			}
+			smpBulanan.sort((a, b) => a.tahun !== b.tahun ? a.tahun - b.tahun : a.monthIndex - b.monthIndex);
 		} else if (smpBulananPayments.length > 0) {
 			smpBulanan = mergeMonthlyRekap([], buildMonthlyPaymentMap(smpBulananPayments), 0);
 		}
@@ -292,19 +407,67 @@ export async function load({ url }) {
 				const totalNominal = items.reduce((sum, p) => sum + (p.nominalDibayar || 0), 0);
 				const lastTanggal = items.length ? items[items.length - 1].tanggalBayar : null;
 
-				const nominalEff = jenis ? getNominal(jenis.id, undefined, jenis.nominalDefault ?? 0) : 0;
+				let totalTagihan = 0;
+				let nominalEff = 0; // untuk display (nominal terbaru/fallback)
 
-				let jumlahTagihan = 0;
-				if (jenis?.tipe === 'tahunan') jumlahTagihan = tahunSpan;
-				else if (jenis?.tipe === 'smk_tahunan') jumlahTagihan = smkTahunSpan;
-				else if (jenis?.tipe === 'smp_tahunan') jumlahTagihan = smpTahunSpan;
-				else if (
+				if (jenis?.tipe === 'tahunan' || jenis?.tipe === 'smk_tahunan' || jenis?.tipe === 'smp_tahunan') {
+					// Hitung totalTagihan per tahun ajaran yang relevan
+					// Gunakan kategori yang aktif di tahun ajaran tersebut
+					let tahunAjaranIds;
+					if (jenis.tipe === 'tahunan') {
+						// Ambil tahunAjaran dari startYear s/d endYear santri
+						const sy = (s.tanggalMasuk ? new Date(s.tanggalMasuk) : now).getFullYear();
+						const ey = (s.tanggalKeluar ? new Date(s.tanggalKeluar) : now).getFullYear();
+						tahunAjaranIds = tahunAjarans
+							.filter(t => {
+								const slash = (t.nama || '').match(/^(\d{4})\s*\/\s*(\d{4})$/);
+								if (slash) { const y1 = Number(slash[1]); return y1 >= sy && y1 <= ey; }
+								const y = Number((t.nama || '').match(/(\d{4})/)?.[1]);
+								return y >= sy && y <= ey;
+							})
+							.map(t => t.id);
+						if (!tahunAjaranIds.length) tahunAjaranIds = [null]; // fallback
+					} else if (jenis.tipe === 'smk_tahunan' && smkInfo) {
+						tahunAjaranIds = tahunAjarans
+							.filter(t => {
+								const slash = (t.nama || '').match(/^(\d{4})\s*\/\s*(\d{4})$/);
+								if (slash) { const y1 = Number(slash[1]); return y1 >= smkInfo.startYear && (!smkInfo.endYear || y1 <= smkInfo.endYear); }
+								return false;
+							})
+							.map(t => t.id);
+						if (!tahunAjaranIds.length) tahunAjaranIds = [null];
+					} else if (jenis.tipe === 'smp_tahunan' && smpInfo) {
+						tahunAjaranIds = tahunAjarans
+							.filter(t => {
+								const slash = (t.nama || '').match(/^(\d{4})\s*\/\s*(\d{4})$/);
+								if (slash) { const y1 = Number(slash[1]); return y1 >= smpInfo.startYear && (!smpInfo.endYear || y1 <= smpInfo.endYear); }
+								return false;
+							})
+							.map(t => t.id);
+						if (!tahunAjaranIds.length) tahunAjaranIds = [null];
+					} else {
+						tahunAjaranIds = [null];
+					}
+					// Jumlahkan nominal per tahun ajaran (masing-masing pakai kategori tahun itu)
+					for (const taId of tahunAjaranIds) {
+						const n = getNominal(jenis.id, undefined, jenis.nominalDefault ?? 0, taId);
+						totalTagihan += n;
+						nominalEff = n; // ambil nilai terakhir untuk display
+					}
+				} else if (
 					jenis?.tipe === 'sekali' ||
 					jenis?.tipe === 'smk_sekali' ||
 					jenis?.tipe === 'smp_sekali'
-				) jumlahTagihan = 1;
+				) {
+					// Untuk sekali: pakai tahunAjaranId dari pembayaran pertama jika ada
+					const taId = items[0]?.tahunAjaranId || null;
+					nominalEff = jenis ? getNominal(jenis.id, undefined, jenis.nominalDefault ?? 0, taId) : 0;
+					totalTagihan = nominalEff;
+				} else {
+					nominalEff = jenis ? getNominal(jenis.id, undefined, jenis.nominalDefault ?? 0) : 0;
+					totalTagihan = nominalEff;
+				}
 
-				const totalTagihan = nominalEff * jumlahTagihan;
 				const sisa = Math.max(0, totalTagihan - totalNominal);
 				return {
 					namaPembayaran: jenis?.namaPembayaran || samplePayment?.namaPembayaran || '-',

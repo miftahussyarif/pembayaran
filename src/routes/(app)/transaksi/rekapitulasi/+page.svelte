@@ -17,8 +17,9 @@
 				size: A4 portrait;
 				margin: 15mm 12mm;
 			}
-			body { background: white !important; }
-			.no-print { display: none !important; }
+			html, body { background: white !important; height: auto !important; }
+			.drawer, .drawer-content, main { overflow: visible !important; height: auto !important; }
+			.no-print, .drawer-side, .navbar, footer { display: none !important; }
 			.print-only { display: block !important; }
 			.card { box-shadow: none !important; border: 1px solid #ddd !important; }
 			table { font-size: 11px !important; }

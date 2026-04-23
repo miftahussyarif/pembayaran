@@ -3,6 +3,12 @@ import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { generateBackup, sendBackupToTelegram } from '$lib/server/backup.js';
+import {
+	buildSessionCookieValue,
+	getSessionCookieName,
+	getSessionCookieOptions,
+	parseSessionCookieValue
+} from '$lib/server/auth.js';
 
 // Setup Daily Backup Cron (Every Minute Check)
 let lastBackupDate = '';
@@ -46,35 +52,49 @@ if (typeof process !== 'undefined') {
 }
 
 export const handle = async ({ event, resolve }) => {
-	// 1. Ambil session cookie
-	const sessionCookie = event.cookies.get('sessionid');
+	const sessionCookieName = getSessionCookieName();
+	const sessionCookie = event.cookies.get(sessionCookieName);
 	let sessionUser = null;
 
 	if (sessionCookie) {
-		try {
-			sessionUser = JSON.parse(sessionCookie);
-			if (sessionUser?.id && sessionUser?.sessionId) {
-				const userInDb = await db.select({ sessionId: schema.users.sessionId }).from(schema.users).where(eq(schema.users.id, sessionUser.id)).limit(1);
-				if (userInDb.length > 0 && userInDb[0].sessionId === sessionUser.sessionId) {
-					// Session valid, perpanjang cookie
-					event.cookies.set('sessionid', sessionCookie, {
-						path: '/',
-						httpOnly: true,
-						sameSite: 'strict',
-						maxAge: 60 * 60 * 6 // 6 jam
-					});
-				} else {
-					// Session tidak valid (Multi login detect / session expired)
-					sessionUser = null;
-					event.cookies.delete('sessionid', { path: '/' });
-				}
+		const parsedSession = parseSessionCookieValue(sessionCookie);
+		if (parsedSession) {
+			const [userInDb] = await db
+				.select({
+					id: schema.users.id,
+					username: schema.users.username,
+					role: schema.users.role,
+					namaLengkap: schema.users.namaLengkap,
+					signatureUrl: schema.users.signatureUrl,
+					sessionId: schema.users.sessionId
+				})
+				.from(schema.users)
+				.where(eq(schema.users.id, parsedSession.userId))
+				.limit(1);
+
+			if (userInDb?.sessionId && userInDb.sessionId === parsedSession.sessionId) {
+				sessionUser = {
+					id: userInDb.id,
+					username: userInDb.username,
+					role: userInDb.role,
+					namaLengkap: userInDb.namaLengkap,
+					signatureUrl: userInDb.signatureUrl,
+					sessionId: userInDb.sessionId
+				};
+
+				event.cookies.set(
+					sessionCookieName,
+					buildSessionCookieValue({
+						userId: userInDb.id,
+						sessionId: userInDb.sessionId
+					}),
+					getSessionCookieOptions()
+				);
 			} else {
-				// Format cookie lama yang belum ada sessionId, suruh relogin
-				sessionUser = null;
-				event.cookies.delete('sessionid', { path: '/' });
+				event.cookies.delete(sessionCookieName, { path: '/' });
 			}
-		} catch (e) {
-			// invalid cookie JSON
+		} else {
+			event.cookies.delete(sessionCookieName, { path: '/' });
 		}
 	}
 
@@ -134,5 +154,19 @@ export const handle = async ({ event, resolve }) => {
 	// 3. Melekatkan session info ke `event.locals` agar bisa diakses oleh Svelte di components / layout
 	event.locals.user = sessionUser || undefined;
 
-	return resolve(event);
+	const response = await resolve(event);
+
+	response.headers.set('x-frame-options', 'DENY');
+	response.headers.set('x-content-type-options', 'nosniff');
+	response.headers.set('referrer-policy', 'strict-origin-when-cross-origin');
+	response.headers.set(
+		'permissions-policy',
+		'camera=(), microphone=(), geolocation=(), payment=(), usb=()'
+	);
+	response.headers.set(
+		'content-security-policy',
+		"base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'"
+	);
+
+	return response;
 };

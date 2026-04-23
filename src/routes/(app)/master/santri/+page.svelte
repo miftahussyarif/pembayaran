@@ -1,32 +1,45 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { page } from '$app/stores';
 	let { data, form } = $props();
 	let editSantri = $state(null);
-	let sortBy = $state('kategori');
+	let sortBy = $state('nama');
 	let filterValue = $state('');
+	let selectedSantris = $state([]);
+	const isAdmin = $derived($page.data.user?.role === 'admin');
 
-	const getKategoriName = (kategoriId) => {
-		if (!kategoriId) return '';
-		const kat = data.kategoris.find((k) => k.id === kategoriId);
-		return kat?.namaKategori || '';
+	// === Helper ===
+	const getKategoriName = (id) => data.kategoris.find((k) => k.id === id)?.namaKategori || '';
+	const getTahunNama = (id) => data.tahunAjarans.find((t) => t.id === id)?.nama || '';
+
+	// Ambil daftar kategori+tahun terakhir untuk display di tabel
+	const getLatestKategoriLabels = (santri) => {
+		if (!santri.kategoriTahun?.length) return [];
+		// Group by tahunAjaranId
+		const byTahun = new Map();
+		for (const kt of santri.kategoriTahun) {
+			if (!byTahun.has(kt.tahunAjaranId)) byTahun.set(kt.tahunAjaranId, []);
+			byTahun.get(kt.tahunAjaranId).push(kt.kategoriId);
+		}
+		// Ambil semua tahun, urutkan descending berdasarkan id
+		const allTahunIds = [...byTahun.keys()].sort((a, b) => b - a);
+		// Tampilkan kategori dari tahun terbaru saja (untuk kolom tabel)
+		const latestTahunId = allTahunIds[0];
+		const latestKatIds = byTahun.get(latestTahunId) || [];
+		return latestKatIds.map((id) => getKategoriName(id)).filter(Boolean);
 	};
 
-	const getSortValue = (santri) => {
-		if (sortBy === 'kategori') return getKategoriName(santri.kategoriId);
-		if (sortBy === 'kabupaten') return santri.detail?.kabupaten || '';
-		if (sortBy === 'kecamatan') return santri.detail?.kecamatan || '';
-		if (sortBy === 'provinsi') return santri.detail?.provinsi || '';
-		return '';
-	};
-
+	// === Filter/Sort ===
 	const filterOptions = $derived.by(() => {
 		if (sortBy === 'kategori') {
 			return data.kategoris.map((k) => k.namaKategori).filter(Boolean);
 		}
-		const key = sortBy;
+		if (sortBy === 'tahun_ajaran') {
+			return data.tahunAjarans.map((t) => t.nama).filter(Boolean);
+		}
 		const values = new Set();
 		for (const santri of data.santris) {
-			const value = santri.detail?.[key];
+			const value = santri.detail?.[sortBy];
 			if (value) values.add(value);
 		}
 		return Array.from(values).sort((a, b) => a.localeCompare(b, 'id'));
@@ -35,8 +48,14 @@
 	const filteredSantris = $derived.by(() => {
 		if (!filterValue) return data.santris;
 		const needle = filterValue.toString().toLowerCase();
+		if (sortBy === 'kategori') {
+			return data.santris.filter((s) => getLatestKategoriLabels(s).some((l) => l.toLowerCase() === needle));
+		}
+		if (sortBy === 'tahun_ajaran') {
+			return data.santris.filter((s) => s.kategoriTahun?.some((kt) => getTahunNama(kt.tahunAjaranId).toLowerCase() === needle));
+		}
 		return data.santris.filter((s) => {
-			const value = getSortValue(s);
+			const value = s.detail?.[sortBy];
 			return value && value.toString().toLowerCase() === needle;
 		});
 	});
@@ -44,21 +63,66 @@
 	const sortedSantris = $derived.by(() => {
 		const list = [...filteredSantris];
 		list.sort((a, b) => {
-			const av = getSortValue(a).toString().toLowerCase();
-			const bv = getSortValue(b).toString().toLowerCase();
-			if (!av && bv) return 1;
-			if (av && !bv) return -1;
+			const av = a.namaLengkap.toLowerCase();
+			const bv = b.namaLengkap.toLowerCase();
 			return av.localeCompare(bv, 'id');
 		});
 		return list;
 	});
+
+	// === Multi-kategori form state untuk Tambah ===
+	let addKategoriRows = $state([{ tahunAjaranId: '', kategoriIds: [] }]);
+
+	const addKategoriRow = () => { addKategoriRows = [...addKategoriRows, { tahunAjaranId: '', kategoriIds: [] }]; };
+	const removeKategoriRow = (i) => { addKategoriRows = addKategoriRows.filter((_, idx) => idx !== i); };
+	const toggleAddKategori = (rowIdx, katId) => {
+		const row = addKategoriRows[rowIdx];
+		if (row.kategoriIds.includes(katId)) {
+			row.kategoriIds = row.kategoriIds.filter((id) => id !== katId);
+		} else {
+			row.kategoriIds = [...row.kategoriIds, katId];
+		}
+		addKategoriRows = [...addKategoriRows];
+	};
+
+	// === Multi-kategori form state untuk Edit ===
+	let editKategoriRows = $state([]);
+
+	const openEdit = (santri) => {
+		editSantri = { ...santri, detail: santri.detail || {} };
+		// Build editKategoriRows dari kategoriTahun santri
+		const byTahun = new Map();
+		for (const kt of (santri.kategoriTahun || [])) {
+			if (!byTahun.has(kt.tahunAjaranId)) byTahun.set(kt.tahunAjaranId, []);
+			byTahun.get(kt.tahunAjaranId).push(kt.kategoriId);
+		}
+		if (byTahun.size === 0) {
+			editKategoriRows = [{ tahunAjaranId: '', kategoriIds: [] }];
+		} else {
+			editKategoriRows = [...byTahun.entries()].map(([tid, kids]) => ({ tahunAjaranId: tid, kategoriIds: kids }));
+		}
+		my_modal_edit_santri.showModal();
+	};
+	const addEditKategoriRow = () => { editKategoriRows = [...editKategoriRows, { tahunAjaranId: '', kategoriIds: [] }]; };
+	const removeEditKategoriRow = (i) => { editKategoriRows = editKategoriRows.filter((_, idx) => idx !== i); };
+	const toggleEditKategori = (rowIdx, katId) => {
+		const row = editKategoriRows[rowIdx];
+		if (row.kategoriIds.includes(katId)) {
+			row.kategoriIds = row.kategoriIds.filter((id) => id !== katId);
+		} else {
+			row.kategoriIds = [...row.kategoriIds, katId];
+		}
+		editKategoriRows = [...editKategoriRows];
+	};
 </script>
 
 <div class="flex flex-col lg:flex-row lg:items-end gap-3 mb-6">
 	<div class="form-control w-full sm:w-56">
 		<label class="label py-0" for="sort-select"><span class="label-text text-xs">Sorting</span></label>
 		<select id="sort-select" class="select select-sm select-bordered w-full" bind:value={sortBy} onchange={() => { filterValue = ''; }}>
+			<option value="nama">Nama Santri</option>
 			<option value="kategori">Kategori Santri</option>
+			<option value="tahun_ajaran">Tahun Ajaran</option>
 			<option value="kabupaten">Alamat: Kabupaten</option>
 			<option value="kecamatan">Alamat: Kecamatan</option>
 			<option value="provinsi">Alamat: Provinsi</option>
@@ -97,6 +161,22 @@
 		</svg>
 		Tambah Santri
 	</button>
+	{#if isAdmin && selectedSantris.length > 0}
+		<form method="POST" action="?/bulkDelete" use:enhance={() => {
+			return async ({ update, result }) => {
+				await update();
+				if (result?.type === 'success' || result?.data?.success) {
+					selectedSantris = [];
+				}
+			};
+		}} class="w-full sm:w-auto">
+			<input type="hidden" name="ids" value={JSON.stringify(selectedSantris)} />
+			<button type="submit" class="btn btn-sm btn-error w-full" onclick={(e) => { if(!confirm(`Yakin hapus ${selectedSantris.length} santri terpilih?`)) e.preventDefault() }}>
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+				Hapus ({selectedSantris.length})
+			</button>
+		</form>
+	{/if}
 </div>
 
 {#if form?.type}
@@ -110,6 +190,16 @@
 		<table class="table table-zebra table-sm sm:table-md w-full">
 			<thead>
 				<tr>
+					{#if isAdmin}
+						<th>
+							<input type="checkbox" class="checkbox checkbox-sm"
+								checked={selectedSantris.length > 0 && selectedSantris.length === sortedSantris.length}
+								onchange={(e) => {
+									if (e.target.checked) selectedSantris = sortedSantris.map(s => s.id);
+									else selectedSantris = [];
+								}} />
+						</th>
+					{/if}
 					<th>No</th>
 					<th>Nomor Induk</th>
 					<th>Nama Lengkap</th>
@@ -123,24 +213,39 @@
 			<tbody>
 				{#if data.santris.length === 0}
 					<tr>
-						<td colspan="8" class="text-center py-4">Belum ada data santri.</td>
+						<td colspan={isAdmin ? 9 : 8} class="text-center py-4">Belum ada data santri.</td>
 					</tr>
 				{/if}
 				{#each sortedSantris as santri, i}
 					<tr>
+						{#if isAdmin}
+							<td>
+								<input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+									checked={selectedSantris.includes(santri.id)}
+									onchange={(e) => {
+										if (e.target.checked) selectedSantris = [...selectedSantris, santri.id];
+										else selectedSantris = selectedSantris.filter(id => id !== santri.id);
+									}} />
+							</td>
+						{/if}
 						<td>{i + 1}</td>
 						<td class="font-medium text-base-content/80 text-sm">{santri.nomorInduk}</td>
 						<td class="font-semibold">{santri.namaLengkap}</td>
 						<td>
-							{#if santri.kategoriId}
-								{@const kat = data.kategoris.find(k => k.id === santri.kategoriId)}
-								{#if kat}
-									<span class="badge badge-outline badge-sm">{kat.namaKategori}</span>
-								{/if}
-							{:else}
-								<span class="text-base-content/40 text-xs">-</span>
-							{/if}
-						</td>
+						{#if santri.kategoriTahun?.length}
+							{@const labels = getLatestKategoriLabels(santri)}
+							<div class="flex flex-wrap gap-1">
+								{#each labels as label}
+									<span class="badge badge-outline badge-sm">{label}</span>
+								{/each}
+							</div>
+						{:else if santri.kategoriId}
+							{@const kat = data.kategoris.find(k => k.id === santri.kategoriId)}
+							{#if kat}<span class="badge badge-outline badge-sm">{kat.namaKategori}</span>{/if}
+						{:else}
+							<span class="text-base-content/40 text-xs">-</span>
+						{/if}
+					</td>
 						<td class="text-sm">{santri.tanggalMasuk || '-'}</td>
 						<td class="text-sm">{santri.tanggalKeluar || '-'}</td>
 						<td>
@@ -151,7 +256,7 @@
 							{/if}
 						</td>
 						<td class="flex gap-1 flex-wrap">
-							<button class="btn btn-xs btn-outline btn-primary" onclick={() => { editSantri = { ...santri, detail: santri.detail || {} }; my_modal_edit_santri.showModal(); }}>
+							<button class="btn btn-xs btn-outline btn-primary" onclick={() => openEdit(santri)}>
 								<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
 								Edit
 							</button>
@@ -182,7 +287,7 @@
 	<div class="modal-box max-w-lg">
 		<h3 class="font-bold text-lg mb-2">Import Santri (Excel/CSV)</h3>
 		<p class="text-sm text-base-content/60 mb-4">
-			Pastikan file CSV/Excel memiliki header yang sesuai dengan template (termasuk data detail alamat & orang tua).
+			Pastikan file CSV/Excel memiliki header yang sesuai dengan template terbaru (mendukung kategori per tahun ajaran serta tanggal mulai SMP/SMK).
 		</p>
 		<div class="alert alert-info mb-4 flex items-center justify-between gap-3">
 			<span>Unduh template contoh agar formatnya benar.</span>
@@ -213,7 +318,13 @@
 	<div class="modal-box max-w-2xl">
 		<h3 class="font-bold text-lg mb-4">Tambah Data Santri</h3>
 		<form method="POST" action="?/create" use:enhance={() => {
-			return async ({ update }) => { await update(); my_modal_santri.close(); };
+			return async ({ update, result }) => {
+				await update();
+				if (result?.type === 'success' || result?.data?.success) {
+					addKategoriRows = [{ tahunAjaranId: '', kategoriIds: [] }];
+				}
+				my_modal_santri.close();
+			};
 		}}>
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-x-4">
 				<div class="form-control w-full mb-3">
@@ -225,31 +336,59 @@
 					<input type="text" id="namaLengkap" name="namaLengkap" placeholder="Masukkan nama santri" class="input input-bordered w-full" required />
 				</div>
 			</div>
-			<div class="form-control w-full mb-3">
-				<label class="label" for="kategoriId"><span class="label-text">Kategori Santri</span></label>
-				<select id="kategoriId" name="kategoriId" class="select select-bordered w-full">
-					<option value="">-- Pilih Kategori --</option>
-					{#each data.kategoris as kat}
-						<option value={kat.id}>{kat.namaKategori}</option>
-					{/each}
-				</select>
+			<!-- Kategori per Tahun Ajaran -->
+		<input type="hidden" name="kategoriTahunJson" value={JSON.stringify(addKategoriRows.filter(r => r.tahunAjaranId && r.kategoriIds.length))} />
+		<div class="mb-4">
+			<div class="flex items-center justify-between mb-2">
+				<label class="label-text font-semibold text-primary">Kategori per Tahun Ajaran</label>
+				<button type="button" class="btn btn-xs btn-outline btn-primary" onclick={addKategoriRow}>+ Tambah Tahun</button>
 			</div>
-			<div class="flex gap-4 mb-3">
-				<div class="form-control w-1/2">
-					<label class="label" for="tanggalMasuk"><span class="label-text">Tanggal Masuk</span></label>
-					<input type="date" id="tanggalMasuk" name="tanggalMasuk" class="input input-bordered w-full" />
+			{#each addKategoriRows as row, rowIdx}
+				<div class="border border-base-200 rounded-lg p-3 mb-2">
+					<div class="flex gap-2 items-center mb-2">
+						<div class="form-control flex-1">
+							<select class="select select-sm select-bordered w-full" bind:value={row.tahunAjaranId}>
+								<option value="">-- Pilih Tahun Ajaran --</option>
+								{#each data.tahunAjarans as ta}
+									<option value={ta.id}>{ta.nama}</option>
+								{/each}
+							</select>
+						</div>
+						{#if addKategoriRows.length > 1}
+							<button type="button" class="btn btn-xs btn-ghost text-error" onclick={() => removeKategoriRow(rowIdx)}>✕</button>
+						{/if}
+					</div>
+					<div class="flex flex-wrap gap-2">
+						{#each data.kategoris as kat}
+							<label class="flex items-center gap-1 cursor-pointer">
+								<input type="checkbox"
+									class="checkbox checkbox-sm checkbox-primary"
+									checked={row.kategoriIds.includes(kat.id)}
+									onchange={() => toggleAddKategori(rowIdx, kat.id)} />
+								<span class="text-sm">{kat.namaKategori}</span>
+							</label>
+						{/each}
+					</div>
 				</div>
-				<div class="form-control w-1/2">
-					<label class="label" for="tanggalKeluar"><span class="label-text">Tanggal Keluar (Opsional)</span></label>
-					<input type="date" id="tanggalKeluar" name="tanggalKeluar" class="input input-bordered w-full" />
-				</div>
+			{/each}
+		</div>
+		<div class="flex gap-4 mb-3">
+			<div class="form-control w-1/2">
+				<label class="label" for="tanggalMasuk"><span class="label-text">Tanggal Masuk</span></label>
+				<input type="date" id="tanggalMasuk" name="tanggalMasuk" class="input input-bordered w-full" />
 			</div>
-			<div class="form-control w-full mb-4">
-				<label class="label cursor-pointer justify-start gap-4" for="isActiveCreate">
-					<input type="checkbox" id="isActiveCreate" name="isActive" class="toggle toggle-primary" checked />
-					<span class="label-text">Santri Aktif</span>
-				</label>
+			<div class="form-control w-1/2">
+				<label class="label" for="tanggalKeluar"><span class="label-text">Tanggal Keluar (Opsional)</span></label>
+				<input type="date" id="tanggalKeluar" name="tanggalKeluar" class="input input-bordered w-full" />
 			</div>
+		</div>
+		<div class="form-control w-full mb-4">
+			<label class="label cursor-pointer justify-start gap-4" for="isActiveCreate">
+				<input type="checkbox" id="isActiveCreate" name="isActive" class="toggle toggle-primary" checked />
+				<span class="label-text">Santri Aktif</span>
+			</label>
+		</div>
+
 
 			<h4 class="text-base font-bold text-primary mt-2 mb-2 border-b border-primary/40 pb-1">I. Identitas Peserta Didik</h4>
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
@@ -486,14 +625,41 @@
 				<label class="label" for="editNamaLengkap"><span class="label-text">Nama Lengkap</span></label>
 				<input type="text" id="editNamaLengkap" name="namaLengkap" value={editSantri.namaLengkap} class="input input-bordered w-full" required />
 			</div>
-			<div class="form-control w-full mb-3">
-				<label class="label" for="editKategoriId"><span class="label-text">Kategori Santri</span></label>
-				<select id="editKategoriId" name="kategoriId" class="select select-bordered w-full">
-					<option value="">-- Pilih Kategori --</option>
-					{#each data.kategoris as kat}
-						<option value={kat.id} selected={kat.id === editSantri.kategoriId}>{kat.namaKategori}</option>
-					{/each}
-				</select>
+			<!-- Kategori per Tahun Ajaran (Edit) -->
+			<input type="hidden" name="kategoriTahunJson" value={JSON.stringify(editKategoriRows.filter(r => r.tahunAjaranId && r.kategoriIds.length))} />
+			<div class="mb-4">
+				<div class="flex items-center justify-between mb-2">
+					<label class="label-text font-semibold text-primary">Kategori per Tahun Ajaran</label>
+					<button type="button" class="btn btn-xs btn-outline btn-primary" onclick={addEditKategoriRow}>+ Tambah Tahun</button>
+				</div>
+				{#each editKategoriRows as row, rowIdx}
+					<div class="border border-base-200 rounded-lg p-3 mb-2">
+						<div class="flex gap-2 items-center mb-2">
+							<div class="form-control flex-1">
+								<select class="select select-sm select-bordered w-full" bind:value={row.tahunAjaranId}>
+									<option value="">-- Pilih Tahun Ajaran --</option>
+									{#each data.tahunAjarans as ta}
+										<option value={ta.id}>{ta.nama}</option>
+									{/each}
+								</select>
+							</div>
+							{#if editKategoriRows.length > 1}
+								<button type="button" class="btn btn-xs btn-ghost text-error" onclick={() => removeEditKategoriRow(rowIdx)}>✕</button>
+							{/if}
+						</div>
+						<div class="flex flex-wrap gap-2">
+							{#each data.kategoris as kat}
+								<label class="flex items-center gap-1 cursor-pointer">
+									<input type="checkbox"
+										class="checkbox checkbox-sm checkbox-primary"
+										checked={row.kategoriIds.includes(kat.id)}
+										onchange={() => toggleEditKategori(rowIdx, kat.id)} />
+									<span class="text-sm">{kat.namaKategori}</span>
+								</label>
+							{/each}
+						</div>
+					</div>
+				{/each}
 			</div>
 			<div class="flex gap-4 mb-3">
 				<div class="form-control w-1/2">
@@ -511,6 +677,7 @@
 					<span class="label-text">Santri Aktif</span>
 				</label>
 			</div>
+
 
 			<h4 class="text-base font-bold text-primary mt-2 mb-2 border-b border-primary/40 pb-1">I. Identitas Peserta Didik</h4>
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">

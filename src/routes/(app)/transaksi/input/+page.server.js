@@ -183,6 +183,24 @@ async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItem
 		.leftJoin(schema.kategoriSantri, eq(schema.santri.kategoriId, schema.kategoriSantri.id))
 		.where(eq(schema.santri.id, santriId));
 
+	// Ambil semua kategori santri ini dari tabel relasi (+ fallback ke kolom lama)
+	const kategoriTahunRows = await db.select().from(schema.santriKategoriTahun)
+		.where(eq(schema.santriKategoriTahun.santriId, santriId));
+	const allKategoriIds = new Set(kategoriTahunRows.map(r => r.kategoriId));
+	if (santriRow?.kategoriId) allKategoriIds.add(santriRow.kategoriId);
+	// Cari customNominal dari semua kategori (ambil yang pertama cocok)
+	let customNominalRow;
+	for (const katId of allKategoriIds) {
+		const [row] = await db
+			.select({ nominal: schema.kategoriGratis.nominal })
+			.from(schema.kategoriGratis)
+			.where(and(
+				eq(schema.kategoriGratis.kategoriId, katId),
+				eq(schema.kategoriGratis.jenisPembayaranId, jenisPembayaranId)
+			));
+		if (row) { customNominalRow = row; break; }
+	}
+
 	const [jenisRow] = await db
 		.select({
 			id: schema.jenisPembayaran.id,
@@ -193,6 +211,7 @@ async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItem
 		.from(schema.jenisPembayaran)
 		.where(eq(schema.jenisPembayaran.id, jenisPembayaranId));
 
+
 	const [tahunAjaranRow] = await db
 		.select({
 			id: schema.tahunAjaran.id,
@@ -201,13 +220,7 @@ async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItem
 		.from(schema.tahunAjaran)
 		.where(eq(schema.tahunAjaran.id, tahunAjaranId));
 
-	const [customNominalRow] = await db
-		.select({ nominal: schema.kategoriGratis.nominal })
-		.from(schema.kategoriGratis)
-		.where(and(
-			eq(schema.kategoriGratis.kategoriId, santriRow.kategoriId),
-			eq(schema.kategoriGratis.jenisPembayaranId, jenisPembayaranId)
-		));
+
 
 	const isBulanan = ['bulanan', 'smk_bulanan', 'smp_bulanan'].includes(jenisRow?.tipe || '');
 	const isTahunan = ['tahunan', 'smk_tahunan', 'smp_tahunan'].includes(jenisRow?.tipe || '');

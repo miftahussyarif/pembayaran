@@ -74,7 +74,6 @@
 					<table class="table w-full">
 						<tbody>
 							<tr><td class="text-base-content/60">Nama Lengkap</td><td class="font-semibold">{data.santri.namaLengkap}</td></tr>
-							<tr><td class="text-base-content/60">Kategori</td><td>{data.kategori?.namaKategori || '-'}</td></tr>
 							<tr><td class="text-base-content/60">Tanggal Masuk</td><td>{formatDate(data.santri.tanggalMasuk)}</td></tr>
 							<tr><td class="text-base-content/60">Tanggal Keluar</td><td>{formatDate(data.santri.tanggalKeluar)}</td></tr>
 							<tr><td class="text-base-content/60">Status</td><td>{data.santri.isActive ? 'Aktif' : 'Berhenti'}</td></tr>
@@ -97,6 +96,40 @@
 					</table>
 				</div>
 			</div>
+
+			<!-- Riwayat Kategori per Tahun Ajaran -->
+			{#if data.kategoriTahunList?.length}
+			<div class="border border-base-200 rounded-lg p-3 mb-4">
+				<h3 class="font-semibold text-sm text-primary mb-2">Riwayat Kategori per Tahun Ajaran</h3>
+				<table class="table table-sm w-full">
+					<thead>
+						<tr>
+							<th class="text-xs text-base-content/60 font-medium w-1/3">Tahun Ajaran</th>
+							<th class="text-xs text-base-content/60 font-medium">Kategori</th>
+						</tr>
+					</thead>
+					<tbody>
+						{#each data.kategoriTahunList as item}
+							<tr>
+								<td class="font-medium text-sm">{item.tahunNama}</td>
+								<td>
+									<div class="flex flex-wrap gap-1">
+										{#each item.kategoriNama as nama}
+											<span class="badge badge-outline badge-sm">{nama}</span>
+										{/each}
+									</div>
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+			{:else if data.kategori}
+			<div class="border border-base-200 rounded-lg p-3 mb-4">
+				<h3 class="font-semibold text-sm text-primary mb-2">Kategori Santri</h3>
+				<span class="badge badge-outline">{data.kategori.namaKategori}</span>
+			</div>
+			{/if}
 
 			<div class="border border-base-200 rounded-lg p-3 mb-4">
 				<h3 class="font-semibold text-sm text-primary mb-2">Alamat & Kesehatan</h3>

@@ -5,6 +5,13 @@ import { redirect } from '@sveltejs/kit';
 import bcrypt from 'bcrypt';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import {
+	createSessionToken,
+	isValidRole,
+	isStrongPassword,
+	isValidUsername,
+	normalizeUsername
+} from '$lib/server/auth.js';
 
 const saveSignature = async (file) => {
 	if (!file || typeof file !== 'object' || !('arrayBuffer' in file) || file.size === 0) return '';
@@ -34,11 +41,27 @@ export const load = async ({ locals }) => {
 export const actions = {
 	createUser: async ({ request }) => {
 		const data = await request.formData();
-		const username = data.get('username')?.toString() || '';
+		const username = normalizeUsername(data.get('username') ?? '');
 		const password = data.get('password')?.toString() || '';
 		const role = data.get('role')?.toString() || 'petugas';
-		const namaLengkap = data.get('namaLengkap')?.toString() || '';
+		const namaLengkap = data.get('namaLengkap')?.toString().trim() || '';
 		const signatureFile = data.get('signatureFile');
+
+		if (!isValidUsername(username)) {
+			return { type: 'error', message: 'Username hanya boleh 3-32 karakter: huruf, angka, titik, garis bawah, atau strip.' };
+		}
+
+		if (!isStrongPassword(password)) {
+			return { type: 'error', message: 'Password minimal 8 karakter.' };
+		}
+
+		if (!namaLengkap) {
+			return { type: 'error', message: 'Nama lengkap wajib diisi.' };
+		}
+
+		if (!isValidRole(role)) {
+			return { type: 'error', message: 'Role user tidak valid.' };
+		}
 
 		const passwordHash = await bcrypt.hash(password, 10);
 		let signatureUrl = '';
@@ -70,6 +93,18 @@ export const actions = {
 		const role = data.get('role')?.toString() || 'petugas';
 		const signatureFile = data.get('signatureFile');
 
+		if (!Number.isInteger(id) || id <= 0) {
+			return { type: 'error', message: 'ID user tidak valid.' };
+		}
+
+		if (!namaLengkap) {
+			return { type: 'error', message: 'Nama lengkap wajib diisi.' };
+		}
+
+		if (!isValidRole(role)) {
+			return { type: 'error', message: 'Role user tidak valid.' };
+		}
+
 		try {
 			let signatureUrl;
 			if (signatureFile && typeof signatureFile === 'object' && signatureFile.size > 0) {
@@ -93,14 +128,18 @@ export const actions = {
 		const id = Number(data.get('id'));
 		const newPassword = data.get('newPassword')?.toString() || '';
 
-		if (newPassword.length < 4) {
-			return { type: 'error', message: 'Password minimal 4 karakter.' };
+		if (!Number.isInteger(id) || id <= 0) {
+			return { type: 'error', message: 'ID user tidak valid.' };
+		}
+
+		if (!isStrongPassword(newPassword)) {
+			return { type: 'error', message: 'Password minimal 8 karakter.' };
 		}
 
 		try {
 			const passwordHash = await bcrypt.hash(newPassword, 10);
 			await db.update(schema.users)
-				.set({ passwordHash })
+				.set({ passwordHash, sessionId: createSessionToken() })
 				.where(eq(schema.users.id, id));
 			return { type: 'success', message: 'Password berhasil direset.' };
 		} catch (e) {
@@ -111,6 +150,10 @@ export const actions = {
 	deleteUser: async ({ request }) => {
 		const data = await request.formData();
 		const id = Number(data.get('id'));
+
+		if (!Number.isInteger(id) || id <= 0) {
+			return { type: 'error', message: 'ID user tidak valid.' };
+		}
 
 		try {
 			await db.delete(schema.users).where(eq(schema.users.id, id));

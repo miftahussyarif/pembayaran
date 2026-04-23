@@ -30,7 +30,7 @@
 			}
 			html, body { background: white !important; height: auto !important; }
 			.drawer, .drawer-content, main { overflow: visible !important; height: auto !important; }
-			.no-print { display: none !important; }
+			.no-print, .drawer-side, .navbar, footer { display: none !important; }
 			.print-card { break-inside: auto; page-break-inside: auto; }
 			.card { box-shadow: none !important; border: 1px solid #ddd !important; }
 			table { font-size: 11px !important; width: 100% !important; }

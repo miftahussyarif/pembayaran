@@ -20,16 +20,16 @@ export const GET = async ({ locals }) => {
 	const workbook = XLSX.utils.book_new();
 	const importRows = [
 		['nomor_induk', 'nama_santri', 'kategori_santri', 'nama_pembayar', 'tahun_ajaran', 'jenis_pembayaran', 'tipe_tagihan', 'bulan_mulai_tunggakan', 'tahun_mulai_tunggakan', 'nominal_total_tagihan', 'nominal_tunggakan', 'keterangan', 'catatan'],
-		['24001', 'Ahmad Fauzi', 'Reguler', '', '2021/2022', 'SPP SMK', 'bulanan', 'Mei', '2022', '', '200000', '', 'Cukup isi bulan pertama belum bayar, sistem buat 2 bulan tunggakan bila nominal per bulan 100rb'],
-		['24001', 'Ahmad Fauzi', 'Reguler', '', '2022/2023', 'Pengembangan', 'sekali', '', '', '1000000', '500000', '', 'Separuh sudah dianggap terbayar saat import'],
-		['24002', 'Aisyah Yatim', 'Yatim', '', '2022/2023', 'SPP SMP', 'smp_bulanan', 'Juli', '2022', '120000', '120000', '', 'Akan ikut aturan kategori saat tagihan ditampilkan'],
+		['24001', 'Ahmad Fauzi', 'Reguler', '', '2021/2022', 'SPP SMK', 'bulanan', 'Mei', '2022', '', '200000', '', 'Sistem akan merekam kategori Reguler untuk 2021/2022'],
+		['24001', 'Ahmad Fauzi', 'Kakak Beradik', '', '2022/2023', 'Pengembangan', 'sekali', '', '', '1000000', '500000', '', 'Bisa ubah kategori di tahun berbeda. Sistem akan merekam Kakak Beradik untuk 2022/2023'],
+		['24002', 'Aisyah Yatim', 'Yatim', '', '2022/2023', 'SPP SMP', 'smp_bulanan', 'Juli', '2022', '120000', '120000', '', 'Akan ikut aturan kategori Yatim saat tagihan ditampilkan'],
 		['', '', '', 'Wali Santri Baru', '2022/2023', jenisKhusus.namaPembayaran, 'khusus', '', '', '300000', '125000', 'Kekurangan seragam', 'Nama belum ada di data santri']
 	];
 	XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(importRows), 'Import Tunggakan');
 
 	const petunjukRows = [
 		['Kolom wajib', 'tahun_ajaran, nominal_tunggakan, lalu isi nomor_induk atau nama_pembayar'],
-		['Kategori santri', 'Isi kategori_santri atau kategori_id agar aturan pengecualian tagihan per kategori langsung berlaku.'],
+		['Kategori santri per tahun', 'Isi kategori_santri. Sistem akan menyimpan kategori ini khusus untuk tahun_ajaran yang dipilih, memungkinkan santri berubah kategori di tahun berbeda.'],
 		['Bulanan mudah', 'Isi bulan_mulai_tunggakan dan tahun_mulai_tunggakan, lalu nominal_tunggakan total. Sistem akan membuat urutan bulan tunggakan otomatis berdasarkan nominal per bulan yang berlaku.'],
 		['Bulanan kategori', 'Jika kategori membuat nominal 0/gratis untuk jenis tersebut, baris tidak akan diimport agar konsisten dengan pengaturan pembayaran.'],
 		['Tahunan/Sekali', 'Bulan dan tahun_tagihan boleh kosong.'],

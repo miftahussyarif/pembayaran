@@ -15,8 +15,32 @@ export async function load({ params }) {
 		.from(schema.santriDetail)
 		.where(eq(schema.santriDetail.santriId, santriId));
 
+	// Ambil semua kategori santri per tahun ajaran (relasi baru)
+	const kategoriTahunRows = await db.select().from(schema.santriKategoriTahun)
+		.where(eq(schema.santriKategoriTahun.santriId, santriId));
+
+	const allKategoris = await db.select().from(schema.kategoriSantri);
+	const allTahunAjarans = await db.select().from(schema.tahunAjaran);
+
+	// Group by tahun ajaran, sort by tahun_ajaran_id desc
+	const byTahun = new Map();
+	for (const row of kategoriTahunRows) {
+		if (!byTahun.has(row.tahunAjaranId)) byTahun.set(row.tahunAjaranId, []);
+		byTahun.get(row.tahunAjaranId).push(row.kategoriId);
+	}
+	const kategoriTahunList = [...byTahun.entries()]
+		.map(([tahunAjaranId, kategoriIds]) => ({
+			tahunNama: allTahunAjarans.find((t) => t.id === tahunAjaranId)?.nama || String(tahunAjaranId),
+			tahunAjaranId,
+			kategoriNama: kategoriIds
+				.map((kid) => allKategoris.find((k) => k.id === kid)?.namaKategori || '')
+				.filter(Boolean)
+		}))
+		.sort((a, b) => b.tahunAjaranId - a.tahunAjaranId);
+
+	// Fallback: jika belum ada di relasi baru, pakai kategoriId lama
 	let kategori = null;
-	if (santri.kategoriId) {
+	if (santri.kategoriId && kategoriTahunList.length === 0) {
 		const [kat] = await db.select().from(schema.kategoriSantri).where(eq(schema.kategoriSantri.id, santri.kategoriId));
 		kategori = kat || null;
 	}
@@ -24,6 +48,8 @@ export async function load({ params }) {
 	return {
 		santri,
 		detail: detail || {},
-		kategori
+		kategori,
+		kategoriTahunList
 	};
 }
+

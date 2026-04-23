@@ -174,6 +174,14 @@ export const kategoriGratis = sqliteTable('kategori_gratis', {
 	nominal: integer('nominal').default(0) // 0 = gratis, null = use default
 });
 
+// Relasi multi-kategori per santri per tahun ajaran
+export const santriKategoriTahun = sqliteTable('santri_kategori_tahun', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  santriId: integer('santri_id').references(() => santri.id).notNull(),
+  tahunAjaranId: integer('tahun_ajaran_id').references(() => tahunAjaran.id).notNull(),
+  kategoriId: integer('kategori_id').references(() => kategoriSantri.id).notNull(),
+});
+
 export const loginAttempts = sqliteTable('login_attempts', {
 	ip: text('ip').primaryKey(),
 	attempts: integer('attempts').notNull().default(0),
