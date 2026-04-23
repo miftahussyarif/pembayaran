@@ -67,18 +67,21 @@ export const actions = {
 		const backupFiles = Array.isArray(payload.files) ? payload.files : [];
 		const asArray = (value) => (Array.isArray(value) ? value : []);
 		const users = asArray(backupData.users);
-		const pengaturan = asArray(backupData.pengaturan);
+		const loginAttempts = asArray(backupData.loginAttempts);
+		const pengaturan = asArray(backupData.pengaturanPesantren ?? backupData.pengaturan);
 		const tahunAjaran = asArray(backupData.tahunAjaran);
 		const jenisPembayaran = asArray(backupData.jenisPembayaran);
 		const kategoriSantri = asArray(backupData.kategoriSantri);
+		const kategoriGratis = asArray(backupData.kategoriGratis);
 		const santri = asArray(backupData.santri);
 		const santriDetail = asArray(backupData.santriDetail);
 		const santriSmk = asArray(backupData.santriSmk);
 		const santriSmp = asArray(backupData.santriSmp);
+		const santriKategoriTahun = asArray(backupData.santriKategoriTahun);
 		const tunggakanImport = asArray(backupData.tunggakanImport);
 		const pembayarLain = asArray(backupData.pembayarLain);
 		const pembayaran = asArray(backupData.pembayaran);
-		const mutasi = asArray(backupData.mutasi);
+		const mutasi = asArray(backupData.mutasiSaldoBendahara ?? backupData.mutasi);
 		const systemLogs = asArray(backupData.systemLogs);
 
 		const insertInBatches = (tx, table, rows, batchSize = 100) => {
@@ -90,6 +93,7 @@ export const actions = {
 
 		try {
 			db.transaction((tx) => {
+				tx.delete(schema.loginAttempts).run();
 				tx.delete(schema.tunggakanImport).run();
 				tx.delete(schema.pembayaran).run();
 				tx.delete(schema.pembayarLain).run();
@@ -98,7 +102,9 @@ export const actions = {
 				tx.delete(schema.santriSmk).run();
 				tx.delete(schema.santriSmp).run();
 				tx.delete(schema.santriDetail).run();
+				tx.delete(schema.santriKategoriTahun).run();
 				tx.delete(schema.santri).run();
+				tx.delete(schema.kategoriGratis).run();
 				tx.delete(schema.kategoriSantri).run();
 				tx.delete(schema.jenisPembayaran).run();
 				tx.delete(schema.tahunAjaran).run();
@@ -107,6 +113,9 @@ export const actions = {
 
 				if (users.length) {
 					insertInBatches(tx, schema.users, users);
+				}
+				if (loginAttempts.length) {
+					insertInBatches(tx, schema.loginAttempts, loginAttempts);
 				}
 				if (pengaturan.length) {
 					insertInBatches(tx, schema.pengaturanPesantren, pengaturan);
@@ -120,6 +129,9 @@ export const actions = {
 				if (kategoriSantri.length) {
 					insertInBatches(tx, schema.kategoriSantri, kategoriSantri);
 				}
+				if (kategoriGratis.length) {
+					insertInBatches(tx, schema.kategoriGratis, kategoriGratis);
+				}
 				if (santri.length) {
 					insertInBatches(tx, schema.santri, santri);
 				}
@@ -131,6 +143,9 @@ export const actions = {
 				}
 				if (santriSmp.length) {
 					insertInBatches(tx, schema.santriSmp, santriSmp);
+				}
+				if (santriKategoriTahun.length) {
+					insertInBatches(tx, schema.santriKategoriTahun, santriKategoriTahun);
 				}
 				if (tunggakanImport.length) {
 					insertInBatches(tx, schema.tunggakanImport, tunggakanImport);
@@ -155,6 +170,7 @@ export const actions = {
 				for (const file of backupFiles) {
 					const filePath = resolveUploadPath(file?.path);
 					if (!filePath || !file?.contentBase64) continue;
+					await mkdir(path.dirname(filePath), { recursive: true });
 					const buffer = Buffer.from(file.contentBase64, 'base64');
 					await writeFile(filePath, buffer);
 				}
@@ -167,7 +183,7 @@ export const actions = {
 					role: locals.user?.role || null,
 					aksi: 'restore',
 					modul: 'backup-restore',
-					keterangan: `Restore backup: master(users=${users.length}, santri=${santri.length}, santri_detail=${santriDetail.length}, smk=${santriSmk.length}, smp=${santriSmp.length}, tunggakan_import=${tunggakanImport.length}, pembayar_lain=${pembayarLain.length}), pembayaran=${pembayaran.length}, mutasi=${mutasi.length}, files=${backupFiles.length}`,
+					keterangan: `Restore backup: master(users=${users.length}, login_attempts=${loginAttempts.length}, santri=${santri.length}, santri_detail=${santriDetail.length}, smk=${santriSmk.length}, smp=${santriSmp.length}, kategori_gratis=${kategoriGratis.length}, santri_kategori_tahun=${santriKategoriTahun.length}, tunggakan_import=${tunggakanImport.length}, pembayar_lain=${pembayarLain.length}), pembayaran=${pembayaran.length}, mutasi=${mutasi.length}, files=${backupFiles.length}`,
 					ip: getClientAddress(),
 					createdAt: new Date().toISOString()
 				});
@@ -177,6 +193,7 @@ export const actions = {
 
 			return { type: 'success', message: 'Restore berhasil. Data transaksi dan mutasi diganti sesuai backup.' };
 		} catch (e) {
+			console.error('[Restore] Gagal restore database:', e);
 			return { type: 'error', message: 'Gagal restore database.' };
 		}
 	}

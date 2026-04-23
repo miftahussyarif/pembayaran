@@ -1,32 +1,37 @@
 import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
-import { readFile, access } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
-const resolveUploadPath = (url) => {
-	if (!url || typeof url !== 'string') return null;
-	if (!url.startsWith('/uploads/')) return null;
-	const filename = url.replace('/uploads/', '');
-	if (!filename) return null;
-	return path.join('static', 'uploads', filename);
-};
+const UPLOADS_DIR = path.join('static', 'uploads');
 
-const collectUploads = async (urls) => {
+const collectUploads = async (dir = UPLOADS_DIR, relativeDir = '') => {
 	const files = [];
-	for (const url of urls) {
-		const filePath = resolveUploadPath(url);
-		if (!filePath) continue;
-		try {
-			await access(filePath);
-			const buffer = await readFile(filePath);
+
+	try {
+		const entries = await readdir(dir, { withFileTypes: true });
+
+		for (const entry of entries) {
+			const nextRelative = relativeDir ? path.posix.join(relativeDir, entry.name) : entry.name;
+			const fullPath = path.join(dir, entry.name);
+
+			if (entry.isDirectory()) {
+				files.push(...await collectUploads(fullPath, nextRelative));
+				continue;
+			}
+
+			if (!entry.isFile()) continue;
+
+			const buffer = await readFile(fullPath);
 			files.push({
-				path: url,
+				path: `/uploads/${nextRelative}`,
 				contentBase64: buffer.toString('base64')
 			});
-		} catch (e) {
-			// ignore missing files
 		}
+	} catch (e) {
+		// ignore missing uploads directory
 	}
+
 	return files;
 };
 
@@ -36,36 +41,37 @@ export const generateBackup = async () => {
 	const mutasi = await db.select().from(schema.mutasiSaldoBendahara);
 	const systemLogs = await db.select().from(schema.systemLogs);
 	const users = await db.select().from(schema.users);
+	const loginAttempts = await db.select().from(schema.loginAttempts);
 	const pengaturan = await db.select().from(schema.pengaturanPesantren);
 	const tahunAjaran = await db.select().from(schema.tahunAjaran);
 	const jenisPembayaran = await db.select().from(schema.jenisPembayaran);
 	const kategoriSantri = await db.select().from(schema.kategoriSantri);
+	const kategoriGratis = await db.select().from(schema.kategoriGratis);
 	const santri = await db.select().from(schema.santri);
 	const santriDetail = await db.select().from(schema.santriDetail);
 	const santriSmk = await db.select().from(schema.santriSmk);
 	const santriSmp = await db.select().from(schema.santriSmp);
+	const santriKategoriTahun = await db.select().from(schema.santriKategoriTahun);
 	const tunggakanImport = await db.select().from(schema.tunggakanImport);
-	const uploadUrls = [
-		...pengaturan.map((p) => p.logoUrl).filter(Boolean),
-		...pengaturan.map((p) => p.stampUrl).filter(Boolean),
-		...users.map((u) => u.signatureUrl).filter(Boolean)
-	];
-	const files = await collectUploads(uploadUrls);
+	const files = await collectUploads();
 
 	return {
 		type: 'pesantren-backup',
-		version: 4,
+		version: 5,
 		exportedAt: new Date().toISOString(),
 		data: {
 			users,
+			loginAttempts,
 			pengaturan,
 			tahunAjaran,
 			jenisPembayaran,
 			kategoriSantri,
+			kategoriGratis,
 			santri,
 			santriDetail,
 			santriSmk,
 			santriSmp,
+			santriKategoriTahun,
 			tunggakanImport,
 			pembayarLain,
 			pembayaran,
