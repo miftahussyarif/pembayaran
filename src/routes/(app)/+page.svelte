@@ -1,5 +1,18 @@
 <script>
 	let { data } = $props();
+
+
+
+	const formatRupiah = (n) => `Rp ${(n || 0).toLocaleString('id-ID')}`;
+	const formatDate = (d) => {
+		if (!d) return '-';
+		const dt = new Date(d);
+		return dt.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+	};
+
+	// Colors for category bars
+	const catColors = ['#6366f1','#f59e0b','#06b6d4','#ec4899','#10b981','#8b5cf6','#f97316','#14b8a6','#ef4444','#3b82f6'];
+	const maxKategori = $derived(Math.max(1, ...data.santriPerKategori.map(k => k.jumlah)));
 </script>
 
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -63,7 +76,7 @@
 	</div>
 </div>
 
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+<div class="mb-8">
 	<!-- Tindakan Cepat -->
 	<div class="card bg-base-100 shadow-sm border border-base-200">
 		<div class="card-body">
@@ -71,11 +84,17 @@
 				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
 				Tindakan Cepat
 			</h2>
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+			<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 				<a href="/transaksi/input" class="btn btn-primary h-auto py-4">
 					<div class="flex flex-col items-center">
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
 						Input Pembayaran Baru
+					</div>
+				</a>
+				<a href="/master/santri?action=tambah" class="btn btn-outline btn-accent h-auto py-4">
+					<div class="flex flex-col items-center">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+						Tambah Santri Baru
 					</div>
 				</a>
 				<a href="/transaksi/rekapitulasi" class="btn btn-outline btn-secondary h-auto py-4">
@@ -87,34 +106,82 @@
 			</div>
 		</div>
 	</div>
+</div>
 
-	<!-- Progress Status -->
+<!-- Charts + Riwayat Terakhir -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+	<!-- Santri per Kategori -->
 	<div class="card bg-base-100 shadow-sm border border-base-200">
 		<div class="card-body">
 			<h2 class="card-title flex items-center gap-2 mb-4">
 				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-				Progress Pembayaran Syahriyah
-				{#if data.tahunAjaranAktif}<span class="badge badge-outline text-xs font-normal ml-1">TA {data.tahunAjaranAktif.nama}</span>{/if}
+				Santri per Kategori
+				<span class="badge badge-outline badge-sm font-normal ml-1">{data.totalSantriAll} total</span>
 			</h2>
 
-			{#if !data.tahunAjaranAktif}
-				<div class="text-center py-6 text-base-content/50 text-sm">Tidak ada tahun aktif.</div>
-			{:else if data.progressBulanan.length === 0}
-				<div class="text-center py-6 text-base-content/50 text-sm">Belum ada data pembayaran untuk ditampilkan.</div>
+			{#if data.santriPerKategori.length === 0}
+				<div class="text-center py-8 text-base-content/50 text-sm">Belum ada data kategori santri.</div>
 			{:else}
-				<div class="space-y-5">
-					{#each data.progressBulanan as p}
+				<div class="space-y-3">
+					{#each data.santriPerKategori as kat, i}
+						{@const pct = data.totalSantriAll > 0 ? Math.round((kat.jumlah / data.totalSantriAll) * 100) : 0}
+						{@const barWidth = Math.max(4, Math.round((kat.jumlah / maxKategori) * 100))}
+						{@const color = catColors[i % catColors.length]}
 						<div>
-							<div class="flex justify-between mb-1">
-								<span class="text-sm font-semibold">{p.bulan} {p.tahun}</span>
-								<span class="text-sm font-bold {p.persen === 100 ? 'text-success' : p.persen === 0 ? 'text-error' : 'text-warning'}">{p.persen}%</span>
+							<div class="flex justify-between items-center mb-1">
+								<div class="flex items-center gap-2">
+									<div class="w-3 h-3 rounded-full shrink-0" style="background: {color}"></div>
+									<span class="font-semibold text-sm">{kat.nama}</span>
+								</div>
+								<span class="text-sm font-bold" style="color: {color}">{kat.jumlah} <span class="font-normal text-base-content/50 text-xs">({pct}%)</span></span>
 							</div>
-							<progress class="progress w-full {p.persen === 100 ? 'progress-success' : p.persen === 0 ? 'progress-error' : 'progress-warning'}" value={p.persen} max="100"></progress>
-							<div class="text-xs text-base-content/60 mt-1">
-								{p.sudahBayar} dari {p.totalWajib} santri telah melunasi pembayaran bulan ini.
+							<div class="w-full bg-base-200 rounded-full h-3 overflow-hidden">
+								<div
+									class="h-full rounded-full transition-all duration-500"
+									style="width: {barWidth}%; background: {color};"
+								></div>
 							</div>
 						</div>
 					{/each}
+				</div>
+			{/if}
+		</div>
+	</div>
+
+	<!-- Riwayat Transaksi Terakhir -->
+	<div class="card bg-base-100 shadow-sm border border-base-200">
+		<div class="card-body">
+			<h2 class="card-title flex items-center gap-2 mb-4">
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+				Transaksi Terakhir
+			</h2>
+
+			{#if data.riwayatTerakhir.length === 0}
+				<div class="text-center py-10 text-base-content/50 text-sm">Belum ada transaksi.</div>
+			{:else}
+				<ul class="steps steps-vertical space-y-3">
+					{#each data.riwayatTerakhir as r}
+						<li class="step step-primary">
+							<div class="text-left py-1 w-full">
+								<div class="flex justify-between items-start gap-2">
+									<div class="min-w-0">
+										<div class="font-bold text-sm truncate">{r.nomorKwitansi}</div>
+										<div class="text-xs text-base-content/60 mt-0.5 truncate">{r.namaSantri || r.namaPembayarLain || 'Tidak diketahui'}</div>
+									</div>
+									<div class="text-right shrink-0">
+										<div class="text-sm font-bold text-primary whitespace-nowrap">{formatRupiah(r.nominalDibayar)}</div>
+										<div class="text-[11px] text-base-content/50 font-mono">{formatDate(r.tanggalBayar)}</div>
+									</div>
+								</div>
+								{#if r.keteranganKhusus}
+									<div class="text-xs text-warning mt-1 truncate">📌 {r.keteranganKhusus}</div>
+								{/if}
+							</div>
+						</li>
+					{/each}
+				</ul>
+				<div class="mt-4 text-center">
+					<a href="/transaksi/input" class="btn btn-sm btn-ghost btn-primary">Lihat Semua →</a>
 				</div>
 			{/if}
 		</div>

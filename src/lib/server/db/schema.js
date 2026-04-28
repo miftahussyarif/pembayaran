@@ -133,7 +133,9 @@ export const users = sqliteTable('users', {
 	role: text('role', { enum: ['admin', 'bendahara', 'petugas'] }).notNull().default('admin'),
 	namaLengkap: text('nama_lengkap').notNull(),
 	signatureUrl: text('signature_url'),
-	sessionId: text('session_id')
+	sessionId: text('session_id'),
+	telegramBotToken: text('telegram_bot_token'),
+	telegramChatId: text('telegram_chat_id')
 });
 
 export const mutasiSaldoBendahara = sqliteTable('mutasi_saldo_bendahara', {

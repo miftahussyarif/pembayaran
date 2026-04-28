@@ -151,8 +151,21 @@ export async function load({ url }) {
 		})
 		.from(schema.pembayaran)
 		.leftJoin(schema.jenisPembayaran, eq(schema.pembayaran.jenisPembayaranId, schema.jenisPembayaran.id));
+	const tunggakanImport = await db
+		.select({
+			id: schema.tunggakanImport.id,
+			santriId: schema.tunggakanImport.santriId,
+			tahunAjaranId: schema.tunggakanImport.tahunAjaranId,
+			jenisPembayaranId: schema.tunggakanImport.jenisPembayaranId,
+			nominalTagihan: schema.tunggakanImport.nominalTagihan,
+			keteranganKhusus: schema.tunggakanImport.keteranganKhusus,
+			catatan: schema.tunggakanImport.catatan,
+			updatedAt: schema.tunggakanImport.updatedAt
+		})
+		.from(schema.tunggakanImport);
 
 	const jenisList = await db.select().from(schema.jenisPembayaran);
+	const jenisKhusus = jenisList.find((item) => item.namaPembayaran === 'Pembayaran Lain-lain');
 	const jenisNonBulanan = jenisList.filter(
 		j => j.tipe !== 'bulanan' && j.tipe !== 'smk_bulanan' && j.tipe !== 'smp_bulanan'
 	);
@@ -225,16 +238,76 @@ export async function load({ url }) {
 
 		const pembayaranSantri = pembayaran.filter(p => p.santriId === s.id);
 
-		// Pisahkan pembayaran khusus (yang punya keteranganKhusus)
-		const pembayaranKhusus = pembayaranSantri
+		// Semua pembayaran dengan keteranganKhusus
+		const allPembayaranKhusus = pembayaranSantri
 			.filter(p => !!p.keteranganKhusus)
 			.map(p => ({
 				id: p.id,
+				tahunAjaranId: p.tahunAjaranId,
 				keterangan: p.keteranganKhusus,
 				nominalDibayar: p.nominalDibayar,
 				tanggalBayar: p.tanggalBayar,
 				nomorKwitansi: p.nomorKwitansi
 			}));
+
+		// Bangun daftar tagihanKhusus dari tunggakanImport
+		const tagihanKhusus = Array.from(
+			tunggakanImport
+				.filter((item) =>
+					item.santriId === s.id &&
+					(!jenisKhusus || item.jenisPembayaranId === jenisKhusus.id) &&
+					!!item.keteranganKhusus &&
+					!!item.tahunAjaranId
+				)
+				.reduce((map, item) => {
+					const key = `${item.tahunAjaranId}-${String(item.keteranganKhusus || '').trim().toLowerCase()}`;
+					if (!map.has(key)) {
+						const tahun = tahunAjarans.find((ta) => ta.id === item.tahunAjaranId);
+						map.set(key, {
+							tahunAjaranId: item.tahunAjaranId,
+							namaTahunAjaran: tahun?.nama || '-',
+							keterangan: item.keteranganKhusus,
+							nominalTagihan: 0,
+							totalDibayar: 0,
+							catatan: item.catatan || null,
+							updatedAt: item.updatedAt || null
+						});
+					}
+					const grouped = map.get(key);
+					grouped.nominalTagihan += Number(item.nominalTagihan || 0);
+					return map;
+				}, new Map())
+				.values()
+		).map((item) => {
+			const totalDibayar = allPembayaranKhusus
+				.filter((payment) =>
+					payment.tahunAjaranId === item.tahunAjaranId &&
+					String(payment.keterangan || '').trim().toLowerCase() === String(item.keterangan || '').trim().toLowerCase()
+				)
+				.reduce((sum, payment) => sum + Number(payment.nominalDibayar || 0), 0);
+			return {
+				...item,
+				totalDibayar,
+				sisa: Math.max(0, Number(item.nominalTagihan || 0) - totalDibayar)
+			};
+		});
+		const totalTagihanKhusus = tagihanKhusus.reduce((sum, item) => sum + Number(item.nominalTagihan || 0), 0);
+		const totalDibayarTagihanKhusus = tagihanKhusus.reduce((sum, item) => sum + Number(item.totalDibayar || 0), 0);
+		const totalSisaTagihanKhusus = tagihanKhusus.reduce((sum, item) => sum + Number(item.sisa || 0), 0);
+
+		// Bangun set kunci tagihan khusus yang ada di tunggakanImport
+		// Pembayaran yang sudah cocok dengan tagihan khusus TIDAK ditampilkan di "Pembayaran Lain-lain"
+		const tagihanKhususKeys = new Set(
+			tagihanKhusus.map((item) =>
+				`${item.tahunAjaranId}-${String(item.keterangan || '').trim().toLowerCase()}`
+			)
+		);
+
+		// pembayaranKhusus: hanya pembayaran yang TIDAK cocok dengan tagihan khusus manapun
+		const pembayaranKhusus = allPembayaranKhusus.filter((p) => {
+			const key = `${p.tahunAjaranId}-${String(p.keterangan || '').trim().toLowerCase()}`;
+			return !tagihanKhususKeys.has(key);
+		});
 		const totalKhusus = pembayaranKhusus.reduce((sum, p) => sum + (p.nominalDibayar || 0), 0);
 
 		// Filter pembayaran normal (bukan khusus)
@@ -490,11 +563,11 @@ export async function load({ url }) {
 		const totalSisaSmkBulanan = Math.max(0, totalTagihanSmkBulanan - totalDibayarSmkBulanan);
 		const totalSisaSmpBulanan = Math.max(0, totalTagihanSmpBulanan - totalDibayarSmpBulanan);
 		const totalTagihanKeseluruhan =
-			totalTagihanKonsumsi + totalTagihanSmkBulanan + totalTagihanSmpBulanan + totalTagihanLain;
+			totalTagihanKonsumsi + totalTagihanSmkBulanan + totalTagihanSmpBulanan + totalTagihanLain + totalTagihanKhusus;
 		const totalDibayarKeseluruhan =
-			totalDibayarKonsumsi + totalDibayarSmkBulanan + totalDibayarSmpBulanan + totalDibayarLain + totalKhusus;
+			totalDibayarKonsumsi + totalDibayarSmkBulanan + totalDibayarSmpBulanan + totalDibayarLain + totalDibayarTagihanKhusus + totalKhusus;
 		const totalBelumTerbayarKeseluruhan =
-			totalSisaKonsumsi + totalSisaSmkBulanan + totalSisaSmpBulanan + totalSisaLain;
+			totalSisaKonsumsi + totalSisaSmkBulanan + totalSisaSmpBulanan + totalSisaLain + totalSisaTagihanKhusus;
 
 		return {
 			...s,
@@ -512,7 +585,11 @@ export async function load({ url }) {
 			totalDibayarSmpBulanan,
 			pembayaranLain: nonBulananByJenis,
 			pembayaranKhusus,
+			tagihanKhusus,
 			totalKhusus,
+			totalTagihanKhusus,
+			totalDibayarTagihanKhusus,
+			totalSisaTagihanKhusus,
 
 			totalTagihanKonsumsi,
 			totalDibayarKonsumsi,

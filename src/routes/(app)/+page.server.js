@@ -1,6 +1,6 @@
 import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
-import { sql, count, sum, eq } from 'drizzle-orm';
+import { sql, count, sum, eq, desc } from 'drizzle-orm';
 
 const BULAN_NAMES = ['Januari','Februari','Maret','April','Mei','Juni',
 	'Juli','Agustus','September','Oktober','November','Desember'];
@@ -52,6 +52,49 @@ export async function load() {
 		.from(schema.tahunAjaran)
 		.where(sql`${schema.tahunAjaran.isActive} = 1`);
 
+
+	// Santri per kategori (for horizontal bar chart)
+	const allKategoris = await db.select().from(schema.kategoriSantri);
+	const kategoriTahunRows = await db.select().from(schema.santriKategoriTahun);
+	const allSantriList = await db.select({ id: schema.santri.id, kategoriId: schema.santri.kategoriId }).from(schema.santri);
+	// Count unique santri per kategori from both sources
+	const santriPerKategoriMap = new Map();
+	// Source 1: santriKategoriTahun relation table (new multi-kategori system)
+	for (const row of kategoriTahunRows) {
+		if (!santriPerKategoriMap.has(row.kategoriId)) santriPerKategoriMap.set(row.kategoriId, new Set());
+		santriPerKategoriMap.get(row.kategoriId).add(row.santriId);
+	}
+	// Source 2: legacy santri.kategoriId column (fallback for santri not yet in relation table)
+	for (const s of allSantriList) {
+		if (s.kategoriId) {
+			if (!santriPerKategoriMap.has(s.kategoriId)) santriPerKategoriMap.set(s.kategoriId, new Set());
+			santriPerKategoriMap.get(s.kategoriId).add(s.id);
+		}
+	}
+	const santriPerKategori = allKategoris.map(k => ({
+		id: k.id,
+		nama: k.namaKategori,
+		jumlah: santriPerKategoriMap.get(k.id)?.size || 0
+	})).sort((a, b) => b.jumlah - a.jumlah);
+	const totalSantriAll = allSantriList.length;
+
+	// Recent transactions (last 7)
+	const riwayatTerakhir = await db
+		.select({
+			id: schema.pembayaran.id,
+			nomorKwitansi: schema.pembayaran.nomorKwitansi,
+			nominalDibayar: schema.pembayaran.nominalDibayar,
+			tanggalBayar: schema.pembayaran.tanggalBayar,
+			keteranganKhusus: schema.pembayaran.keteranganKhusus,
+			namaSantri: schema.santri.namaLengkap,
+			namaPembayarLain: schema.pembayarLain.namaPembayar
+		})
+		.from(schema.pembayaran)
+		.leftJoin(schema.santri, eq(schema.pembayaran.santriId, schema.santri.id))
+		.leftJoin(schema.pembayarLain, eq(schema.pembayaran.pembayarLainId, schema.pembayarLain.id))
+		.orderBy(desc(schema.pembayaran.id))
+		.limit(7);
+
 	let totalTunggakan = 0;
 	let rincianTunggakan = [];
 	let progressBulanan = [];
@@ -98,11 +141,20 @@ export async function load() {
 				bulan: schema.pembayaran.bulan,
 				tahunTagihan: schema.pembayaran.tahunTagihan,
 				nominalDibayar: schema.pembayaran.nominalDibayar,
+				keteranganKhusus: schema.pembayaran.keteranganKhusus,
 				tipe: schema.jenisPembayaran.tipe
 			})
 			.from(schema.pembayaran)
 			.leftJoin(schema.jenisPembayaran, eq(schema.pembayaran.jenisPembayaranId, schema.jenisPembayaran.id))
 			.where(eq(schema.pembayaran.tahunAjaranId, tahunAjaranAktif.id));
+		const tunggakanImportAktif = await db
+			.select({
+				santriId: schema.tunggakanImport.santriId,
+				nominalTagihan: schema.tunggakanImport.nominalTagihan,
+				keteranganKhusus: schema.tunggakanImport.keteranganKhusus
+			})
+			.from(schema.tunggakanImport)
+			.where(eq(schema.tunggakanImport.tahunAjaranId, tahunAjaranAktif.id));
 
 		// --- Progress per Bulan ---
 		// Gunakan semua santri aktif sebagai basis (denominator) sesuai permintaan user
@@ -208,6 +260,38 @@ export async function load() {
 				});
 			}
 		}
+
+		const customTunggakanBySantri = new Map();
+		for (const item of tunggakanImportAktif.filter((row) => !!row.keteranganKhusus && row.santriId)) {
+			const key = `${item.santriId}-${String(item.keteranganKhusus || '').trim().toLowerCase()}`;
+			if (!customTunggakanBySantri.has(key)) {
+				customTunggakanBySantri.set(key, {
+					santriId: item.santriId,
+					keterangan: item.keteranganKhusus,
+					totalTagihan: 0
+				});
+			}
+			customTunggakanBySantri.get(key).totalTagihan += Number(item.nominalTagihan || 0);
+		}
+
+		for (const item of customTunggakanBySantri.values()) {
+			const totalDibayar = allPembayaran
+				.filter((payment) =>
+					payment.santriId === item.santriId &&
+					String(payment.keteranganKhusus || '').trim().toLowerCase() === String(item.keterangan || '').trim().toLowerCase()
+				)
+				.reduce((sum, payment) => sum + Number(payment.nominalDibayar || 0), 0);
+			const sisa = Math.max(0, item.totalTagihan - totalDibayar);
+			if (sisa <= 0) continue;
+
+			const santri = santris.find((row) => row.id === item.santriId);
+			totalTunggakan += sisa;
+			rincianTunggakan.push({
+				nama: santri?.namaLengkap || 'Santri',
+				jumlahBulan: 1,
+				nominal: sisa
+			});
+		}
 	}
 
 	return {
@@ -218,6 +302,9 @@ export async function load() {
 			totalTunggakan,
 			rincianTunggakan
 		},
+		santriPerKategori,
+		totalSantriAll,
+		riwayatTerakhir,
 		tahunAjaranAktif,
 		progressBulanan
 	};

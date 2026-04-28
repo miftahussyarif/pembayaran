@@ -99,13 +99,13 @@ export const handle = async ({ event, resolve }) => {
 	}
 
 	// 2. Proteksi Halaman Internal
-	// Jika user BUKAN di halaman /login, dan dia TIDAK PUNYA session -> Redirect ke /login
-	if (event.url.pathname !== '/login' && !sessionUser) {
+	// Jika user BUKAN di halaman /login atau halamannya, dan dia TIDAK PUNYA session -> Redirect ke /login
+	if (!event.url.pathname.startsWith('/login') && !sessionUser) {
 		throw redirect(303, '/login');
 	}
 
-	// Jika Punya session, dan malah mencoba buka halaman /login -> Redirect ke dashboard (/)
-	if (event.url.pathname === '/login' && sessionUser) {
+	// Jika Punya session, dan malah mencoba buka halaman /login (kecuali logout) -> Redirect ke dashboard (/)
+	if (event.url.pathname.startsWith('/login') && sessionUser) {
 		throw redirect(303, '/');
 	}
 

@@ -349,25 +349,47 @@ export const actions = {
 	delete: async ({ request, locals, getClientAddress }) => {
 		const data = await request.formData();
 		const id = Number(data.get('id'));
-		// Hapus relasi kategori-tahun dulu
-		await db.delete(schema.santriKategoriTahun).where(eq(schema.santriKategoriTahun.santriId, id));
-		await db.delete(schema.santriDetail).where(eq(schema.santriDetail.santriId, id));
-		await db.delete(schema.santri).where(eq(schema.santri.id, id));
 		try {
-			await db.insert(schema.systemLogs).values({
-				userId: locals.user?.id || null,
-				username: locals.user?.username || null,
-				role: locals.user?.role || null,
-				aksi: 'delete',
-				modul: 'master-santri',
-				keterangan: `Hapus santri id=${id}`,
-				ip: getClientAddress(),
-				createdAt: new Date().toISOString()
-			});
-		} catch (e) {
-			// ignore logging errors
+			// Hapus relasi kategori-tahun dulu
+			await db.delete(schema.santriKategoriTahun).where(eq(schema.santriKategoriTahun.santriId, id));
+			await db.delete(schema.santriDetail).where(eq(schema.santriDetail.santriId, id));
+			await db.delete(schema.santri).where(eq(schema.santri.id, id));
+			try {
+				await db.insert(schema.systemLogs).values({
+					userId: locals.user?.id || null,
+					username: locals.user?.username || null,
+					role: locals.user?.role || null,
+					aksi: 'delete',
+					modul: 'master-santri',
+					keterangan: `Hapus santri id=${id}`,
+					ip: getClientAddress(),
+					createdAt: new Date().toISOString()
+				});
+			} catch (e) {
+				// ignore logging errors
+			}
+			return { success: true };
+		} catch (error) {
+			console.error('Error deleting santri:', error);
+			const msg = String(error?.message || '').toLowerCase();
+			let detail = 'Gagal menghapus santri.';
+			if (msg.includes('foreign key') || msg.includes('constraint')) {
+				// Cek relasi yang masih ada
+				const relasi = [];
+				const [smk] = await db.select({ id: schema.santriSmk.id }).from(schema.santriSmk).where(eq(schema.santriSmk.santriId, id));
+				if (smk) relasi.push('Data Siswa SMK');
+				const [smp] = await db.select({ id: schema.santriSmp.id }).from(schema.santriSmp).where(eq(schema.santriSmp.santriId, id));
+				if (smp) relasi.push('Data Siswa SMP');
+				const [pembayaran] = await db.select({ id: schema.pembayaran.id }).from(schema.pembayaran).where(eq(schema.pembayaran.santriId, id));
+				if (pembayaran) relasi.push('Data Pembayaran');
+				const [tunggakan] = await db.select({ id: schema.tunggakanImport.id }).from(schema.tunggakanImport).where(eq(schema.tunggakanImport.santriId, id));
+				if (tunggakan) relasi.push('Data Tunggakan/Tagihan Khusus');
+				detail = relasi.length
+					? `Tidak bisa menghapus santri karena masih memiliki data terkait: ${relasi.join(', ')}. Hapus data terkait terlebih dahulu.`
+					: 'Tidak bisa menghapus santri karena masih terkait dengan data lain.';
+			}
+			return { success: false, error: detail };
 		}
-		return { success: true };
 	},
 
 	bulkDelete: async ({ request, locals, getClientAddress }) => {
@@ -380,26 +402,35 @@ export const actions = {
 
 		if (!Array.isArray(ids) || ids.length === 0) return { success: false, error: 'Tidak ada santri yang dipilih.' };
 
-		// Hapus relasi kategori-tahun dulu
-		await db.delete(schema.santriKategoriTahun).where(inArray(schema.santriKategoriTahun.santriId, ids));
-		await db.delete(schema.santriDetail).where(inArray(schema.santriDetail.santriId, ids));
-		await db.delete(schema.santri).where(inArray(schema.santri.id, ids));
-		
 		try {
-			await db.insert(schema.systemLogs).values({
-				userId: locals.user?.id || null,
-				username: locals.user?.username || null,
-				role: locals.user?.role || null,
-				aksi: 'delete',
-				modul: 'master-santri',
-				keterangan: `Bulk delete ${ids.length} santri`,
-				ip: getClientAddress(),
-				createdAt: new Date().toISOString()
-			});
-		} catch (e) {
-			// ignore logging errors
+			// Hapus relasi kategori-tahun dulu
+			await db.delete(schema.santriKategoriTahun).where(inArray(schema.santriKategoriTahun.santriId, ids));
+			await db.delete(schema.santriDetail).where(inArray(schema.santriDetail.santriId, ids));
+			await db.delete(schema.santri).where(inArray(schema.santri.id, ids));
+			
+			try {
+				await db.insert(schema.systemLogs).values({
+					userId: locals.user?.id || null,
+					username: locals.user?.username || null,
+					role: locals.user?.role || null,
+					aksi: 'delete',
+					modul: 'master-santri',
+					keterangan: `Bulk delete ${ids.length} santri`,
+					ip: getClientAddress(),
+					createdAt: new Date().toISOString()
+				});
+			} catch (e) {
+				// ignore logging errors
+			}
+			return { success: true };
+		} catch (error) {
+			console.error('Error bulk deleting santri:', error);
+			const msg = String(error?.message || '').toLowerCase();
+			if (msg.includes('foreign key') || msg.includes('constraint')) {
+				return { success: false, error: `Tidak bisa menghapus ${ids.length} santri karena sebagian masih memiliki data terkait (Data Siswa SMK/SMP, Pembayaran, atau Tunggakan). Hapus data terkait terlebih dahulu.` };
+			}
+			return { success: false, error: 'Gagal menghapus data santri.' };
 		}
-		return { success: true };
 	},
 
 	import: async ({ request, locals, getClientAddress }) => {

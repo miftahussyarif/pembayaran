@@ -136,9 +136,17 @@
 					<option value="admin">Admin System</option>
 				</select>
 			</div>
-			<div class="form-control w-full mb-6">
+			<div class="form-control w-full mb-3">
 				<label class="label" for="signatureNew"><span class="label-text">Tanda Tangan (JPG/PNG)</span></label>
 				<input type="file" id="signatureNew" name="signatureFile" accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="file-input file-input-bordered w-full" />
+			</div>
+			<div class="form-control w-full mb-3">
+				<label class="label" for="tgTokenNew"><span class="label-text">Custom Telegram Bot Token (Opsional)</span></label>
+				<input type="text" id="tgTokenNew" name="telegramBotToken" placeholder="123456789:AAH..." class="input input-sm input-bordered w-full" />
+			</div>
+			<div class="form-control w-full mb-6">
+				<label class="label" for="tgChatIdNew"><span class="label-text">Custom Telegram Chat ID (Opsional)</span></label>
+				<input type="text" id="tgChatIdNew" name="telegramChatId" placeholder="123456789" class="input input-sm input-bordered w-full" />
 			</div>
 			<div class="modal-action">
 				<button type="button" class="btn" onclick={() => modal_add_user.close()}>Batal</button>
@@ -174,7 +182,7 @@
 					<option value="admin" selected={editUser.role === 'admin'}>Admin System</option>
 				</select>
 			</div>
-			<div class="form-control w-full mb-6">
+			<div class="form-control w-full mb-3">
 				<label class="label" for="signatureEdit"><span class="label-text">Tanda Tangan (JPG/PNG)</span></label>
 				<input type="file" id="signatureEdit" name="signatureFile" accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="file-input file-input-bordered w-full" />
 				{#if editUser.signatureUrl}
@@ -183,6 +191,14 @@
 						<span class="text-xs text-base-content/60">Tanda tangan saat ini</span>
 					</div>
 				{/if}
+			</div>
+			<div class="form-control w-full mb-3">
+				<label class="label" for="tgTokenEdit"><span class="label-text">Custom Telegram Bot Token (Opsional)</span></label>
+				<input type="text" id="tgTokenEdit" name="telegramBotToken" value={editUser.telegramBotToken || ''} placeholder="123456789:AAH..." class="input input-sm input-bordered w-full" />
+			</div>
+			<div class="form-control w-full mb-6">
+				<label class="label" for="tgChatIdEdit"><span class="label-text">Custom Telegram Chat ID (Opsional)</span></label>
+				<input type="text" id="tgChatIdEdit" name="telegramChatId" value={editUser.telegramChatId || ''} placeholder="123456789" class="input input-sm input-bordered w-full" />
 			</div>
 			<div class="modal-action">
 				<button type="button" class="btn" onclick={() => { modal_edit_user.close(); editUser = null; }}>Batal</button>

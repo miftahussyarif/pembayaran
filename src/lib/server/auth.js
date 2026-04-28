@@ -67,3 +67,15 @@ export function isStrongPassword(password) {
 export function isValidRole(role) {
 	return ALLOWED_ROLES.has(role);
 }
+
+// In-memory store for pending OTPs during 2FA login
+export const pendingOtps = new Map();
+
+export function generateOTP(length = 5) {
+	const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+	let otp = '';
+	for (let i = 0; i < length; i++) {
+		otp += chars.charAt(Math.floor(Math.random() * chars.length));
+	}
+	return otp;
+}

@@ -91,7 +91,16 @@ export const actions = {
 	delete: async ({ request }) => {
 		const data = await request.formData();
 		const id = Number(data.get('id'));
-		await db.delete(schema.santriSmk).where(eq(schema.santriSmk.id, id));
-		return { success: true };
+		try {
+			await db.delete(schema.santriSmk).where(eq(schema.santriSmk.id, id));
+			return { success: true };
+		} catch (error) {
+			console.error('Error deleting data siswa SMK:', error);
+			const msg = String(error?.message || '').toLowerCase();
+			if (msg.includes('foreign key') || msg.includes('constraint')) {
+				return { success: false, message: 'Tidak bisa menghapus data siswa SMK karena masih terkait dengan data lain.' };
+			}
+			return { success: false, message: 'Gagal menghapus data siswa SMK.' };
+		}
 	}
 };

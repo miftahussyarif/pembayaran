@@ -28,6 +28,169 @@ function inferTahunTagihan(tahunAjaranNama, bulan, tanggalBayar = new Date().toI
 	return fallbackYear;
 }
 
+function parseTahunAjaranRange(tahunAjaranNama, fallbackYear = new Date().getFullYear()) {
+	const normalizedTahun = String(tahunAjaranNama || '').trim();
+	const slashMatch = normalizedTahun.match(/^(\d{4})\s*\/\s*(\d{4})$/);
+	if (slashMatch) {
+		return {
+			startYear: Number(slashMatch[1]),
+			endYear: Number(slashMatch[2]),
+			mode: 'academic'
+		};
+	}
+
+	const directYearMatch = normalizedTahun.match(/(\d{4})/);
+	if (directYearMatch) {
+		const year = Number(directYearMatch[1]);
+		return {
+			startYear: year,
+			endYear: year,
+			mode: 'calendar'
+		};
+	}
+
+	return {
+		startYear: fallbackYear,
+		endYear: fallbackYear,
+		mode: 'calendar'
+	};
+}
+
+function getPeriodeStartDate({ tahunAjaranNama, bulan = null, tahunTagihan = null }) {
+	const parsedRange = parseTahunAjaranRange(tahunAjaranNama);
+	if (bulan) {
+		const monthIndex = BULAN_NAMES.indexOf(bulan);
+		const resolvedYear = Number(tahunTagihan || inferTahunTagihan(tahunAjaranNama, bulan));
+		if (monthIndex >= 0 && resolvedYear) {
+			return new Date(resolvedYear, monthIndex, 1);
+		}
+	}
+
+	if (parsedRange.mode === 'academic') {
+		return new Date(parsedRange.startYear, 6, 1);
+	}
+
+	return new Date(parsedRange.startYear, 0, 1);
+}
+
+function formatDateOnly(year, month, day) {
+	const mm = String(month).padStart(2, '0');
+	const dd = String(day).padStart(2, '0');
+	return `${year}-${mm}-${dd}`;
+}
+
+async function syncEarliestBillingStart({ santriId, normalizedItems }) {
+	if (!santriId || !normalizedItems.length) return;
+
+	const [santriRow] = await db
+		.select({
+			id: schema.santri.id,
+			tanggalMasuk: schema.santri.tanggalMasuk
+		})
+		.from(schema.santri)
+		.where(eq(schema.santri.id, santriId));
+
+	if (!santriRow) return;
+
+	const smkRows = await db.select().from(schema.santriSmk).where(eq(schema.santriSmk.santriId, santriId));
+	const smpRows = await db.select().from(schema.santriSmp).where(eq(schema.santriSmp.santriId, santriId));
+	const tahunRows = await db.select().from(schema.tahunAjaran);
+	const jenisRows = await db.select().from(schema.jenisPembayaran);
+
+	const tahunById = new Map(tahunRows.map((item) => [item.id, item]));
+	const jenisById = new Map(jenisRows.map((item) => [item.id, item]));
+	const existingSmk = smkRows[0] || null;
+	const existingSmp = smpRows[0] || null;
+
+	let earliestPondokDate = santriRow.tanggalMasuk ? new Date(santriRow.tanggalMasuk) : null;
+	let earliestSmk = existingSmk
+		? { year: existingSmk.startYear, month: existingSmk.startMonth }
+		: null;
+	let earliestSmp = existingSmp
+		? { year: existingSmp.startYear, month: existingSmp.startMonth }
+		: null;
+
+	for (const item of normalizedItems) {
+		const jenis = jenisById.get(item.jenisPembayaranId);
+		const tahunAjaran = tahunById.get(item.tahunAjaranId);
+		if (!jenis || !tahunAjaran || item.keteranganKhusus) continue;
+
+		const periodeDate = getPeriodeStartDate({
+			tahunAjaranNama: tahunAjaran.nama,
+			bulan: item.bulan,
+			tahunTagihan: item.tahunTagihan
+		});
+		if (Number.isNaN(periodeDate.getTime())) continue;
+
+		if (String(jenis.tipe || '').startsWith('smk_')) {
+			const candidate = { year: periodeDate.getFullYear(), month: periodeDate.getMonth() + 1 };
+			const existingKey = earliestSmk ? (earliestSmk.year * 12 + earliestSmk.month) : Number.POSITIVE_INFINITY;
+			const candidateKey = candidate.year * 12 + candidate.month;
+			if (!earliestSmk || candidateKey < existingKey) earliestSmk = candidate;
+		}
+
+		if (String(jenis.tipe || '').startsWith('smp_')) {
+			const candidate = { year: periodeDate.getFullYear(), month: periodeDate.getMonth() + 1 };
+			const existingKey = earliestSmp ? (earliestSmp.year * 12 + earliestSmp.month) : Number.POSITIVE_INFINITY;
+			const candidateKey = candidate.year * 12 + candidate.month;
+			if (!earliestSmp || candidateKey < existingKey) earliestSmp = candidate;
+		}
+
+		if (!earliestPondokDate || periodeDate < earliestPondokDate) {
+			earliestPondokDate = periodeDate;
+		}
+	}
+
+	if (earliestPondokDate) {
+		const nextTanggalMasuk = formatDateOnly(
+			earliestPondokDate.getFullYear(),
+			earliestPondokDate.getMonth() + 1,
+			1
+		);
+		if (!santriRow.tanggalMasuk || nextTanggalMasuk < santriRow.tanggalMasuk) {
+			await db.update(schema.santri)
+				.set({ tanggalMasuk: nextTanggalMasuk })
+				.where(eq(schema.santri.id, santriId));
+		}
+	}
+
+	if (earliestSmk) {
+		if (existingSmk) {
+			const existingKey = existingSmk.startYear * 12 + existingSmk.startMonth;
+			const candidateKey = earliestSmk.year * 12 + earliestSmk.month;
+			if (candidateKey < existingKey) {
+				await db.update(schema.santriSmk)
+					.set({ startYear: earliestSmk.year, startMonth: earliestSmk.month })
+					.where(eq(schema.santriSmk.id, existingSmk.id));
+			}
+		} else {
+			await db.insert(schema.santriSmk).values({
+				santriId,
+				startYear: earliestSmk.year,
+				startMonth: earliestSmk.month
+			});
+		}
+	}
+
+	if (earliestSmp) {
+		if (existingSmp) {
+			const existingKey = existingSmp.startYear * 12 + existingSmp.startMonth;
+			const candidateKey = earliestSmp.year * 12 + earliestSmp.month;
+			if (candidateKey < existingKey) {
+				await db.update(schema.santriSmp)
+					.set({ startYear: earliestSmp.year, startMonth: earliestSmp.month })
+					.where(eq(schema.santriSmp.id, existingSmp.id));
+			}
+		} else {
+			await db.insert(schema.santriSmp).values({
+				santriId,
+				startYear: earliestSmp.year,
+				startMonth: earliestSmp.month
+			});
+		}
+	}
+}
+
 function getEffectiveNominal({ santriRow, jenisRow, customNominalRow }) {
 	const hasCustomNominal = customNominalRow !== undefined;
 	const customNominal = customNominalRow?.nominal;
@@ -374,6 +537,8 @@ export async function load() {
 			id: schema.santri.id,
 			nomorInduk: schema.santri.nomorInduk,
 			namaLengkap: schema.santri.namaLengkap,
+			tanggalMasuk: schema.santri.tanggalMasuk,
+			tanggalKeluar: schema.santri.tanggalKeluar,
 			kategoriId: schema.santri.kategoriId,
 			nominalKonsumsi: schema.kategoriSantri.nominalKonsumsi,
 			namaKategori: schema.kategoriSantri.namaKategori
@@ -383,6 +548,10 @@ export async function load() {
 		.where(eq(schema.santri.isActive, true));
 	const tahunAjarans = await db.select().from(schema.tahunAjaran);
 	const jenisPembayarans = await db.select().from(schema.jenisPembayaran);
+	const kategoriSantris = await db.select().from(schema.kategoriSantri);
+	const santriSmk = await db.select().from(schema.santriSmk);
+	const santriSmp = await db.select().from(schema.santriSmp);
+	const santriKategoriTahun = await db.select().from(schema.santriKategoriTahun);
 
 	// Ambil riwayat pembayaran terbaru (10 terakhir) - order by ID descending untuk yang terbaru di atas
 	const riwayatData = await db
@@ -444,6 +613,10 @@ export async function load() {
 		riwayatData,
 		pembayaranReguler,
 		kategoriGratis,
+		kategoriSantris,
+		santriSmk,
+		santriSmp,
+		santriKategoriTahun,
 		tunggakanImport,
 		khususJenisId: jenisKhusus?.id || null
 	};
@@ -530,6 +703,13 @@ export const actions = {
 					}).returning();
 					pembayarLainId = newPembayar?.id || null;
 				}
+			}
+
+			if (santriId) {
+				await syncEarliestBillingStart({
+					santriId,
+					normalizedItems
+				});
 			}
 
 			const pembayaranValues = normalizedItems.map((item, index) => {

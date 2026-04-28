@@ -11,6 +11,7 @@
 		page.url.pathname.includes('/master/santri') ? 'Data Santri' :
 		page.url.pathname.includes('/master/jenis-pembayaran') ? 'Jenis Pembayaran' :
 		page.url.pathname.includes('/transaksi/input') ? 'Input Pembayaran' :
+		page.url.pathname.includes('/transaksi/tambah-tagihan-khusus') ? 'Tambahkan Tagihan Khusus' :
 		page.url.pathname.includes('/transaksi/riwayat') ? 'Riwayat Pembayaran' :
 		page.url.pathname.includes('/transaksi/rekapitulasi') ? 'Rekapitulasi Pembayaran' :
 		page.url.pathname.includes('/transaksi/rekap-individu') ? 'Rekapitulasi Individu' :

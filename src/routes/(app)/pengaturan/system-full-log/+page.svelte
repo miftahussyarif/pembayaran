@@ -4,7 +4,9 @@
 	const formatTanggal = (t) =>
 		t ? new Date(t).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
 
-	const exportUrl = `/pengaturan/system-full-log/export.csv?start=${encodeURIComponent(data.filters.start || '')}&end=${encodeURIComponent(data.filters.end || '')}&userId=${encodeURIComponent(data.filters.userId || '')}`;
+	let exportUrl = $derived(
+		`/pengaturan/system-full-log/export.csv?start=${encodeURIComponent(data.filters.start || '')}&end=${encodeURIComponent(data.filters.end || '')}&userId=${encodeURIComponent(data.filters.userId || '')}`
+	);
 </script>
 
 <div class="mb-6">

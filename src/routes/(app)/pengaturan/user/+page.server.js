@@ -46,6 +46,8 @@ export const actions = {
 		const role = data.get('role')?.toString() || 'petugas';
 		const namaLengkap = data.get('namaLengkap')?.toString().trim() || '';
 		const signatureFile = data.get('signatureFile');
+		const telegramBotToken = data.get('telegramBotToken')?.toString().trim() || null;
+		const telegramChatId = data.get('telegramChatId')?.toString().trim() || null;
 
 		if (!isValidUsername(username)) {
 			return { type: 'error', message: 'Username hanya boleh 3-32 karakter: huruf, angka, titik, garis bawah, atau strip.' };
@@ -75,7 +77,9 @@ export const actions = {
 				passwordHash,
 				role,
 				namaLengkap,
-				signatureUrl
+				signatureUrl,
+				telegramBotToken,
+				telegramChatId
 			});
 			return { type: 'success', message: 'User baru berhasil ditambahkan.' };
 		} catch (e) {
@@ -92,6 +96,8 @@ export const actions = {
 		const namaLengkap = data.get('namaLengkap')?.toString().trim() || '';
 		const role = data.get('role')?.toString() || 'petugas';
 		const signatureFile = data.get('signatureFile');
+		const telegramBotToken = data.get('telegramBotToken')?.toString().trim() || null;
+		const telegramChatId = data.get('telegramChatId')?.toString().trim() || null;
 
 		if (!Number.isInteger(id) || id <= 0) {
 			return { type: 'error', message: 'ID user tidak valid.' };
@@ -110,7 +116,8 @@ export const actions = {
 			if (signatureFile && typeof signatureFile === 'object' && signatureFile.size > 0) {
 				signatureUrl = await saveSignature(signatureFile);
 			}
-			const updateData = signatureUrl ? { namaLengkap, role, signatureUrl } : { namaLengkap, role };
+			const updateData = { namaLengkap, role, telegramBotToken, telegramChatId };
+			if (signatureUrl) updateData.signatureUrl = signatureUrl;
 			await db.update(schema.users)
 				.set(updateData)
 				.where(eq(schema.users.id, id));

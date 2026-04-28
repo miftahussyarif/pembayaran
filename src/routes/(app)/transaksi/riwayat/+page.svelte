@@ -119,7 +119,7 @@
 						<td class="text-sm font-medium">{r.tahunNama || '-'}</td>
 						<td class="text-right font-bold text-sm text-success">{formatRupiah(r.totalNominal)}</td>
 						<td class="text-center">
-							<button type="button" class="btn btn-xs btn-ghost" 
+							<button type="button" class="btn btn-xs btn-ghost" aria-label={`Toggle detail kwitansi ${r.nomorKwitansi}`} title="Lihat detail kwitansi"
 								onclick={(e) => { e.stopPropagation(); toggleKwitansi(r.nomorKwitansi); }}>
 								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" class:rotate-180={expandedKwitansi.has(r.nomorKwitansi)} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
 							</button>

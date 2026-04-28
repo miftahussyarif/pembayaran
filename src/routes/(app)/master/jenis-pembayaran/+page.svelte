@@ -1,6 +1,7 @@
 <script>
 	import { enhance } from '$app/forms';
-	let { data } = $props();
+	let { data, form } = $props();
+	let deleteError = $state('');
 
 	let hapusJp = $state(null);
 	let editJp = $state(null);
@@ -47,6 +48,14 @@
 		Tambah Jenis
 	</button>
 </div>
+
+{#if deleteError}
+	<div class="alert alert-error mb-4 shadow-sm">
+		<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+		<span>{deleteError}</span>
+		<button class="btn btn-ghost btn-xs" onclick={() => deleteError = ''}>✕</button>
+	</div>
+{/if}
 
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 	{#each data.jenisPembayarans as jp}
@@ -96,7 +105,15 @@
 			<button class="btn" type="button" onclick={() => { modal_hapus_jp.close(); hapusJp = null; }}>Batal</button>
 			<form method="POST" action="?/delete"
 				use:enhance={() => {
-					return async ({ update }) => { await update(); modal_hapus_jp.close(); hapusJp = null; };
+					return async ({ update, result }) => {
+						await update();
+						if (result?.data?.success === false) {
+							deleteError = result.data.error || 'Gagal menghapus jenis pembayaran.';
+						} else {
+							deleteError = '';
+						}
+						modal_hapus_jp.close(); hapusJp = null;
+					};
 				}}>
 				<input type="hidden" name="id" value={hapusJp?.id} />
 				<button type="submit" class="btn btn-error">Ya, Hapus</button>

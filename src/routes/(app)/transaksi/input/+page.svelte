@@ -9,6 +9,7 @@
 	let selectedTahunAjaranId = $state('');
 	let selectedBulan = $state('');
 	let selectedTahunTagihan = $state('');
+	let selectedSisipkanTahun = $state('');
 	let isSubmitting = $state(false);
 	let santriSearch = $state('');
 	let isKhusus = $state(false);
@@ -23,10 +24,40 @@
 		'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
 		'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
 	];
+
+	const BULAN_SHORT = {
+		Januari: 'Jan',
+		Februari: 'Feb',
+		Maret: 'Mar',
+		April: 'Apr',
+		Mei: 'Mei',
+		Juni: 'Jun',
+		Juli: 'Jul',
+		Agustus: 'Agu',
+		September: 'Sep',
+		Oktober: 'Okt',
+		November: 'Nov',
+		Desember: 'Des'
+	};
+
+	const TIPE_LABELS = {
+		bulanan: 'Bulanan',
+		tahunan: 'Tahunan',
+		sekali: 'Sekali',
+		smk_bulanan: 'SMK Bulanan',
+		smk_tahunan: 'SMK Tahunan',
+		smk_sekali: 'SMK Sekali',
+		smp_bulanan: 'SMP Bulanan',
+		smp_tahunan: 'SMP Tahunan',
+		smp_sekali: 'SMP Sekali'
+	};
 	
 	let selectedJenis = $derived(data.jenisPembayarans.find(j => j.id == selectedJenisId) || null);
 	let selectedSantri = $derived(data.santris.find(s => s.id == selectedSantriId) || null);
 	let selectedTahunAjaran = $derived(data.tahunAjarans.find((ta) => ta.id == selectedTahunAjaranId) || null);
+	let kategoriSantriById = $derived(new Map((data.kategoriSantris || []).map((item) => [item.id, item])));
+	let santriSmkBySantriId = $derived(new Map((data.santriSmk || []).map((item) => [item.santriId, item])));
+	let santriSmpBySantriId = $derived(new Map((data.santriSmp || []).map((item) => [item.santriId, item])));
 	let regularPayments = $derived((data.pembayaranReguler || []).filter((p) => !p.keteranganKhusus));
 	let importedTunggakan = $derived(data.tunggakanImport || []);
 	let filteredSantris = $derived.by(() => {
@@ -173,9 +204,13 @@
 		if (paymentItems.length > 0) return selectedTahunAjaranId !== '';
 		if (!selectedTahunAjaranId) return false;
 		if (isKhusus) {
+			const khususLunas = selectedKhususPaymentStatus?.isLunas;
+			const exceedsSisa = selectedKhususPaymentStatus && nominal > selectedKhususPaymentStatus.sisa;
 			return (selectedSantriId || namaPembayarManual.trim().length > 0) &&
 				keteranganKhusus.trim().length > 0 &&
-				nominal > 0;
+				nominal > 0 &&
+				!khususLunas &&
+				!exceedsSisa;
 		}
 		if (!selectedSantriId) return false;
 		return selectedJenisId &&
@@ -256,6 +291,471 @@
 			.sort((a, b) => a.label.localeCompare(b.label, 'id'));
 	});
 
+	// Status pembayaran tagihan khusus yang sedang dipilih (untuk cicilan)
+	let selectedKhususPaymentStatus = $derived.by(() => {
+		if (!isKhusus || !selectedSantriId || !selectedTahunAjaranId || !data.khususJenisId || !keteranganKhusus.trim()) return null;
+
+		const keteranganNorm = keteranganKhusus.trim().toLowerCase();
+
+		// Cari total tagihan dari tunggakan import
+		const totalTagihan = importedTunggakan
+			.filter((item) =>
+				item.santriId == selectedSantriId &&
+				item.tahunAjaranId == selectedTahunAjaranId &&
+				item.jenisPembayaranId == data.khususJenisId &&
+				String(item.keteranganKhusus || '').trim().toLowerCase() === keteranganNorm
+			)
+			.reduce((sum, item) => sum + Number(item.nominalTagihan || 0), 0);
+
+		if (totalTagihan <= 0) return null;
+
+		// Cari total sudah dibayar
+		const totalDibayar = (data.pembayaranReguler || [])
+			.filter((payment) =>
+				payment.santriId == selectedSantriId &&
+				payment.tahunAjaranId == selectedTahunAjaranId &&
+				payment.jenisPembayaranId == data.khususJenisId &&
+				String(payment.keteranganKhusus || '').trim().toLowerCase() === keteranganNorm
+			)
+			.reduce((sum, payment) => sum + Number(payment.nominalDibayar || 0), 0);
+
+		const sisa = Math.max(0, totalTagihan - totalDibayar);
+
+		return {
+			totalTagihan,
+			totalDibayar,
+			sisa,
+			isLunas: totalDibayar >= totalTagihan && totalTagihan > 0
+		};
+	});
+
+	function parseTahunAjaranRange(tahunAjaranNama) {
+		const normalized = String(tahunAjaranNama || '').trim();
+		const slashMatch = normalized.match(/^(\d{4})\s*\/\s*(\d{4})$/);
+		if (slashMatch) {
+			return { startYear: Number(slashMatch[1]), endYear: Number(slashMatch[2]), mode: 'academic' };
+		}
+
+		const directYearMatch = normalized.match(/(\d{4})/);
+		if (directYearMatch) {
+			const year = Number(directYearMatch[1]);
+			return { startYear: year, endYear: year, mode: 'calendar' };
+		}
+
+		const currentYear = new Date().getFullYear();
+		return { startYear: currentYear, endYear: currentYear, mode: 'calendar' };
+	}
+
+	function getTahunAjaranBounds(tahunAjaranNama) {
+		const { startYear, endYear, mode } = parseTahunAjaranRange(tahunAjaranNama);
+		if (mode === 'academic' && startYear !== endYear) {
+			return {
+				start: new Date(startYear, 6, 1),
+				end: new Date(endYear, 5, 1)
+			};
+		}
+
+		return {
+			start: new Date(startYear, 0, 1),
+			end: new Date(endYear, 11, 1)
+		};
+	}
+
+	function getMonthsForYearInTahunAjaran(tahunAjaranNama, selectedYearValue) {
+		const selectedYearNumber = Number(selectedYearValue || 0);
+		if (!selectedYearNumber) return [];
+
+		const { startYear, endYear, mode } = parseTahunAjaranRange(tahunAjaranNama);
+		if (mode === 'academic' && startYear !== endYear) {
+			if (selectedYearNumber === startYear) {
+				return BULAN_NAMES.slice(6);
+			}
+			if (selectedYearNumber === endYear) {
+				return BULAN_NAMES.slice(0, 6);
+			}
+			return [];
+		}
+
+		return [...BULAN_NAMES];
+	}
+
+	function formatMonthYearLabel(bulan, tahun) {
+		if (!bulan) return tahun ? String(tahun) : '-';
+		return `${BULAN_SHORT[bulan] || bulan} ${tahun}`;
+	}
+
+	function getPeriodeDate(year, monthIndex) {
+		return new Date(year, monthIndex, 1);
+	}
+
+	function getApplicableWindow(jenis, santri) {
+		if (!jenis || !santri) return null;
+
+		if (jenis.tipe.startsWith('smk_')) {
+			const smkInfo = santriSmkBySantriId.get(santri.id);
+			if (!smkInfo) return null;
+			return {
+				start: new Date(smkInfo.startYear, (smkInfo.startMonth || 1) - 1, 1),
+				end: smkInfo.endYear && smkInfo.endMonth
+					? new Date(smkInfo.endYear, smkInfo.endMonth - 1, 1)
+					: null
+			};
+		}
+
+		if (jenis.tipe.startsWith('smp_')) {
+			const smpInfo = santriSmpBySantriId.get(santri.id);
+			if (!smpInfo) return null;
+			return {
+				start: new Date(smpInfo.startYear, (smpInfo.startMonth || 1) - 1, 1),
+				end: smpInfo.endYear && smpInfo.endMonth
+					? new Date(smpInfo.endYear, smpInfo.endMonth - 1, 1)
+					: null
+			};
+		}
+
+		return {
+			start: santri.tanggalMasuk ? new Date(santri.tanggalMasuk) : null,
+			end: santri.tanggalKeluar ? new Date(santri.tanggalKeluar) : null
+		};
+	}
+
+	function getKategoriIdsForTahun(santriId, tahunAjaranId, fallbackKategoriId) {
+		const categoryIds = new Set();
+		for (const row of data.santriKategoriTahun || []) {
+			if (row.santriId == santriId && row.tahunAjaranId == tahunAjaranId) {
+				categoryIds.add(row.kategoriId);
+			}
+		}
+		if (categoryIds.size === 0 && fallbackKategoriId) {
+			categoryIds.add(fallbackKategoriId);
+		}
+		return [...categoryIds];
+	}
+
+	function getKategoriNamesForTahun(santriId, tahunAjaranId, fallbackKategoriId) {
+		const ids = getKategoriIdsForTahun(santriId, tahunAjaranId, fallbackKategoriId);
+		const names = ids
+			.map((id) => kategoriSantriById.get(id)?.namaKategori)
+			.filter(Boolean);
+		return names.length ? names.join(', ') : (selectedSantri?.namaKategori || '-');
+	}
+
+	function getEffectiveNominalForSantri(jenis, santri, tahunAjaranId) {
+		if (!jenis || !santri) return 0;
+
+		const kategoriIds = getKategoriIdsForTahun(santri.id, tahunAjaranId, santri.kategoriId);
+		for (const kategoriId of kategoriIds) {
+			const mapping = data.kategoriGratis.find((item) =>
+				item.kategoriId == kategoriId &&
+				item.jenisPembayaranId == jenis.id &&
+				item.nominal !== null
+			);
+			if (mapping) return Number(mapping.nominal || 0);
+		}
+
+		if (/konsumsi/i.test(jenis.namaPembayaran) && santri?.nominalKonsumsi !== undefined) {
+			return Number(santri.nominalKonsumsi || 0);
+		}
+
+		return Number(jenis.nominalDefault || 0);
+	}
+
+	function sumImportedTagihan({ santriId, tahunAjaranId, jenisPembayaranId, bulan = null, tahunTagihan = null, keteranganKhusus = null }) {
+		return importedTunggakan
+			.filter((item) =>
+				item.santriId == santriId &&
+				item.tahunAjaranId == tahunAjaranId &&
+				item.jenisPembayaranId == jenisPembayaranId &&
+				String(item.bulan || '') === String(bulan || '') &&
+				String(item.tahunTagihan || '') === String(tahunTagihan || '') &&
+				String(item.keteranganKhusus || '').trim().toLowerCase() === String(keteranganKhusus || '').trim().toLowerCase()
+			)
+			.reduce((sum, item) => sum + Number(item.nominalTagihan || 0), 0);
+	}
+
+	function getFirstApplicablePeriodeYear(jenis, santri, tahunAjaranNama) {
+		const window = getApplicableWindow(jenis, santri);
+		const tahunBounds = getTahunAjaranBounds(tahunAjaranNama);
+		if (!window?.start) return tahunBounds.start.getFullYear();
+
+		const start = new Date(window.start.getFullYear(), window.start.getMonth(), 1);
+		const taStart = new Date(tahunBounds.start.getFullYear(), tahunBounds.start.getMonth(), 1);
+		const effectiveStart = start > taStart ? start : taStart;
+
+		const taEnd = new Date(tahunBounds.end.getFullYear(), tahunBounds.end.getMonth(), 1);
+		if (effectiveStart > taEnd) return null;
+		if (window.end) {
+			const end = new Date(window.end.getFullYear(), window.end.getMonth(), 1);
+			if (end < effectiveStart) return null;
+		}
+
+		return effectiveStart.getFullYear();
+	}
+
+	function appendPaymentItems(itemsToAppend) {
+		batchError = '';
+		if (!itemsToAppend.length) {
+			batchError = 'Tidak ada item tagihan yang bisa disisipkan.';
+			return;
+		}
+
+		if (paymentItems.length > 0) {
+			const first = paymentItems[0];
+			const mismatch = itemsToAppend.some((item) =>
+				String(first.santriId || '') !== String(item.santriId || '') ||
+				String(first.tahunAjaranId) !== String(item.tahunAjaranId)
+			);
+			if (mismatch) {
+				batchError = 'Multi payment harus untuk santri dan tahun ajaran yang sama.';
+				return;
+			}
+		}
+
+		const existingKeys = new Set(
+			paymentItems.map((item) =>
+				[
+					String(item.jenisPembayaranId),
+					String(item.bulan || ''),
+					String(item.tahunTagihan || ''),
+					String(item.keteranganKhusus || '').trim().toLowerCase()
+				].join('|')
+			)
+		);
+		const uniqueItems = itemsToAppend.filter((item) => {
+			const key = [
+				String(item.jenisPembayaranId),
+				String(item.bulan || ''),
+				String(item.tahunTagihan || ''),
+				String(item.keteranganKhusus || '').trim().toLowerCase()
+			].join('|');
+			if (existingKeys.has(key)) return false;
+			existingKeys.add(key);
+			return true;
+		});
+
+		if (!uniqueItems.length) {
+			batchError = 'Semua item tagihan yang dipilih sudah ada di daftar.';
+			return;
+		}
+
+		paymentItems = [...paymentItems, ...uniqueItems];
+	}
+
+	let sisipkanTagihanRows = $derived.by(() => {
+		if (!selectedSantriId || !selectedTahunAjaranId || !selectedSisipkanTahun || !selectedSantri || !selectedTahunAjaran) {
+			return [];
+		}
+
+		const santri = selectedSantri;
+		const tahunAjaranId = Number(selectedTahunAjaranId);
+		const selectedYearNumber = Number(selectedSisipkanTahun);
+		if (!selectedYearNumber) return [];
+
+		const results = [];
+		const kategoriNama = getKategoriNamesForTahun(santri.id, tahunAjaranId, santri.kategoriId);
+
+		for (const jenis of data.jenisPembayarans.filter((item) => item.namaPembayaran !== 'Pembayaran Lain-lain')) {
+			const tipe = jenis.tipe || '';
+			const isBulananJenis = tipe.endsWith('bulanan');
+			const isTahunanJenis = tipe.endsWith('tahunan');
+			const isSekaliJenis = tipe.endsWith('sekali');
+			const window = getApplicableWindow(jenis, santri);
+			if (window === null) continue;
+
+			const nominalDefault = getEffectiveNominalForSantri(jenis, santri, tahunAjaranId);
+			if (nominalDefault <= 0) continue;
+
+			if (isBulananJenis) {
+				const targetMonths = getMonthsForYearInTahunAjaran(selectedTahunAjaran.nama, selectedYearNumber);
+				const missingMonths = [];
+				const items = [];
+
+				for (const bulan of targetMonths) {
+					const monthIndex = BULAN_NAMES.indexOf(bulan);
+					const periodeDate = getPeriodeDate(selectedYearNumber, monthIndex);
+					if (window.start) {
+						const startDate = new Date(window.start.getFullYear(), window.start.getMonth(), 1);
+						if (periodeDate < startDate) continue;
+					}
+					if (window.end) {
+						const endDate = new Date(window.end.getFullYear(), window.end.getMonth(), 1);
+						if (periodeDate > endDate) continue;
+					}
+
+					const importedTotal = sumImportedTagihan({
+						santriId: santri.id,
+						tahunAjaranId,
+						jenisPembayaranId: jenis.id,
+						bulan,
+						tahunTagihan: selectedYearNumber
+					});
+					const totalTagihan = importedTotal > 0 ? importedTotal : nominalDefault;
+					const totalDibayar = regularPayments
+						.filter((payment) =>
+							payment.santriId == santri.id &&
+							payment.tahunAjaranId == tahunAjaranId &&
+							payment.jenisPembayaranId == jenis.id &&
+							payment.bulan === bulan &&
+							String(payment.tahunTagihan || '') === String(selectedYearNumber)
+						)
+						.reduce((sum, payment) => sum + Number(payment.nominalDibayar || 0), 0);
+					const sisa = Math.max(0, totalTagihan - totalDibayar);
+					if (sisa <= 0) continue;
+
+					missingMonths.push(formatMonthYearLabel(bulan, selectedYearNumber));
+					items.push({
+						santriId: santri.id,
+						tahunAjaranId,
+						jenisPembayaranId: jenis.id,
+						nominalDibayar: sisa,
+						bulan,
+						tahunTagihan: String(selectedYearNumber),
+						keteranganKhusus: '',
+						namaPembayarManual: '',
+						label: jenis.namaPembayaran,
+						periode: `${bulan} ${selectedYearNumber}`
+					});
+				}
+
+				if (items.length > 0) {
+					results.push({
+						key: `jenis-${jenis.id}-${selectedYearNumber}`,
+						mode: 'regular',
+						namaPembayaran: jenis.namaPembayaran,
+						tipeLabel: TIPE_LABELS[tipe] || tipe,
+						kategoriNama,
+						customLabel: '-',
+						detail: missingMonths.join(', '),
+						totalNominal: items.reduce((sum, item) => sum + Number(item.nominalDibayar || 0), 0),
+						items
+					});
+				}
+				continue;
+			}
+
+			const firstApplicableYear = getFirstApplicablePeriodeYear(jenis, santri, selectedTahunAjaran.nama);
+			if (!firstApplicableYear || firstApplicableYear !== selectedYearNumber) continue;
+
+			const importedTotal = sumImportedTagihan({
+				santriId: santri.id,
+				tahunAjaranId,
+				jenisPembayaranId: jenis.id
+			});
+			const totalTagihan = importedTotal > 0 ? importedTotal : nominalDefault;
+			const totalDibayar = regularPayments
+				.filter((payment) =>
+					payment.santriId == santri.id &&
+					payment.tahunAjaranId == tahunAjaranId &&
+					payment.jenisPembayaranId == jenis.id
+				)
+				.reduce((sum, payment) => sum + Number(payment.nominalDibayar || 0), 0);
+			const sisa = Math.max(0, totalTagihan - totalDibayar);
+			if (sisa <= 0) continue;
+
+			results.push({
+				key: `jenis-${jenis.id}-${selectedYearNumber}`,
+				mode: 'regular',
+				namaPembayaran: jenis.namaPembayaran,
+				tipeLabel: TIPE_LABELS[tipe] || tipe,
+				kategoriNama,
+				customLabel: '-',
+				detail: isTahunanJenis
+					? `Kurang ${formatRupiah(sisa)}`
+					: `Belum lunas, sisa ${formatRupiah(sisa)}`,
+				totalNominal: sisa,
+				items: [{
+					santriId: santri.id,
+					tahunAjaranId,
+					jenisPembayaranId: jenis.id,
+					nominalDibayar: sisa,
+					bulan: '',
+					tahunTagihan: '',
+					keteranganKhusus: '',
+					namaPembayarManual: '',
+					label: jenis.namaPembayaran,
+					periode: selectedTahunAjaran.nama || ''
+				}]
+			});
+		}
+
+		const customOutstanding = [];
+		for (const item of importedTunggakan) {
+			if (
+				item.santriId != santri.id ||
+				item.tahunAjaranId != tahunAjaranId ||
+				item.jenisPembayaranId != data.khususJenisId ||
+				!item.keteranganKhusus
+			) {
+				continue;
+			}
+
+			if (item.tahunTagihan && Number(item.tahunTagihan) !== selectedYearNumber) continue;
+			if (item.bulan && !getMonthsForYearInTahunAjaran(selectedTahunAjaran.nama, selectedYearNumber).includes(item.bulan)) continue;
+
+			customOutstanding.push(item);
+		}
+
+		const customGrouped = new Map();
+		for (const item of customOutstanding) {
+			const key = String(item.keteranganKhusus || '').trim().toLowerCase();
+			if (!customGrouped.has(key)) {
+				customGrouped.set(key, {
+					label: item.keteranganKhusus,
+					totalTagihan: 0,
+					details: []
+				});
+			}
+			const target = customGrouped.get(key);
+			target.totalTagihan += Number(item.nominalTagihan || 0);
+			target.details.push(formatMonthYearLabel(item.bulan, item.tahunTagihan));
+		}
+
+		for (const item of customGrouped.values()) {
+			const totalDibayar = (data.pembayaranReguler || [])
+				.filter((payment) =>
+					payment.santriId == santri.id &&
+					payment.tahunAjaranId == tahunAjaranId &&
+					payment.jenisPembayaranId == data.khususJenisId &&
+					String(payment.keteranganKhusus || '').trim().toLowerCase() === String(item.label || '').trim().toLowerCase()
+				)
+				.reduce((sum, payment) => sum + Number(payment.nominalDibayar || 0), 0);
+			const sisa = Math.max(0, item.totalTagihan - totalDibayar);
+			if (sisa <= 0) continue;
+
+			results.push({
+				key: `custom-${item.label}`,
+				mode: 'custom',
+				namaPembayaran: 'Pembayaran Lain-lain',
+				tipeLabel: 'Custom',
+				kategoriNama,
+				customLabel: item.label,
+				detail: `Kurang ${formatRupiah(sisa)}${item.details.length ? ` · ${item.details.filter((value) => value !== '-').join(', ')}` : ''}`,
+				totalNominal: sisa,
+				items: [{
+					santriId: santri.id,
+					tahunAjaranId,
+					jenisPembayaranId: data.khususJenisId,
+					nominalDibayar: sisa,
+					bulan: '',
+					tahunTagihan: '',
+					keteranganKhusus: item.label,
+					namaPembayarManual: '',
+					label: item.label,
+					periode: ''
+				}]
+			});
+		}
+
+		return results.sort((a, b) => {
+			if (a.mode !== b.mode) return a.mode.localeCompare(b.mode);
+			return a.namaPembayaran.localeCompare(b.namaPembayaran, 'id');
+		});
+	});
+
+	let totalSisipkanTagihan = $derived(
+		sisipkanTagihanRows.reduce((sum, row) => sum + Number(row.totalNominal || 0), 0)
+	);
+
 	// Auto-fill nominal ketika memilih jenis pembayaran & santri
 	$effect(() => {
 		if (isKhusus) return; // Jangan auto-fill untuk pembayaran khusus
@@ -297,6 +797,19 @@
 		const nextDefault = inferDefaultTahunTagihan(selectedTahunAjaran?.nama, selectedBulan);
 		if (!selectedTahunTagihan || !tahunTagihanOptions.includes(Number(selectedTahunTagihan))) {
 			selectedTahunTagihan = nextDefault;
+		}
+	});
+
+	$effect(() => {
+		const options = getTahunTagihanOptions(selectedTahunAjaran?.nama);
+		if (!options.length) {
+			selectedSisipkanTahun = '';
+			return;
+		}
+
+		const currentValue = Number(selectedSisipkanTahun || 0);
+		if (!currentValue || !options.includes(currentValue)) {
+			selectedSisipkanTahun = String(options[0]);
 		}
 	});
 
@@ -348,38 +861,26 @@
 	}
 
 	function addCurrentPaymentItem() {
-		batchError = '';
 		const item = buildCurrentPaymentItem();
 		if (!item) {
+			batchError = '';
 			batchError = 'Lengkapi item pembayaran terlebih dahulu sebelum ditambahkan.';
 			return;
 		}
-
-		if (paymentItems.length > 0) {
-			const first = paymentItems[0];
-			if (String(first.santriId || '') !== String(item.santriId || '') || String(first.tahunAjaranId) !== String(item.tahunAjaranId)) {
-				batchError = 'Multi payment harus untuk santri dan tahun ajaran yang sama.';
-				return;
-			}
-		}
-
-		const duplicate = paymentItems.some((existing) =>
-			String(existing.jenisPembayaranId) === String(item.jenisPembayaranId) &&
-			String(existing.bulan || '') === String(item.bulan || '') &&
-			String(existing.tahunTagihan || '') === String(item.tahunTagihan || '') &&
-			String(existing.keteranganKhusus || '') === String(item.keteranganKhusus || '')
-		);
-		if (duplicate) {
-			batchError = 'Item pembayaran ini sudah ada di daftar.';
-			return;
-		}
-
-		paymentItems = [...paymentItems, item];
-		resetDraft();
+		appendPaymentItems([item]);
+		if (!batchError) resetDraft();
 	}
 
 	function removePaymentItem(index) {
 		paymentItems = paymentItems.filter((_, idx) => idx !== index);
+	}
+
+	function insertSisipkanRow(row) {
+		appendPaymentItems(row.items || []);
+	}
+
+	function insertAllSisipkanRows() {
+		appendPaymentItems(sisipkanTagihanRows.flatMap((row) => row.items || []));
 	}
 
 	function validateFormBeforeSubmit() {
@@ -698,7 +1199,7 @@
 								bind:value={nominal}
 								class="input input-bordered w-full font-bold text-lg"
 								min={isGratis ? 0 : 1}
-								max={(isTahunan || isSekali) && selectedPaymentStatus ? selectedPaymentStatus.sisa : undefined}
+								max={(isTahunan || isSekali) && selectedPaymentStatus ? selectedPaymentStatus.sisa : (isKhusus && selectedKhususPaymentStatus ? selectedKhususPaymentStatus.sisa : undefined)}
 								readonly={!isKhusus && !isTahunan && !isSekali}
 							/>
 							{#if nominal <= 0 && !isGratis && !isKhusus && paymentItems.length === 0}
@@ -710,6 +1211,24 @@
 								<div class="label pt-2 pb-0">
 									<span class="label-text-alt text-error">Nominal pembayaran lain-lain harus lebih dari 0</span>
 								</div>
+							{/if}
+							{#if isKhusus && selectedKhususPaymentStatus}
+								<div class="label pt-2 pb-0">
+									<span class={`label-text-alt font-medium ${selectedKhususPaymentStatus.isLunas ? 'text-success' : 'text-base-content/70'}`}>
+										Tagihan: {selectedKhususPaymentStatus.totalTagihan.toLocaleString('id-ID')} ·
+										Sudah dibayar: {selectedKhususPaymentStatus.totalDibayar.toLocaleString('id-ID')} ·
+										Sisa: {selectedKhususPaymentStatus.sisa.toLocaleString('id-ID')}
+									</span>
+								</div>
+								{#if selectedKhususPaymentStatus.isLunas}
+									<div class="label pt-1 pb-0">
+										<span class="label-text-alt text-success font-medium">✓ Tagihan khusus "{keteranganKhusus}" sudah lunas</span>
+									</div>
+								{:else}
+									<div class="label pt-1 pb-0">
+										<span class="label-text-alt text-warning font-medium">💡 Boleh dicicil — masukkan nominal sesuai kemampuan</span>
+									</div>
+								{/if}
 							{/if}
 							{#if isGratis}
 								<div class="label pt-2 pb-0">
@@ -750,6 +1269,88 @@
 							{/if}
 						</div>
 					</div>
+
+					{#if selectedSantriId && selectedTahunAjaranId}
+						<div class="mt-6 rounded-xl border border-info/20 bg-info/5 p-4">
+							<div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+								<div>
+									<h3 class="font-semibold text-info">Sisipkan Tagihan</h3>
+									<p class="text-sm text-base-content/70">Daftar ini mengambil jenis pembayaran, kategori santri, tagihan custom, dan detail kekurangan pada tahun tagihan yang dipilih.</p>
+								</div>
+								<div class="flex flex-col gap-3 sm:flex-row sm:items-end">
+									<div class="form-control w-full sm:w-48">
+										<label for="selectedSisipkanTahun" class="label py-1">
+											<span class="label-text text-xs font-medium text-info">Tahun Tagihan</span>
+										</label>
+										<select id="selectedSisipkanTahun" class="select select-bordered select-sm w-full" bind:value={selectedSisipkanTahun}>
+											{#each getTahunTagihanOptions(selectedTahunAjaran?.nama) as tahun}
+												<option value={String(tahun)}>{tahun}</option>
+											{/each}
+										</select>
+									</div>
+									<button
+										type="button"
+										class="btn btn-sm btn-info text-info-content"
+										onclick={insertAllSisipkanRows}
+										disabled={sisipkanTagihanRows.length === 0}
+									>
+										Sisipkan Semua
+									</button>
+								</div>
+							</div>
+
+							<div class="mt-4 overflow-x-auto">
+								<table class="table table-sm w-full">
+									<thead>
+										<tr class="bg-base-100">
+											<th>Jenis Pembayaran</th>
+											<th>Kategori Santri</th>
+											<th>Detail Kekurangan</th>
+											<th>Jenis Tagihan Custom</th>
+											<th class="text-right">Nominal</th>
+											<th class="text-center">Aksi</th>
+										</tr>
+									</thead>
+									<tbody>
+										{#if sisipkanTagihanRows.length === 0}
+											<tr>
+												<td colspan="6" class="py-6 text-center text-sm text-base-content/60">
+													Tidak ada tagihan kurang untuk tahun {selectedSisipkanTahun || '-'}.
+												</td>
+											</tr>
+										{:else}
+											{#each sisipkanTagihanRows as row}
+												<tr>
+													<td>
+														<div class="font-medium">{row.namaPembayaran}</div>
+														<div class="text-xs text-base-content/60">{row.tipeLabel}</div>
+													</td>
+													<td class="text-sm">{row.kategoriNama}</td>
+													<td class="text-sm text-base-content/80">{row.detail}</td>
+													<td class="text-sm">{row.customLabel}</td>
+													<td class="text-right font-semibold">{formatRupiah(row.totalNominal)}</td>
+													<td class="text-center">
+														<button type="button" class="btn btn-xs btn-outline btn-info" onclick={() => insertSisipkanRow(row)}>
+															Sisipkan
+														</button>
+													</td>
+												</tr>
+											{/each}
+										{/if}
+									</tbody>
+									{#if sisipkanTagihanRows.length > 0}
+										<tfoot>
+											<tr class="font-semibold">
+												<td colspan="4" class="text-right">Total Tagihan Tersedia</td>
+												<td class="text-right text-info">{formatRupiah(totalSisipkanTagihan)}</td>
+												<td></td>
+											</tr>
+										</tfoot>
+									{/if}
+								</table>
+							</div>
+						</div>
+					{/if}
 
 					<div class="divider"></div>
 

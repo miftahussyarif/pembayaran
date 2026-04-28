@@ -68,24 +68,33 @@ export const actions = {
 		const data = await request.formData();
 		const id = Number(data.get('id'));
 		
-		// Delete related category mappings first
-		await db.delete(schema.kategoriGratis).where(eq(schema.kategoriGratis.jenisPembayaranId, id));
-		// Delete the payment type
-		await db.delete(schema.jenisPembayaran).where(eq(schema.jenisPembayaran.id, id));
 		try {
-			await db.insert(schema.systemLogs).values({
-				userId: locals.user?.id || null,
-				username: locals.user?.username || null,
-				role: locals.user?.role || null,
-				aksi: 'delete',
-				modul: 'master-jenis-pembayaran',
-				keterangan: `Hapus jenis pembayaran id=${id}`,
-				ip: getClientAddress(),
-				createdAt: new Date().toISOString()
-			});
-		} catch (e) {
-			// ignore logging errors
+			// Delete related category mappings first
+			await db.delete(schema.kategoriGratis).where(eq(schema.kategoriGratis.jenisPembayaranId, id));
+			// Delete the payment type
+			await db.delete(schema.jenisPembayaran).where(eq(schema.jenisPembayaran.id, id));
+			try {
+				await db.insert(schema.systemLogs).values({
+					userId: locals.user?.id || null,
+					username: locals.user?.username || null,
+					role: locals.user?.role || null,
+					aksi: 'delete',
+					modul: 'master-jenis-pembayaran',
+					keterangan: `Hapus jenis pembayaran id=${id}`,
+					ip: getClientAddress(),
+					createdAt: new Date().toISOString()
+				});
+			} catch (e) {
+				// ignore logging errors
+			}
+			return { success: true };
+		} catch (error) {
+			console.error('Error deleting jenis pembayaran:', error);
+			const msg = String(error?.message || '').toLowerCase();
+			if (msg.includes('foreign key') || msg.includes('constraint')) {
+				return { success: false, error: 'Tidak bisa menghapus jenis pembayaran karena masih digunakan oleh data pembayaran atau data tunggakan. Hapus data terkait terlebih dahulu.' };
+			}
+			return { success: false, error: 'Gagal menghapus jenis pembayaran.' };
 		}
-		return { success: true };
 	}
 };
