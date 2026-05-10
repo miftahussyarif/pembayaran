@@ -82,13 +82,40 @@
 	});
 
 	const sortedSantris = $derived.by(() => {
-		const list = [...filteredSantris];
-		list.sort((a, b) => {
-			const av = a.namaLengkap.toLowerCase();
-			const bv = b.namaLengkap.toLowerCase();
-			return av.localeCompare(bv, 'id');
-		});
-		return list;
+	       const list = [...filteredSantris];
+	       if (sortBy === 'nama') {
+		       list.sort((a, b) => {
+			       const av = a.namaLengkap?.toLowerCase() || '';
+			       const bv = b.namaLengkap?.toLowerCase() || '';
+			       return av.localeCompare(bv, 'id');
+		       });
+	       } else if (sortBy === 'nomorInduk') {
+		       list.sort((a, b) => {
+			       const av = a.nomorInduk?.toString() || '';
+			       const bv = b.nomorInduk?.toString() || '';
+			       return av.localeCompare(bv, 'id');
+		       });
+	       } else if (sortBy === 'tanggalMasukTerbaru') {
+		       list.sort((a, b) => {
+			       const av = a.tanggalMasuk ? new Date(a.tanggalMasuk) : new Date(0);
+			       const bv = b.tanggalMasuk ? new Date(b.tanggalMasuk) : new Date(0);
+			       return bv - av;
+		       });
+	       } else if (sortBy === 'tanggalMasukTerlama') {
+		       list.sort((a, b) => {
+			       const av = a.tanggalMasuk ? new Date(a.tanggalMasuk) : new Date(0);
+			       const bv = b.tanggalMasuk ? new Date(b.tanggalMasuk) : new Date(0);
+			       return av - bv;
+		       });
+	       } else {
+		       // fallback ke nama
+		       list.sort((a, b) => {
+			       const av = a.namaLengkap?.toLowerCase() || '';
+			       const bv = b.namaLengkap?.toLowerCase() || '';
+			       return av.localeCompare(bv, 'id');
+		       });
+	       }
+	       return list;
 	});
 
 	// === Multi-kategori form state untuk Tambah ===
@@ -192,12 +219,15 @@
 	<div class="form-control w-full sm:w-56">
 		<label class="label py-0" for="sort-select"><span class="label-text text-xs">Sorting</span></label>
 		<select id="sort-select" class="select select-sm select-bordered w-full" bind:value={sortBy} onchange={() => { filterValue = ''; }}>
-			<option value="nama">Nama Santri</option>
-			<option value="kategori">Kategori Santri</option>
-			<option value="tahun_ajaran">Tahun Ajaran</option>
-			<option value="kabupaten">Alamat: Kabupaten</option>
-			<option value="kecamatan">Alamat: Kecamatan</option>
-			<option value="provinsi">Alamat: Provinsi</option>
+			   <option value="nama">Nama Santri</option>
+			   <option value="nomorInduk">Nomor Induk</option>
+			   <option value="tanggalMasukTerbaru">Tanggal Masuk Terbaru</option>
+			   <option value="tanggalMasukTerlama">Tanggal Masuk Terlama</option>
+			   <option value="kategori">Kategori Santri</option>
+			   <option value="tahun_ajaran">Tahun Ajaran</option>
+			   <option value="kabupaten">Alamat: Kabupaten</option>
+			   <option value="kecamatan">Alamat: Kecamatan</option>
+			   <option value="provinsi">Alamat: Provinsi</option>
 		</select>
 	</div>
 	<div class="form-control w-full sm:w-56">
@@ -295,26 +325,21 @@
 	<div class="overflow-x-auto">
 		<table class="table table-zebra table-sm sm:table-md w-full">
 			<thead>
-				<tr>
-					{#if isAdmin}
-						<th class="print:hidden">
-							<input id="selectAllSantri" type="checkbox" class="checkbox checkbox-sm"
-								checked={selectedSantris.length > 0 && selectedSantris.length === sortedSantris.length}
-								onchange={(e) => {
-									if (e.target.checked) selectedSantris = sortedSantris.map(s => s.id);
-									else selectedSantris = [];
-								}} />
-						</th>
-					{/if}
-					<th>No</th>
-					<th>Nomor Induk</th>
-					<th>Nama Lengkap</th>
-					<th>Kategori</th>
-					<th>Tanggal Masuk</th>
-					<th>Tanggal Keluar</th>
-					<th>Status</th>
-					<th class="print:hidden">Aksi</th>
-				</tr>
+				   <tr>
+					   {#if isAdmin}
+						   <th class="w-10 print:hidden">{''}</th>
+					   {/if}
+					   <th class="w-12">No</th>
+					   <th class="w-32">Nomor Induk</th>
+					   <th class="min-w-48">Nama Lengkap</th>
+					   <th class="w-40">Kategori</th>
+					   <th class="w-36">Tanggal Masuk</th>
+					   <th class="w-36">Tanggal Keluar</th>
+					   <th class="w-28">Status</th>
+					   {#if !window?.matchMedia?.('print').matches}
+						   <th class="w-48 print:hidden">Aksi</th>
+					   {/if}
+				   </tr>
 			</thead>
 			<tbody>
 				{#if data.santris.length === 0}
@@ -322,66 +347,70 @@
 						<td colspan={isAdmin ? 9 : 8} class="text-center py-4">Belum ada data santri.</td>
 					</tr>
 				{/if}
-				{#each sortedSantris as santri, i}
-					<tr>
-						{#if isAdmin}
-							<td>
-								<input id={`selectSantri-${santri.id}`} type="checkbox" class="checkbox checkbox-sm checkbox-primary"
-									checked={selectedSantris.includes(santri.id)}
-									onchange={(e) => {
-										if (e.target.checked) selectedSantris = [...selectedSantris, santri.id];
-										else selectedSantris = selectedSantris.filter(id => id !== santri.id);
-									}} />
-							</td>
-						{/if}
-						<td>{i + 1}</td>
-						<td class="font-medium text-base-content/80 text-sm">{santri.nomorInduk}</td>
-						<td class="font-semibold">{santri.namaLengkap}</td>
-						<td>
-						{#if santri.kategoriTahun?.length}
-							{@const labels = getLatestKategoriLabels(santri)}
-							<div class="flex flex-wrap gap-1">
-								{#each labels as label}
-									<span class="badge badge-outline badge-sm">{label}</span>
-								{/each}
-							</div>
-						{:else if santri.kategoriId}
-							{@const kat = data.kategoris.find(k => k.id === santri.kategoriId)}
-							{#if kat}<span class="badge badge-outline badge-sm">{kat.namaKategori}</span>{/if}
-						{:else}
-							<span class="text-base-content/40 text-xs">-</span>
-						{/if}
-					</td>
-						<td class="text-sm">{santri.tanggalMasuk || '-'}</td>
-						<td class="text-sm">{santri.tanggalKeluar || '-'}</td>
-						<td>
-							{#if santri.isActive}
-								<div class="badge badge-success badge-sm gap-1"><span class="w-1.5 h-1.5 rounded-full bg-white"></span> Aktif</div>
-							{:else}
-								<div class="badge badge-ghost badge-sm">Berhenti</div>
-							{/if}
-						</td>
-						<td class="flex gap-1 flex-wrap print:hidden">
-							<button class="btn btn-xs btn-outline btn-primary" onclick={() => openEdit(santri)}>
-								<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-								Edit
-							</button>
-							<a class="btn btn-xs btn-outline btn-secondary" href={`/master/santri/cetak/${santri.id}`} target="_blank" rel="noopener">
-								<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-								Cetak
-							</a>
-							<form method="POST" action="?/toggleAktif" class="inline">
-								<input type="hidden" name="id" value={santri.id} />
-								<button type="submit" class="btn btn-xs btn-outline {santri.isActive ? 'btn-error' : 'btn-success'}">
-									{santri.isActive ? 'Nonaktifkan' : 'Aktifkan'}
-								</button>
-							</form>
-							<form method="POST" action="?/delete" class="inline">
-								<input type="hidden" name="id" value={santri.id} />
-								<button type="submit" class="btn btn-xs btn-ghost text-error" onclick={(e) => { if(!confirm('Hapus santri ini?')) e.preventDefault() }}>Hapus</button>
-							</form>
-						</td>
-					</tr>
+				   {#each sortedSantris as santri, i}
+					   <tr>
+						   {#if isAdmin}
+							   <td class="w-10 print:hidden">
+								   <input id={`selectSantri-${santri.id}`} type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+									   checked={selectedSantris.includes(santri.id)}
+									   onchange={(e) => {
+										   if (e.target.checked) selectedSantris = [...selectedSantris, santri.id];
+										   else selectedSantris = selectedSantris.filter(id => id !== santri.id);
+									   }} />
+							   </td>
+						   {/if}
+						   <td class="w-12">{i + 1}</td>
+						   <td class="w-32 font-medium text-base-content/80 text-sm">{santri.nomorInduk}</td>
+						   <td class="min-w-48 font-semibold">{santri.namaLengkap}</td>
+						   <td class="w-40">
+						   {#if santri.kategoriTahun?.length}
+							   {@const labels = getLatestKategoriLabels(santri)}
+							   <div class="flex flex-wrap gap-1">
+								   {#each labels as label}
+									   <span class="badge badge-outline badge-sm">{label}</span>
+								   {/each}
+							   </div>
+						   {:else if santri.kategoriId}
+							   {@const kat = data.kategoris.find(k => k.id === santri.kategoriId)}
+							   {#if kat}<span class="badge badge-outline badge-sm">{kat.namaKategori}</span>{/if}
+						   {:else}
+							   <span class="text-base-content/40 text-xs">-</span>
+						   {/if}
+					   </td>
+						   <td class="w-36 text-sm">{santri.tanggalMasuk || '-'}</td>
+						   <td class="w-36 text-sm">{santri.tanggalKeluar || '-'}</td>
+						   <td class="w-28">
+							   {#if santri.isActive}
+								   <div class="badge badge-success badge-sm gap-1"><span class="w-1.5 h-1.5 rounded-full bg-white"></span> Aktif</div>
+							   {:else}
+								   <div class="badge badge-ghost badge-sm">Berhenti</div>
+							   {/if}
+						   </td>
+						   {#if !window?.matchMedia?.('print').matches}
+						   <td class="w-48 print:hidden">
+							   <div class="flex gap-1 flex-wrap">
+							   <button class="btn btn-xs btn-outline btn-primary" onclick={() => openEdit(santri)}>
+								   <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+								   Edit
+							   </button>
+							   <a class="btn btn-xs btn-outline btn-secondary" href={`/master/santri/cetak/${santri.id}`} target="_blank" rel="noopener">
+								   <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+								   Cetak
+							   </a>
+							   <form method="POST" action="?/toggleAktif" class="inline">
+								   <input type="hidden" name="id" value={santri.id} />
+								   <button type="submit" class="btn btn-xs btn-outline {santri.isActive ? 'btn-error' : 'btn-success'}">
+									   {santri.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+								   </button>
+							   </form>
+							   <form method="POST" action="?/delete" class="inline">
+								   <input type="hidden" name="id" value={santri.id} />
+								   <button type="submit" class="btn btn-xs btn-ghost text-error" onclick={(e) => { if(!confirm('Hapus santri ini?')) e.preventDefault() }}>Hapus</button>
+							   </form>
+							   </div>
+						   </td>
+						   {/if}
+					   </tr>
 				{/each}
 			</tbody>
 		</table>
