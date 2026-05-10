@@ -42,6 +42,11 @@
 			.card { max-width: none !important; box-shadow: none !important; }
 			.badge { font-size: 9px !important; padding-left: 0.35rem !important; padding-right: 0.35rem !important; }
 		}
+		.photo-3x4-box {
+			width: 3cm;
+			height: 4cm;
+			border: 1px solid currentColor;
+		}
 	</style>
 </svelte:head>
 
@@ -79,6 +84,11 @@
 							<tr><td class="text-base-content/60">Status</td><td>{data.santri.isActive ? 'Aktif' : 'Berhenti'}</td></tr>
 						</tbody>
 					</table>
+					<div class="mt-3">
+						<div class="photo-3x4-box flex items-center justify-center text-[10px] text-base-content/40">
+							3x4
+						</div>
+					</div>
 				</div>
 				<div class="border border-base-200 rounded-lg p-3">
 					<h3 class="font-semibold text-sm text-primary mb-2">Identitas Peserta Didik</h3>

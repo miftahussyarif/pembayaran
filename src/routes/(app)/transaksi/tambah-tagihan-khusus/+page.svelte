@@ -7,20 +7,35 @@
 
 	const isAdmin = $derived($page.data.user?.role === 'admin');
 
-	let searchSantri = $state('');
+	let santriSearch = $state('');
 	let selectedSantriId = $state('');
 	let selectedTahunAjaranId = $state('');
 	let isSubmitting = $state(false);
 	let isDeleting = $state(false);
 
+	// Combobox state
+	let santriDropdownOpen = $state(false);
+	let santriHighlightIndex = $state(-1);
+	let santriComboboxRef = $state(null);
+	let santriInputRef = $state(null);
+
+	let selectedSantri = $derived(data.santris.find(s => s.id == selectedSantriId) || null);
+
 	let filteredSantris = $derived.by(() => {
-		const query = searchSantri.trim().toLowerCase();
-		if (!query) return data.santris;
-		return data.santris.filter((santri) => {
-			const nama = String(santri.namaLengkap || '').toLowerCase();
-			const nomor = String(santri.nomorInduk || '').toLowerCase();
-			return nama.includes(query) || nomor.includes(query);
-		});
+		const query = santriSearch.trim().toLowerCase();
+		let list = data.santris;
+		if (query) {
+			list = data.santris.filter((santri) => {
+				const nama = String(santri.namaLengkap || '').toLowerCase();
+				const nomor = String(santri.nomorInduk || '').toLowerCase();
+				return nama.includes(query) || nomor.includes(query);
+			});
+		}
+		if (selectedSantriId && !list.some((s) => s.id == selectedSantriId)) {
+			const selected = data.santris.find((s) => s.id == selectedSantriId);
+			if (selected) list = [selected, ...list];
+		}
+		return list;
 	});
 
 	$effect(() => {
@@ -61,22 +76,133 @@
 				>
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 						<div class="form-control md:col-span-2">
-							<label class="label" for="searchSantri"><span class="label-text font-medium">Santri</span></label>
-							<input
-								id="searchSantri"
-								type="text"
-								class="input input-bordered mb-2"
-								placeholder="Cari nama atau nomor induk..."
-								bind:value={searchSantri}
-							/>
-							<select id="santriId" name="santriId" class="select select-bordered" bind:value={selectedSantriId} required>
-								<option value="" disabled selected>Pilih santri...</option>
-								{#each filteredSantris as santri}
-									<option value={santri.id}>
-										{santri.nomorInduk} - {santri.namaLengkap} ({santri.namaKategori || 'Tanpa Kategori'})
-									</option>
-								{/each}
-							</select>
+							<label class="label" for="santriSearchTagihan"><span class="label-text font-medium">Santri</span></label>
+							<input type="hidden" name="santriId" value={selectedSantriId} />
+							<!-- svelte-ignore a11y_role_has_required_aria_attrs -->
+							<div
+								class="relative"
+								bind:this={santriComboboxRef}
+								role="combobox"
+								onfocusout={(e) => {
+									setTimeout(() => {
+										if (santriComboboxRef && !santriComboboxRef.contains(document.activeElement)) {
+											santriDropdownOpen = false;
+										}
+									}, 150);
+								}}
+							>
+								{#if selectedSantriId && selectedSantri && !santriDropdownOpen}
+									<!-- Display selected santri -->
+									<div
+										class="input input-bordered w-full flex items-center gap-2 cursor-pointer bg-base-100 pr-2"
+										role="button"
+										tabindex="0"
+										onclick={() => {
+											santriDropdownOpen = true;
+											santriSearch = '';
+											santriHighlightIndex = -1;
+											setTimeout(() => santriInputRef?.focus(), 0);
+										}}
+										onkeydown={(e) => {
+											if (e.key === 'Enter' || e.key === ' ') {
+												e.preventDefault();
+												santriDropdownOpen = true;
+												santriSearch = '';
+												santriHighlightIndex = -1;
+												setTimeout(() => santriInputRef?.focus(), 0);
+											}
+										}}
+									>
+										<span class="flex-1 truncate text-sm">
+											<span class="font-semibold">{selectedSantri.nomorInduk}</span>
+											<span class="mx-1">—</span>
+											<span>{selectedSantri.namaLengkap}</span>
+											<span class="text-base-content/50 ml-1">({selectedSantri.namaKategori || 'Tanpa Kategori'})</span>
+										</span>
+										<button
+											type="button"
+											class="btn btn-ghost btn-xs btn-circle text-base-content/40 hover:text-error"
+											onclick={(e) => {
+												e.stopPropagation();
+												selectedSantriId = '';
+												santriSearch = '';
+												santriDropdownOpen = false;
+											}}
+											title="Hapus pilihan"
+										>✕</button>
+									</div>
+								{:else}
+									<!-- Search input -->
+									<input
+										id="santriSearchTagihan"
+										type="text"
+										placeholder="Ketik nama atau nomor induk untuk mencari..."
+										class="input input-bordered w-full"
+										autocomplete="off"
+										bind:this={santriInputRef}
+										bind:value={santriSearch}
+										onfocus={() => {
+											santriDropdownOpen = true;
+											santriHighlightIndex = -1;
+										}}
+										oninput={() => {
+											santriDropdownOpen = true;
+											santriHighlightIndex = -1;
+										}}
+										onkeydown={(e) => {
+											if (e.key === 'ArrowDown') {
+												e.preventDefault();
+												santriHighlightIndex = Math.min(santriHighlightIndex + 1, filteredSantris.length - 1);
+											} else if (e.key === 'ArrowUp') {
+												e.preventDefault();
+												santriHighlightIndex = Math.max(santriHighlightIndex - 1, 0);
+											} else if (e.key === 'Enter') {
+												e.preventDefault();
+												if (santriHighlightIndex >= 0 && santriHighlightIndex < filteredSantris.length) {
+													selectedSantriId = filteredSantris[santriHighlightIndex].id;
+													santriSearch = '';
+													santriDropdownOpen = false;
+													santriHighlightIndex = -1;
+												}
+											} else if (e.key === 'Escape') {
+												santriDropdownOpen = false;
+												santriHighlightIndex = -1;
+											}
+										}}
+									/>
+								{/if}
+
+								<!-- Dropdown list -->
+								{#if santriDropdownOpen}
+									<div class="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-lg border border-base-300 bg-base-100 shadow-lg">
+										{#if filteredSantris.length === 0}
+											<div class="px-4 py-3 text-sm text-base-content/50 text-center">
+												Tidak ada santri yang cocok.
+											</div>
+										{:else}
+											{#each filteredSantris as s, idx}
+												<button
+													type="button"
+													class="w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2
+														{idx === santriHighlightIndex ? 'bg-primary/10 text-primary' : 'hover:bg-base-200'}
+														{s.id == selectedSantriId ? 'bg-primary/5 font-semibold' : ''}"
+													onmouseenter={() => santriHighlightIndex = idx}
+													onclick={() => {
+														selectedSantriId = s.id;
+														santriSearch = '';
+														santriDropdownOpen = false;
+														santriHighlightIndex = -1;
+													}}
+												>
+													<span class="font-mono text-xs text-base-content/60 w-16 shrink-0">{s.nomorInduk}</span>
+													<span class="flex-1 truncate">{s.namaLengkap}</span>
+													<span class="badge badge-sm badge-ghost text-xs">{s.namaKategori || 'Tanpa Kategori'}</span>
+												</button>
+											{/each}
+										{/if}
+									</div>
+								{/if}
+							</div>
 						</div>
 
 						<div class="form-control">
@@ -105,7 +231,7 @@
 					</div>
 
 					<div class="flex justify-end mt-6">
-						<button type="submit" class="btn btn-primary" disabled={isSubmitting}>
+						<button type="submit" class="btn btn-primary" disabled={isSubmitting || !selectedSantriId}>
 							{#if isSubmitting}
 								<span class="loading loading-spinner loading-sm"></span>
 								Menyimpan...

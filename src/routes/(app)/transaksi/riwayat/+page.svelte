@@ -1,5 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { page } from '$app/stores';
 	let { data, form } = $props();
 
 	let hapusRiwayat = $state(null); // transaksi yang akan dihapus
@@ -16,13 +17,59 @@
 		}
 		expandedKwitansi = expandedKwitansi; // trigger reactivity
 	}
+
+	const HARI_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+	const cetakWaktu = $derived.by(() => {
+		const now = new Date();
+		const hari = HARI_NAMES[now.getDay()];
+		const tanggal = now.toLocaleDateString("id-ID", {
+			day: "2-digit",
+			month: "long",
+			year: "numeric",
+		});
+		return `${hari}, ${tanggal}`;
+	});
 </script>
 
 <svelte:head>
 	<title>Riwayat Pembayaran</title>
+	<style>
+		@media print {
+			@page {
+				size: landscape;
+			}
+			:global(body) {
+				background-color: white !important;
+			}
+			:global(.drawer-toggle), :global(.drawer-side), :global(.navbar), :global(footer) {
+				display: none !important;
+			}
+			.print-meta {
+				display: block !important;
+			}
+			.card {
+				border: none !important;
+				box-shadow: none !important;
+			}
+			table {
+				font-size: 12px;
+			}
+		}
+		.print-meta {
+			display: none;
+		}
+		.print-only {
+			display: none;
+		}
+		@media print {
+			.print-only {
+				display: block;
+			}
+		}
+	</style>
 </svelte:head>
 
-<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+<div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 print:hidden">
 	<div>
 		<h2 class="text-2xl font-bold">Riwayat Pembayaran</h2>
 		<p class="text-sm text-base-content/60 mt-1">Total {data.riwayat.length} {data.mode === 'per-kwitansi' ? 'kwitansi' : 'transaksi'} ditemukan</p>
@@ -36,13 +83,13 @@
 </div>
 
 {#if form?.message}
-	<div class="alert {form.type === 'error' ? 'alert-error' : 'alert-success'} mb-4 py-2 text-sm rounded-lg">
+	<div class="alert {form.type === 'error' ? 'alert-error' : 'alert-success'} mb-4 py-2 text-sm rounded-lg no-print">
 		<span>{form.message}</span>
 	</div>
 {/if}
 
 <!-- Filter -->
-<div class="card bg-base-100 shadow-sm border border-base-200 mb-4">
+<div class="card bg-base-100 shadow-sm border border-base-200 mb-4 print:hidden">
 	<div class="card-body py-3 px-4">
 		<form method="GET" action="/transaksi/riwayat" class="flex flex-wrap gap-3 items-end">
 			<div class="form-control flex-1 min-w-48">
@@ -74,9 +121,19 @@
 				{#if data.filterSantri || data.filterTahun}
 					<a href="/transaksi/riwayat?mode={data.mode}" class="btn btn-sm btn-ghost">Reset</a>
 				{/if}
+				<button type="button" class="btn btn-sm btn-outline" onclick={() => window.print()}>
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+					Cetak
+				</button>
 			</div>
 		</form>
 	</div>
+</div>
+
+<!-- Print Header -->
+<div class="print-only mb-4 text-center">
+	<h2 class="text-xl font-bold">Riwayat Pembayaran</h2>
+	<p class="font-medium mt-1">Santri: {data.filterSantri || 'Semua Santri'}</p>
 </div>
 
 <!-- Tabel Riwayat -->
@@ -93,7 +150,7 @@
 					<th>Detail Pembayaran</th>
 					<th>Tahun</th>
 					<th class="text-right">Total Nominal</th>
-					<th class="text-center">Aksi</th>
+					<th class="text-center no-print">Aksi</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -118,7 +175,7 @@
 						</td>
 						<td class="text-sm font-medium">{r.tahunNama || '-'}</td>
 						<td class="text-right font-bold text-sm text-success">{formatRupiah(r.totalNominal)}</td>
-						<td class="text-center">
+						<td class="text-center print:hidden">
 							<button type="button" class="btn btn-xs btn-ghost" aria-label={`Toggle detail kwitansi ${r.nomorKwitansi}`} title="Lihat detail kwitansi"
 								onclick={(e) => { e.stopPropagation(); toggleKwitansi(r.nomorKwitansi); }}>
 								<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 transition-transform" class:rotate-180={expandedKwitansi.has(r.nomorKwitansi)} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
@@ -138,7 +195,7 @@
 								</td>
 								<td class="text-xs text-base-content/60"></td>
 								<td class="text-right font-semibold text-sm text-success">{formatRupiah(item.nominalDibayar)}</td>
-								<td class="text-center">
+								<td class="text-center print:hidden">
 									{#if data.isAdmin}
 										<button class="btn btn-xs btn-ghost text-error"
 											onclick={() => { hapusRiwayat = item; modal_hapus_riwayat.showModal(); }}
@@ -180,7 +237,7 @@
 					<th>Tahun</th>
 					<th>Status</th>
 					<th class="text-right">Nominal</th>
-					<th class="text-center">Aksi</th>
+					<th class="text-center no-print">Aksi</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -218,7 +275,7 @@
 							</span>
 						</td>
 						<td class="text-right font-bold text-sm text-success">{formatRupiah(r.nominalDibayar)}</td>
-						<td class="text-center">
+						<td class="text-center no-print">
 							<div class="flex gap-1 justify-center">
 								<a href="/transaksi/cetak/{r.id}"
 									class="btn btn-xs btn-outline btn-primary gap-1" title="Cetak Ulang Kwitansi">
@@ -254,6 +311,16 @@
 			{/if}
 		</table>
 		{/if}
+	</div>
+</div>
+
+<!-- Print Metadata Footer -->
+<div class="print-meta mt-8 text-sm">
+	<div class="flex justify-between items-start">
+		<div class="flex-1">
+			<p>Dicetak pada {cetakWaktu}</p>
+			<p>Oleh <span class="font-medium">{$page.data.user?.namaLengkap || $page.data.user?.username || 'Petugas'}</span></p>
+		</div>
 	</div>
 </div>
 

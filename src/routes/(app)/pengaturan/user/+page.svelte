@@ -38,6 +38,7 @@
 						<th>Username</th>
 						<th>Nama Lengkap</th>
 						<th>Role</th>
+						<th>OTP 2FA</th>
 						<th>Tanda Tangan</th>
 						<th class="text-right">Aksi</th>
 					</tr>
@@ -51,6 +52,16 @@
 								<span class="badge badge-sm badge-outline uppercase text-[10px] {u.role === 'admin' ? 'badge-primary' : (u.role === 'bendahara' ? 'badge-info' : 'badge-warning')}">
 									{u.role}
 								</span>
+							</td>
+							<td>
+								<div class="flex flex-col gap-1">
+									<span class={`badge badge-sm ${u.otp2faEnabled === false ? 'badge-ghost' : 'badge-success'}`}>
+										{u.otp2faEnabled === false ? 'OTP Nonaktif' : 'OTP Aktif'}
+									</span>
+									{#if !u.telegramBotToken || !u.telegramChatId}
+										<span class="text-[10px] text-base-content/40">Pakai bot sistem jika tersedia</span>
+									{/if}
+								</div>
 							</td>
 							<td>
 								{#if u.signatureUrl}
@@ -67,6 +78,15 @@
 									<button class="btn btn-xs btn-outline btn-warning" onclick={() => { passwordUser = {...u}; modal_reset_pw.showModal(); }}>
 										Reset PW
 									</button>
+									<form method="POST" action="?/toggleOtp2fa" use:enhance class="inline">
+										<input type="hidden" name="id" value={u.id} />
+										<button
+											type="submit"
+											class={`btn btn-xs btn-outline ${u.otp2faEnabled === false ? 'btn-success' : 'btn-error'}`}
+										>
+											{u.otp2faEnabled === false ? 'OTP ON' : 'OTP OFF'}
+										</button>
+									</form>
 									{#if u.username !== 'admin'}
 										<button class="btn btn-xs btn-ghost text-error" onclick={() => { hapusUser = {...u}; modal_konfirmasi_hapus.showModal(); }}>
 											Hapus

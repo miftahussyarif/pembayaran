@@ -28,6 +28,12 @@ export async function load({ params }) {
 		if (!byTahun.has(row.tahunAjaranId)) byTahun.set(row.tahunAjaranId, []);
 		byTahun.get(row.tahunAjaranId).push(row.kategoriId);
 	}
+	// Helper: extract first year number from tahun ajaran name for proper sorting
+	const extractYear = (nama) => {
+		const match = String(nama || '').match(/(\d{4})/);
+		return match ? Number(match[1]) : 0;
+	};
+
 	const kategoriTahunList = [...byTahun.entries()]
 		.map(([tahunAjaranId, kategoriIds]) => ({
 			tahunNama: allTahunAjarans.find((t) => t.id === tahunAjaranId)?.nama || String(tahunAjaranId),
@@ -36,7 +42,7 @@ export async function load({ params }) {
 				.map((kid) => allKategoris.find((k) => k.id === kid)?.namaKategori || '')
 				.filter(Boolean)
 		}))
-		.sort((a, b) => b.tahunAjaranId - a.tahunAjaranId);
+		.sort((a, b) => extractYear(a.tahunNama) - extractYear(b.tahunNama));
 
 	// Fallback: jika belum ada di relasi baru, pakai kategoriId lama
 	let kategori = null;

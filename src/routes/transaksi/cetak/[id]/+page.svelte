@@ -84,6 +84,9 @@
 								{:else}
 									{item.namaPembayaran || 'Pembayaran'}
 								{/if}
+								{#if item.keteranganDetail}
+									<div class="payment-detail">{item.keteranganDetail}</div>
+								{/if}
 								{#if item.bulan}
 									<span class="bulan-badge">
 										Bulan: {item.bulan}{item.tahunTagihan ? ` ${item.tahunTagihan}` : ''}
@@ -303,6 +306,12 @@
 		margin-left: 6px;
 		color: #6b7280;
 	}
+	.payment-detail {
+		margin-top: 3px;
+		font-size: 10.5px;
+		color: #4b5563;
+		font-style: italic;
+	}
 	.total-row {
 		background: #f0f0ff;
 	}
@@ -510,6 +519,10 @@
 			font-size: 5pt;
 			padding: 0.5pt 2pt;
 			margin-left: 3px;
+		}
+		.payment-detail {
+			margin-top: 1pt;
+			font-size: 5pt;
 		}
 		.total-row td {
 			font-size: 7pt;

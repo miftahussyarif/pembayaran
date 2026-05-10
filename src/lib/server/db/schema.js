@@ -88,6 +88,15 @@ export const santriSmp = sqliteTable('santri_smp', {
 	endYear: integer('end_year')
 });
 
+export const santriKeaktifan = sqliteTable('santri_keaktifan', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	santriId: integer('santri_id').references(() => santri.id).notNull(),
+	bulan: integer('bulan').notNull(),
+	tahun: integer('tahun').notNull(),
+	isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+	updatedAt: text('updated_at').notNull()
+});
+
 export const pembayarLain = sqliteTable('pembayar_lain', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	namaPembayar: text('nama_pembayar').notNull(),
@@ -135,7 +144,8 @@ export const users = sqliteTable('users', {
 	signatureUrl: text('signature_url'),
 	sessionId: text('session_id'),
 	telegramBotToken: text('telegram_bot_token'),
-	telegramChatId: text('telegram_chat_id')
+	telegramChatId: text('telegram_chat_id'),
+	otp2faEnabled: integer('otp_2fa_enabled', { mode: 'boolean' }).notNull().default(true)
 });
 
 export const mutasiSaldoBendahara = sqliteTable('mutasi_saldo_bendahara', {
@@ -187,5 +197,6 @@ export const santriKategoriTahun = sqliteTable('santri_kategori_tahun', {
 export const loginAttempts = sqliteTable('login_attempts', {
 	ip: text('ip').primaryKey(),
 	attempts: integer('attempts').notNull().default(0),
-	lockUntil: text('lock_until')
+	lockUntil: text('lock_until'),
+	lastAttemptAt: text('last_attempt_at')
 });

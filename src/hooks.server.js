@@ -133,6 +133,8 @@ export const handle = async ({ event, resolve }) => {
 				path === '/' ||
 				path === '/master/santri' ||
 				path.startsWith('/master/santri/') ||
+				path === '/master/keaktifan-santri' ||
+				path.startsWith('/master/keaktifan-santri/') ||
 				path === '/master/data-siswa-smk' ||
 				path.startsWith('/master/data-siswa-smk/') ||
 				path === '/master/data-siswa-smp' ||

@@ -18,6 +18,12 @@
 	let paymentItems = $state([]);
 	let batchError = $state('');
 
+	// Combobox state for santri search
+	let santriDropdownOpen = $state(false);
+	let santriHighlightIndex = $state(-1);
+	let santriComboboxRef = $state(null);
+	let santriInputRef = $state(null);
+
 	const formatRupiah = (n) => 'Rp ' + (n || 0).toLocaleString('id-ID');
 
 	const BULAN_NAMES = [
@@ -60,6 +66,33 @@
 	let santriSmpBySantriId = $derived(new Map((data.santriSmp || []).map((item) => [item.santriId, item])));
 	let regularPayments = $derived((data.pembayaranReguler || []).filter((p) => !p.keteranganKhusus));
 	let importedTunggakan = $derived(data.tunggakanImport || []);
+
+	// Helper: resolve current category for a santri from santriKategoriTahun
+	// Prefers the active tahun ajaran, then the latest (highest id) tahun ajaran
+	function getSantriKategoriLabel(santriId, fallbackNamaKategori) {
+		const rows = (data.santriKategoriTahun || []).filter(r => r.santriId == santriId);
+		if (!rows.length) return fallbackNamaKategori || null;
+
+		// Try to find categories for the active tahun ajaran first
+		const activeTahun = data.tahunAjarans.find(t => t.isActive);
+		if (activeTahun) {
+			const activeRows = rows.filter(r => r.tahunAjaranId == activeTahun.id);
+			if (activeRows.length) {
+				const names = activeRows
+					.map(r => kategoriSantriById.get(r.kategoriId)?.namaKategori)
+					.filter(Boolean);
+				if (names.length) return names.join(', ');
+			}
+		}
+
+		// Fallback: use the highest tahunAjaranId (latest year)
+		const maxTahunId = Math.max(...rows.map(r => r.tahunAjaranId));
+		const latestRows = rows.filter(r => r.tahunAjaranId === maxTahunId);
+		const names = latestRows
+			.map(r => kategoriSantriById.get(r.kategoriId)?.namaKategori)
+			.filter(Boolean);
+		return names.length ? names.join(', ') : (fallbackNamaKategori || null);
+	}
 	let filteredSantris = $derived.by(() => {
 		const query = santriSearch.trim().toLowerCase();
 		let list = data.santris;
@@ -1012,23 +1045,135 @@
 				}}>
 					<input type="hidden" name="paymentItemsJson" value={paymentItemsJson} />
 					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<!-- Pilih Santri -->
+						<!-- Pilih Santri (Searchable Combobox) -->
 						<div class="form-control w-full">
-							<label for="santriId" class="label"><span class="label-text font-medium">Santri</span></label>
-							<input id="santriSearch" name="santriSearch" type="text" placeholder="Cari nama atau nomor induk..." class="input input-bordered w-full mb-2" bind:value={santriSearch} />
-							<select id="santriId" name="santriId" class="select select-bordered w-full" bind:value={selectedSantriId}>
-								<option value="" selected>Pilih Santri...</option>
-								{#each filteredSantris as santri}
-									<option value={santri.id}>
-										{santri.nomorInduk} - {santri.namaLengkap} ({santri.namaKategori || 'Tanpa Kategori'})
-									</option>
-								{/each}
-							</select>
-							{#if santriSearch && filteredSantris.length === 0}
-								<div class="label pt-2 pb-0">
-									<span class="label-text-alt text-base-content/60">Tidak ada santri yang cocok.</span>
-								</div>
-							{/if}
+							<label for="santriSearch" class="label"><span class="label-text font-medium">Santri</span></label>
+							<input type="hidden" name="santriId" value={selectedSantriId} />
+							<!-- svelte-ignore a11y_role_has_required_aria_attrs -->
+							<div
+								class="relative"
+								bind:this={santriComboboxRef}
+								role="combobox"
+								onfocusout={(e) => {
+									setTimeout(() => {
+										if (santriComboboxRef && !santriComboboxRef.contains(document.activeElement)) {
+											santriDropdownOpen = false;
+										}
+									}, 150);
+								}}
+							>
+								{#if selectedSantriId && selectedSantri && !santriDropdownOpen}
+									<!-- Display selected santri -->
+									<div
+										class="input input-bordered w-full flex items-center gap-2 cursor-pointer bg-base-100 pr-2"
+										role="button"
+										tabindex="0"
+										onclick={() => {
+											santriDropdownOpen = true;
+											santriSearch = '';
+											santriHighlightIndex = -1;
+											setTimeout(() => santriInputRef?.focus(), 0);
+										}}
+										onkeydown={(e) => {
+											if (e.key === 'Enter' || e.key === ' ') {
+												e.preventDefault();
+												santriDropdownOpen = true;
+												santriSearch = '';
+												santriHighlightIndex = -1;
+												setTimeout(() => santriInputRef?.focus(), 0);
+											}
+										}}
+									>
+										<span class="flex-1 truncate text-sm">
+											<span class="font-semibold">{selectedSantri.nomorInduk}</span>
+											<span class="mx-1">—</span>
+											<span>{selectedSantri.namaLengkap}</span>
+											<span class="text-base-content/50 ml-1">({getSantriKategoriLabel(selectedSantri.id, selectedSantri.namaKategori) || 'Tanpa Kategori'})</span>
+										</span>
+										<button
+											type="button"
+											class="btn btn-ghost btn-xs btn-circle text-base-content/40 hover:text-error"
+											onclick={(e) => {
+												e.stopPropagation();
+												selectedSantriId = '';
+												santriSearch = '';
+												santriDropdownOpen = false;
+											}}
+											title="Hapus pilihan"
+										>✕</button>
+									</div>
+								{:else}
+									<!-- Search input -->
+									<input
+										id="santriSearch"
+										type="text"
+										placeholder="Ketik nama atau nomor induk untuk mencari..."
+										class="input input-bordered w-full"
+										autocomplete="off"
+										bind:this={santriInputRef}
+										bind:value={santriSearch}
+										onfocus={() => {
+											santriDropdownOpen = true;
+											santriHighlightIndex = -1;
+										}}
+										oninput={() => {
+											santriDropdownOpen = true;
+											santriHighlightIndex = -1;
+										}}
+										onkeydown={(e) => {
+											if (e.key === 'ArrowDown') {
+												e.preventDefault();
+												santriHighlightIndex = Math.min(santriHighlightIndex + 1, filteredSantris.length - 1);
+											} else if (e.key === 'ArrowUp') {
+												e.preventDefault();
+												santriHighlightIndex = Math.max(santriHighlightIndex - 1, 0);
+											} else if (e.key === 'Enter') {
+												e.preventDefault();
+												if (santriHighlightIndex >= 0 && santriHighlightIndex < filteredSantris.length) {
+													selectedSantriId = filteredSantris[santriHighlightIndex].id;
+													santriSearch = '';
+													santriDropdownOpen = false;
+													santriHighlightIndex = -1;
+												}
+											} else if (e.key === 'Escape') {
+												santriDropdownOpen = false;
+												santriHighlightIndex = -1;
+											}
+										}}
+									/>
+								{/if}
+
+								<!-- Dropdown list -->
+								{#if santriDropdownOpen}
+									<div class="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-lg border border-base-300 bg-base-100 shadow-lg">
+										{#if filteredSantris.length === 0}
+											<div class="px-4 py-3 text-sm text-base-content/50 text-center">
+												Tidak ada santri yang cocok.
+											</div>
+										{:else}
+											{#each filteredSantris as s, idx}
+												<button
+													type="button"
+													class="w-full text-left px-4 py-2.5 text-sm transition-colors flex items-center gap-2
+														{idx === santriHighlightIndex ? 'bg-primary/10 text-primary' : 'hover:bg-base-200'}
+														{s.id == selectedSantriId ? 'bg-primary/5 font-semibold' : ''}"
+													onmouseenter={() => santriHighlightIndex = idx}
+													onclick={() => {
+														selectedSantriId = s.id;
+														santriSearch = '';
+														santriDropdownOpen = false;
+														santriHighlightIndex = -1;
+													}}
+												>
+													<span class="font-mono text-xs text-base-content/60 w-16 shrink-0">{s.nomorInduk}</span>
+													<span class="flex-1 truncate">{s.namaLengkap}</span>
+													<span class="badge badge-sm badge-ghost text-xs">{getSantriKategoriLabel(s.id, s.namaKategori) || 'Tanpa Kategori'}</span>
+												</button>
+											{/each}
+										{/if}
+									</div>
+								{/if}
+							</div>
 							{#if isKhusus}
 								<div class="label pt-2 pb-0">
 									<span class="label-text-alt text-base-content/60">Opsional. Kosongkan jika pembayar tidak ada di daftar santri.</span>
@@ -1038,9 +1183,9 @@
 
 						<!-- Pilih Tahun -->
 						<div class="form-control w-full">
-							<label for="tahunAjaranId" class="label"><span class="label-text font-medium">Tahun</span></label>
+							<label for="tahunAjaranId" class="label"><span class="label-text font-medium">Tahun Tagihan</span></label>
 							<select id="tahunAjaranId" name="tahunAjaranId" class="select select-bordered w-full" bind:value={selectedTahunAjaranId} required>
-								{#each data.tahunAjarans as ta}
+								{#each [...data.tahunAjarans].sort((a, b) => b.nama.localeCompare(a.nama)) as ta}
 									<option value={ta.id} selected={ta.isActive}>{ta.nama}</option>
 								{/each}
 							</select>
@@ -1365,7 +1510,7 @@
 							<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
 								<div>
 									<h3 class="font-semibold">Multi Payment</h3>
-									<p class="text-xs text-base-content/60">Tambahkan beberapa item pembayaran lalu simpan sekali untuk satu kwitansi.</p>
+									<p class="text-xs text-base-content/60">Tambahkan pembayaran ke daftar terlebih dahulu, lalu simpan daftar tersebut untuk dibayar dan dicetak dalam satu kwitansi.</p>
 								</div>
 								<button type="button" class="btn btn-sm btn-outline btn-primary" onclick={addCurrentPaymentItem}>
 									Tambah ke Daftar
@@ -1373,7 +1518,7 @@
 							</div>
 
 							{#if paymentItems.length === 0}
-								<div class="text-sm text-base-content/60">Belum ada item di daftar. Anda masih bisa langsung simpan 1 item tanpa menambahkannya ke daftar.</div>
+								<div class="text-sm text-base-content/60">Belum ada item pembayaran di daftar. Pilih tagihan dan nominal pembayaran, lalu klik Tambah ke Daftar sebelum menyimpan pembayaran atau mencetak kwitansi.</div>
 							{:else}
 								<div class="overflow-x-auto">
 									<table class="table table-sm w-full">

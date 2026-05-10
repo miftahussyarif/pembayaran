@@ -106,6 +106,60 @@ function mergeMonthlyRekap(expectedMonths, paymentMap, nominalTagihan) {
 	});
 }
 
+function parseTahunAjaranRange(nama) {
+	const normalized = String(nama || '').trim();
+	const slash = normalized.match(/^(\d{4})\s*\/\s*(\d{4})$/);
+	if (slash) {
+		return {
+			startYear: Number(slash[1]),
+			endYear: Number(slash[2])
+		};
+	}
+
+	const year = Number(normalized.match(/(\d{4})/)?.[1]);
+	if (year) {
+		return { startYear: year, endYear: year };
+	}
+
+	return null;
+}
+
+function getTahunAjaranForMonth(tahunAjarans, year, monthIndex) {
+	return tahunAjarans.find((tahunAjaran) => {
+		const range = parseTahunAjaranRange(tahunAjaran.nama);
+		if (!range) return false;
+
+		if (range.startYear === range.endYear) return range.startYear === year;
+		if (monthIndex >= 6) return range.startYear === year;
+		return range.endYear === year;
+	}) || null;
+}
+
+function getAcademicYearStart(tahunAjaran) {
+	const range = parseTahunAjaranRange(tahunAjaran?.nama);
+	return range?.startYear || null;
+}
+
+function hasActiveMonthInTahunAjaran(tahunAjaran, activeMonthKeys) {
+	const range = parseTahunAjaranRange(tahunAjaran?.nama);
+	if (!range) return false;
+
+	if (range.startYear === range.endYear) {
+		for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
+			if (activeMonthKeys.has(`${range.startYear}-${monthIndex}`)) return true;
+		}
+		return false;
+	}
+
+	for (let monthIndex = 6; monthIndex < 12; monthIndex++) {
+		if (activeMonthKeys.has(`${range.startYear}-${monthIndex}`)) return true;
+	}
+	for (let monthIndex = 0; monthIndex < 6; monthIndex++) {
+		if (activeMonthKeys.has(`${range.endYear}-${monthIndex}`)) return true;
+	}
+	return false;
+}
+
 export async function load({ url }) {
 	const now = new Date();
 	const santriParam = url.searchParams.get('santriId') || '';
@@ -121,6 +175,7 @@ export async function load({ url }) {
 			tanggalKeluar: schema.santri.tanggalKeluar,
 			isActive: schema.santri.isActive,
 
+			nominalSyahriyah: schema.kategoriSantri.nominalSyahriyah,
 			nominalKonsumsi: schema.kategoriSantri.nominalKonsumsi,
 			namaKategori: schema.kategoriSantri.namaKategori
 		})
@@ -173,6 +228,7 @@ export async function load({ url }) {
 	const smkBulananNominal = jenisSmkBulanan[0]?.nominalDefault ?? 0;
 	const jenisSmpBulanan = jenisList.filter(j => j.tipe === 'smp_bulanan');
 	const smpBulananNominal = jenisSmpBulanan[0]?.nominalDefault ?? 0;
+	const keaktifanRows = await db.select().from(schema.santriKeaktifan);
 
 	const smkBySantriId = new Map(santriSmkList.map(s => [s.santriId, s]));
 	const smpBySantriId = new Map(santriSmpList.map(s => [s.santriId, s]));
@@ -189,8 +245,18 @@ export async function load({ url }) {
 		if (!tahunMap.has(row.tahunAjaranId)) tahunMap.set(row.tahunAjaranId, new Set());
 		tahunMap.get(row.tahunAjaranId).add(row.kategoriId);
 	}
+	const activeMonthKeysBySantri = new Map();
+	for (const row of keaktifanRows) {
+		if (!row.isActive) continue;
+		if (!activeMonthKeysBySantri.has(row.santriId)) activeMonthKeysBySantri.set(row.santriId, new Set());
+		activeMonthKeysBySantri.get(row.santriId).add(`${row.tahun}-${row.bulan - 1}`);
+	}
 
 	const rekapIndividu = santris.map(s => {
+		const activeMonthKeys = activeMonthKeysBySantri.get(s.id) || new Set();
+		const isActiveMonth = (month) => activeMonthKeys.has(`${month.year}-${month.monthIndex}`);
+		const filterActiveMonths = (months) => months.filter(isActiveMonth);
+
 		// Helper: dapatkan kategoriIds santri untuk tahun ajaran tertentu
 		// Jika tahunAjaranId tidak diketahui, fallback ke semua kategori (union)
 		const getKategoriIdsForTahun = (tahunAjaranId) => {
@@ -205,6 +271,13 @@ export async function load({ url }) {
 			return all;
 		};
 
+		const getCategoryColumnNominal = (jenis) => {
+			if (!jenis?.namaPembayaran) return undefined;
+			if (/konsumsi/i.test(jenis.namaPembayaran)) return s.nominalKonsumsi;
+			if (/syahriyah|spp/i.test(jenis.namaPembayaran)) return s.nominalSyahriyah;
+			return undefined;
+		};
+
 		// Helper: cek gratisList dengan kategori yang berlaku untuk tahun tertentu
 		const getNominal = (jenisId, categoryColumnNominal, defaultNominal, tahunAjaranId = null) => {
 			const katIds = getKategoriIdsForTahun(tahunAjaranId);
@@ -217,23 +290,14 @@ export async function load({ url }) {
 			return defaultNominal;
 		};
 
-		// Helper khusus untuk konsumsi per bulan (pakai tahun kalender pembayaran)
-		// Karena konsumsi bulanan, kita perlu lookup tahunAjaranId dari pembayaran itu sendiri
-		// atau fallback berdasarkan tahun kalender → cari tahunAjaran yang cover bulan tersebut
-		const getNominalForMonth = (jenisId, defaultNominal, tahunKalender) => {
-			// Cari tahunAjaranId yang namanya mengandung tahun kalender tsb
-			// Tahun ajaran "2024/2025": bulan Juli-Des = 2024, Jan-Jun = 2025
-			const matchedTahun = tahunAjarans.find(t => {
-				const nama = t.nama || '';
-				const slash = nama.match(/^(\d{4})\s*\/\s*(\d{4})$/);
-				if (slash) {
-					const y1 = Number(slash[1]);
-					const y2 = Number(slash[2]);
-					return tahunKalender === y1 || tahunKalender === y2;
-				}
-				return nama.includes(String(tahunKalender));
-			});
-			return getNominal(jenisId, null, defaultNominal, matchedTahun?.id || null);
+		const getNominalForMonth = (jenis, month) => {
+			const matchedTahun = getTahunAjaranForMonth(tahunAjarans, month.year, month.monthIndex);
+			return getNominal(
+				jenis.id,
+				getCategoryColumnNominal(jenis),
+				jenis.nominalDefault ?? 0,
+				matchedTahun?.id || null
+			);
 		};
 
 		const pembayaranSantri = pembayaran.filter(p => p.santriId === s.id);
@@ -312,7 +376,8 @@ export async function load({ url }) {
 
 		// Filter pembayaran normal (bukan khusus)
 		const normalPayments = pembayaranSantri.filter(p => !p.keteranganKhusus);
-		const konsumsiPayments = normalPayments.filter(p => p.tipe === 'bulanan' && /konsumsi/i.test(p.namaPembayaran || ''));
+		const bulananPondokPayments = normalPayments.filter(p => p.tipe === 'bulanan');
+		const konsumsiPayments = bulananPondokPayments.filter(p => /konsumsi/i.test(p.namaPembayaran || ''));
 		const smkBulananPayments = normalPayments.filter(p => p.tipe === 'smk_bulanan');
 		const smpBulananPayments = normalPayments.filter(p => p.tipe === 'smp_bulanan');
 		const nonBulananPayments = normalPayments.filter(p => p.tipe !== 'bulanan' && p.tipe !== 'smk_bulanan' && p.tipe !== 'smp_bulanan');
@@ -320,6 +385,7 @@ export async function load({ url }) {
 		const jenisKonsumsiId = konsumsiPayments[0]?.jenisPembayaranId || jenisList.find(j => j.tipe === 'bulanan' && /konsumsi/i.test(j.namaPembayaran))?.id;
 		const jenisSmkId = jenisSmkBulanan[0]?.id;
 		const jenisSmpId = jenisSmpBulanan[0]?.id;
+		const jenisBulananPondokAktif = jenisList.filter(j => j.tipe === 'bulanan');
 
 		// Nominal fallback (union semua tahun) untuk summary
 		const konsumsiNominalEff = getNominal(jenisKonsumsiId, s.nominalKonsumsi, 0);
@@ -329,47 +395,84 @@ export async function load({ url }) {
 		const startDate = s.tanggalMasuk ? new Date(s.tanggalMasuk) : now;
 		const endDate = s.tanggalKeluar ? new Date(s.tanggalKeluar) : now;
 		const monthsRange = startDate <= endDate ? buildMonthRange(startDate, endDate) : [];
+		const activeMonthsRange = filterActiveMonths(monthsRange);
 
-		// Konsumsi: hitung nominal per bulan berdasarkan tahun kalender bulan tersebut
-		const konsumsiPaymentMap = buildMonthlyPaymentMap(konsumsiPayments);
-		const konsumsi = monthsRange.map(month => {
-			const key = `${month.year}-${month.monthIndex}`;
-			const paidBucket = konsumsiPaymentMap.get(key);
-			const paidItems = paidBucket?.items || [];
-			const nominalDibayar = paidItems.reduce((sum, item) => sum + (item.nominalDibayar || 0), 0);
-			// Cek apakah ada pembayaran yang punya tahunAjaranId (ambil dari pembayaran langsung)
-			const tahunAjaranIdDariPembayaran = paidItems[0]?.tahunAjaranId || null;
-			const nominalTagihan = jenisKonsumsiId
-				? (tahunAjaranIdDariPembayaran
-					? getNominal(jenisKonsumsiId, s.nominalKonsumsi, 0, tahunAjaranIdDariPembayaran)
-					: getNominalForMonth(jenisKonsumsiId, s.nominalKonsumsi ?? 0, month.year))
-				: 0;
-			return {
-				bulan: month.monthName,
-				tahun: month.year,
-				monthIndex: month.monthIndex,
-				paid: nominalDibayar > 0,
-				nominalTagihan,
-				nominalDibayar,
-				tanggalBayar: paidItems[0]?.tanggalBayar || null,
-				nomorKwitansi: paidItems[0]?.nomorKwitansi || null,
-				isTambahanDariPembayaran: false
-			};
-		});
-		// Tambahkan bulan yang ada pembayaran tapi di luar range
-		const konsumsiExpectedKeys = new Set(monthsRange.map(m => `${m.year}-${m.monthIndex}`));
-		for (const [key, bucket] of konsumsiPaymentMap.entries()) {
-			if (konsumsiExpectedKeys.has(key)) continue;
-			const paidItems = bucket.items || [];
-			const nominalDibayar = paidItems.reduce((sum, item) => sum + (item.nominalDibayar || 0), 0);
-			konsumsi.push({
-				bulan: bucket.monthName, tahun: bucket.year, monthIndex: bucket.monthIndex,
-				paid: nominalDibayar > 0, nominalTagihan: 0, nominalDibayar,
-				tanggalBayar: paidItems[0]?.tanggalBayar || null,
-				nomorKwitansi: paidItems[0]?.nomorKwitansi || null, isTambahanDariPembayaran: true
+		const buildBulananPondokForJenis = (jenis) => {
+			const jenisPayments = bulananPondokPayments.filter(p => p.jenisPembayaranId === jenis.id);
+			const paymentMap = buildMonthlyPaymentMap(jenisPayments);
+			const rows = activeMonthsRange.map(month => {
+				const key = `${month.year}-${month.monthIndex}`;
+				const paidBucket = paymentMap.get(key);
+				const paidItems = paidBucket?.items || [];
+				const nominalDibayar = paidItems.reduce((sum, item) => sum + (item.nominalDibayar || 0), 0);
+				const tahunAjaranIdDariPembayaran = paidItems[0]?.tahunAjaranId || null;
+				const nominalTagihan = tahunAjaranIdDariPembayaran
+					? getNominal(jenis.id, getCategoryColumnNominal(jenis), jenis.nominalDefault ?? 0, tahunAjaranIdDariPembayaran)
+					: getNominalForMonth(jenis, month);
+				return {
+					bulan: month.monthName,
+					tahun: month.year,
+					monthIndex: month.monthIndex,
+					paid: nominalDibayar > 0,
+					nominalTagihan,
+					nominalDibayar,
+					tanggalBayar: paidItems[0]?.tanggalBayar || null,
+					nomorKwitansi: paidItems[0]?.nomorKwitansi || null,
+					isTambahanDariPembayaran: false
+				};
 			});
-		}
-		konsumsi.sort((a, b) => a.tahun !== b.tahun ? a.tahun - b.tahun : a.monthIndex - b.monthIndex);
+
+			const expectedKeys = new Set(activeMonthsRange.map(m => `${m.year}-${m.monthIndex}`));
+			for (const [key, bucket] of paymentMap.entries()) {
+				if (expectedKeys.has(key)) continue;
+				const paidItems = bucket.items || [];
+				const nominalDibayar = paidItems.reduce((sum, item) => sum + (item.nominalDibayar || 0), 0);
+				rows.push({
+					bulan: bucket.monthName,
+					tahun: bucket.year,
+					monthIndex: bucket.monthIndex,
+					paid: nominalDibayar > 0,
+					nominalTagihan: 0,
+					nominalDibayar,
+					tanggalBayar: paidItems[0]?.tanggalBayar || null,
+					nomorKwitansi: paidItems[0]?.nomorKwitansi || null,
+					isTambahanDariPembayaran: true
+				});
+			}
+
+			rows.sort((a, b) => a.tahun !== b.tahun ? a.tahun - b.tahun : a.monthIndex - b.monthIndex);
+			return rows;
+		};
+
+		const bulananPondok = Array.from(new Set([
+			...jenisBulananPondokAktif.map(j => j.id),
+			...bulananPondokPayments.map(p => p.jenisPembayaranId).filter(Boolean)
+		])).map((jenisId) => {
+			const jenis = jenisList.find(j => j.id === jenisId) || null;
+			const samplePayment = bulananPondokPayments.find(p => p.jenisPembayaranId === jenisId) || null;
+			if (!jenis && !samplePayment) return null;
+			const effectiveJenis = jenis || {
+				id: jenisId,
+				namaPembayaran: samplePayment.namaPembayaran,
+				nominalDefault: 0
+			};
+			const rows = buildBulananPondokForJenis(effectiveJenis);
+			const totalTagihan = rows.reduce((sum, m) => sum + (m.nominalTagihan || 0), 0);
+			const totalDibayar = rows.reduce((sum, m) => sum + (m.nominalDibayar || 0), 0);
+			return {
+				jenisId,
+				namaPembayaran: effectiveJenis.namaPembayaran || '-',
+				nominalEff: getNominal(effectiveJenis.id, getCategoryColumnNominal(effectiveJenis), effectiveJenis.nominalDefault ?? 0),
+				months: rows,
+				totalTagihan,
+				totalDibayar,
+				totalSisa: Math.max(0, totalTagihan - totalDibayar),
+				isTambahanDariPembayaran: !jenis
+			};
+		}).filter(item => item && (item.totalTagihan > 0 || item.totalDibayar > 0));
+
+		const konsumsiJenis = bulananPondok.find(item => /konsumsi/i.test(item.namaPembayaran || ''));
+		const konsumsi = konsumsiJenis?.months || [];
 
 		const smkInfo = smkBySantriId.get(s.id);
 		let smkBulanan = [];
@@ -379,8 +482,9 @@ export async function load({ url }) {
 				? new Date(smkInfo.endYear, smkInfo.endMonth - 1, 1)
 				: now;
 			const smkMonthsRange = smkStart <= smkEnd ? buildMonthRange(smkStart, smkEnd) : [];
+			const smkActiveMonthsRange = filterActiveMonths(smkMonthsRange);
 			const smkPaymentMap = buildMonthlyPaymentMap(smkBulananPayments);
-			smkBulanan = smkMonthsRange.map(month => {
+			smkBulanan = smkActiveMonthsRange.map(month => {
 				const key = `${month.year}-${month.monthIndex}`;
 				const paidBucket = smkPaymentMap.get(key);
 				const paidItems = paidBucket?.items || [];
@@ -389,11 +493,11 @@ export async function load({ url }) {
 				const nominalTagihan = jenisSmkId
 					? (tahunAjaranIdDariPembayaran
 						? getNominal(jenisSmkId, undefined, smkBulananNominal, tahunAjaranIdDariPembayaran)
-						: getNominalForMonth(jenisSmkId, smkBulananNominal, month.year))
+						: getNominalForMonth(jenisSmkBulanan[0], month))
 					: 0;
 				return { bulan: month.monthName, tahun: month.year, monthIndex: month.monthIndex, paid: nominalDibayar > 0, nominalTagihan, nominalDibayar, tanggalBayar: paidItems[0]?.tanggalBayar || null, nomorKwitansi: paidItems[0]?.nomorKwitansi || null, isTambahanDariPembayaran: false };
 			});
-			const smkExpectedKeys = new Set(smkMonthsRange.map(m => `${m.year}-${m.monthIndex}`));
+			const smkExpectedKeys = new Set(smkActiveMonthsRange.map(m => `${m.year}-${m.monthIndex}`));
 			for (const [key, bucket] of smkPaymentMap.entries()) {
 				if (smkExpectedKeys.has(key)) continue;
 				const paidItems = bucket.items || [];
@@ -413,8 +517,9 @@ export async function load({ url }) {
 				? new Date(smpInfo.endYear, smpInfo.endMonth - 1, 1)
 				: now;
 			const smpMonthsRange = smpStart <= smpEnd ? buildMonthRange(smpStart, smpEnd) : [];
+			const smpActiveMonthsRange = filterActiveMonths(smpMonthsRange);
 			const smpPaymentMap = buildMonthlyPaymentMap(smpBulananPayments);
-			smpBulanan = smpMonthsRange.map(month => {
+			smpBulanan = smpActiveMonthsRange.map(month => {
 				const key = `${month.year}-${month.monthIndex}`;
 				const paidBucket = smpPaymentMap.get(key);
 				const paidItems = paidBucket?.items || [];
@@ -423,11 +528,11 @@ export async function load({ url }) {
 				const nominalTagihan = jenisSmpId
 					? (tahunAjaranIdDariPembayaran
 						? getNominal(jenisSmpId, undefined, smpBulananNominal, tahunAjaranIdDariPembayaran)
-						: getNominalForMonth(jenisSmpId, smpBulananNominal, month.year))
+						: getNominalForMonth(jenisSmpBulanan[0], month))
 					: 0;
 				return { bulan: month.monthName, tahun: month.year, monthIndex: month.monthIndex, paid: nominalDibayar > 0, nominalTagihan, nominalDibayar, tanggalBayar: paidItems[0]?.tanggalBayar || null, nomorKwitansi: paidItems[0]?.nomorKwitansi || null, isTambahanDariPembayaran: false };
 			});
-			const smpExpectedKeys = new Set(smpMonthsRange.map(m => `${m.year}-${m.monthIndex}`));
+			const smpExpectedKeys = new Set(smpActiveMonthsRange.map(m => `${m.year}-${m.monthIndex}`));
 			for (const [key, bucket] of smpPaymentMap.entries()) {
 				if (smpExpectedKeys.has(key)) continue;
 				const paidItems = bucket.items || [];
@@ -442,6 +547,8 @@ export async function load({ url }) {
 
 		const totalTagihanKonsumsi = konsumsi.reduce((sum, m) => sum + (m.nominalTagihan || 0), 0);
 		const totalDibayarKonsumsi = konsumsi.reduce((sum, m) => sum + (m.nominalDibayar || 0), 0);
+		const totalTagihanBulananPondok = bulananPondok.reduce((sum, item) => sum + (item.totalTagihan || 0), 0);
+		const totalDibayarBulananPondok = bulananPondok.reduce((sum, item) => sum + (item.totalDibayar || 0), 0);
 		const totalTagihanSmkBulanan = smkBulanan.reduce((sum, m) => sum + (m.nominalTagihan || 0), 0);
 		const totalDibayarSmkBulanan = smkBulanan.reduce((sum, m) => sum + (m.nominalDibayar || 0), 0);
 		const totalTagihanSmpBulanan = smpBulanan.reduce((sum, m) => sum + (m.nominalTagihan || 0), 0);
@@ -482,51 +589,75 @@ export async function load({ url }) {
 
 				let totalTagihan = 0;
 				let nominalEff = 0; // untuk display (nominal terbaru/fallback)
+				let tahunDetails = []; // detail per tahun ajaran
 
-				if (jenis?.tipe === 'tahunan' || jenis?.tipe === 'smk_tahunan' || jenis?.tipe === 'smp_tahunan') {
+				const isTahunan = jenis?.tipe === 'tahunan' || jenis?.tipe === 'smk_tahunan' || jenis?.tipe === 'smp_tahunan';
+
+				if (isTahunan) {
 					// Hitung totalTagihan per tahun ajaran yang relevan
-					// Gunakan kategori yang aktif di tahun ajaran tersebut
+					// Gunakan kategori pada Juli tahun ajaran tersebut, dan hanya muncul jika ada minimal 1 bulan aktif.
 					let tahunAjaranIds;
 					if (jenis.tipe === 'tahunan') {
-						// Ambil tahunAjaran dari startYear s/d endYear santri
-						const sy = (s.tanggalMasuk ? new Date(s.tanggalMasuk) : now).getFullYear();
-						const ey = (s.tanggalKeluar ? new Date(s.tanggalKeluar) : now).getFullYear();
 						tahunAjaranIds = tahunAjarans
 							.filter(t => {
-								const slash = (t.nama || '').match(/^(\d{4})\s*\/\s*(\d{4})$/);
-								if (slash) { const y1 = Number(slash[1]); return y1 >= sy && y1 <= ey; }
-								const y = Number((t.nama || '').match(/(\d{4})/)?.[1]);
-								return y >= sy && y <= ey;
+								const startYear = getAcademicYearStart(t);
+								if (!startYear) return false;
+								return hasActiveMonthInTahunAjaran(t, activeMonthKeys);
 							})
 							.map(t => t.id);
-						if (!tahunAjaranIds.length) tahunAjaranIds = [null]; // fallback
 					} else if (jenis.tipe === 'smk_tahunan' && smkInfo) {
 						tahunAjaranIds = tahunAjarans
 							.filter(t => {
-								const slash = (t.nama || '').match(/^(\d{4})\s*\/\s*(\d{4})$/);
-								if (slash) { const y1 = Number(slash[1]); return y1 >= smkInfo.startYear && (!smkInfo.endYear || y1 <= smkInfo.endYear); }
-								return false;
+								const startYear = getAcademicYearStart(t);
+								if (!startYear) return false;
+								if (startYear < smkInfo.startYear || (smkInfo.endYear && startYear > smkInfo.endYear)) return false;
+								return hasActiveMonthInTahunAjaran(t, activeMonthKeys);
 							})
 							.map(t => t.id);
-						if (!tahunAjaranIds.length) tahunAjaranIds = [null];
 					} else if (jenis.tipe === 'smp_tahunan' && smpInfo) {
 						tahunAjaranIds = tahunAjarans
 							.filter(t => {
-								const slash = (t.nama || '').match(/^(\d{4})\s*\/\s*(\d{4})$/);
-								if (slash) { const y1 = Number(slash[1]); return y1 >= smpInfo.startYear && (!smpInfo.endYear || y1 <= smpInfo.endYear); }
-								return false;
+								const startYear = getAcademicYearStart(t);
+								if (!startYear) return false;
+								if (startYear < smpInfo.startYear || (smpInfo.endYear && startYear > smpInfo.endYear)) return false;
+								return hasActiveMonthInTahunAjaran(t, activeMonthKeys);
 							})
 							.map(t => t.id);
-						if (!tahunAjaranIds.length) tahunAjaranIds = [null];
 					} else {
-						tahunAjaranIds = [null];
+						tahunAjaranIds = [];
 					}
-					// Jumlahkan nominal per tahun ajaran (masing-masing pakai kategori tahun itu)
-					for (const taId of tahunAjaranIds) {
+					// Bangun detail per tahun ajaran (masing-masing pakai kategori tahun itu)
+					// Also include tahun ajaran from payments that don't have active months
+					const paymentTahunIds = new Set(items.map(p => p.tahunAjaranId).filter(Boolean));
+					const allTahunIds = new Set([...tahunAjaranIds, ...paymentTahunIds]);
+
+					for (const taId of allTahunIds) {
+						const ta = tahunAjarans.find(t => t.id === taId);
 						const n = getNominal(jenis.id, undefined, jenis.nominalDefault ?? 0, taId);
-						totalTagihan += n;
-						nominalEff = n; // ambil nilai terakhir untuk display
+						const taPayments = items.filter(p => p.tahunAjaranId === taId);
+						const dibayar = taPayments.reduce((sum, p) => sum + (p.nominalDibayar || 0), 0);
+						const tagihanForYear = tahunAjaranIds.includes(taId) ? n : 0;
+						const sisaYear = Math.max(0, tagihanForYear - dibayar);
+						const lastPayDate = taPayments.length ? taPayments[taPayments.length - 1].tanggalBayar : null;
+						tahunDetails.push({
+							tahunAjaranId: taId,
+							namaTahun: ta?.nama || String(taId),
+							nominalTagihan: tagihanForYear,
+							totalDibayar: dibayar,
+							jumlahTransaksi: taPayments.length,
+							sisa: sisaYear,
+							terakhirBayar: lastPayDate,
+							isTambahanDariPembayaran: !tahunAjaranIds.includes(taId)
+						});
+						totalTagihan += tagihanForYear;
+						nominalEff = n;
 					}
+					// Sort by extracted year from tahun name
+					tahunDetails.sort((a, b) => {
+						const ya = Number(String(a.namaTahun).match(/(\d{4})/)?.[1] || 0);
+						const yb = Number(String(b.namaTahun).match(/(\d{4})/)?.[1] || 0);
+						return ya - yb;
+					});
 				} else if (
 					jenis?.tipe === 'sekali' ||
 					jenis?.tipe === 'smk_sekali' ||
@@ -536,6 +667,18 @@ export async function load({ url }) {
 					const taId = items[0]?.tahunAjaranId || null;
 					nominalEff = jenis ? getNominal(jenis.id, undefined, jenis.nominalDefault ?? 0, taId) : 0;
 					totalTagihan = nominalEff;
+					// Build single detail entry
+					const ta = taId ? tahunAjarans.find(t => t.id === taId) : null;
+					tahunDetails.push({
+						tahunAjaranId: taId,
+						namaTahun: ta?.nama || '-',
+						nominalTagihan: totalTagihan,
+						totalDibayar: totalNominal,
+						jumlahTransaksi: items.length,
+						sisa: Math.max(0, totalTagihan - totalNominal),
+						terakhirBayar: lastTanggal,
+						isTambahanDariPembayaran: false
+					});
 				} else {
 					nominalEff = jenis ? getNominal(jenis.id, undefined, jenis.nominalDefault ?? 0) : 0;
 					totalTagihan = nominalEff;
@@ -545,12 +688,14 @@ export async function load({ url }) {
 				return {
 					namaPembayaran: jenis?.namaPembayaran || samplePayment?.namaPembayaran || '-',
 					tipe: jenis?.tipe || samplePayment?.tipe || '-',
+					isTahunan,
 					jumlahTransaksi: items.length,
 					totalNominal,
 					totalTagihan,
 					sisa,
 					terakhirBayar: lastTanggal,
 					nominalEff,
+					tahunDetails,
 					isTambahanDariPembayaran: !jenis || !jenisNonBulananAktif.some(j => j.id === jenisId)
 				};
 			})
@@ -560,14 +705,15 @@ export async function load({ url }) {
 		const totalDibayarLain = nonBulananByJenis.reduce((sum, p) => sum + (p.totalNominal || 0), 0);
 		const totalSisaLain = nonBulananByJenis.reduce((sum, p) => sum + (p.sisa || 0), 0);
 		const totalSisaKonsumsi = Math.max(0, totalTagihanKonsumsi - totalDibayarKonsumsi);
+		const totalSisaBulananPondok = Math.max(0, totalTagihanBulananPondok - totalDibayarBulananPondok);
 		const totalSisaSmkBulanan = Math.max(0, totalTagihanSmkBulanan - totalDibayarSmkBulanan);
 		const totalSisaSmpBulanan = Math.max(0, totalTagihanSmpBulanan - totalDibayarSmpBulanan);
 		const totalTagihanKeseluruhan =
-			totalTagihanKonsumsi + totalTagihanSmkBulanan + totalTagihanSmpBulanan + totalTagihanLain + totalTagihanKhusus;
+			totalTagihanBulananPondok + totalTagihanSmkBulanan + totalTagihanSmpBulanan + totalTagihanLain + totalTagihanKhusus;
 		const totalDibayarKeseluruhan =
-			totalDibayarKonsumsi + totalDibayarSmkBulanan + totalDibayarSmpBulanan + totalDibayarLain + totalDibayarTagihanKhusus + totalKhusus;
+			totalDibayarBulananPondok + totalDibayarSmkBulanan + totalDibayarSmpBulanan + totalDibayarLain + totalDibayarTagihanKhusus + totalKhusus;
 		const totalBelumTerbayarKeseluruhan =
-			totalSisaKonsumsi + totalSisaSmkBulanan + totalSisaSmpBulanan + totalSisaLain + totalSisaTagihanKhusus;
+			totalSisaBulananPondok + totalSisaSmkBulanan + totalSisaSmpBulanan + totalSisaLain + totalSisaTagihanKhusus;
 
 		return {
 			...s,
@@ -576,6 +722,10 @@ export async function load({ url }) {
 			smkBulananNominalEff,
 			smpBulananNominalEff,
 
+			bulananPondok,
+			totalTagihanBulananPondok,
+			totalDibayarBulananPondok,
+			totalSisaBulananPondok,
 			konsumsi,
 			smkBulanan,
 			totalTagihanSmkBulanan,

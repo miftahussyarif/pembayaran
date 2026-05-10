@@ -51,6 +51,7 @@ export const generateBackup = async () => {
 	const santriDetail = await db.select().from(schema.santriDetail);
 	const santriSmk = await db.select().from(schema.santriSmk);
 	const santriSmp = await db.select().from(schema.santriSmp);
+	const santriKeaktifan = await db.select().from(schema.santriKeaktifan);
 	const santriKategoriTahun = await db.select().from(schema.santriKategoriTahun);
 	const tunggakanImport = await db.select().from(schema.tunggakanImport);
 	const files = await collectUploads();
@@ -71,6 +72,7 @@ export const generateBackup = async () => {
 			santriDetail,
 			santriSmk,
 			santriSmp,
+			santriKeaktifan,
 			santriKategoriTahun,
 			tunggakanImport,
 			pembayarLain,

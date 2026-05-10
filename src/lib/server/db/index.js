@@ -70,6 +70,16 @@ sqlite.exec(`
 		end_year INTEGER,
 		FOREIGN KEY (santri_id) REFERENCES santri(id)
 	);
+	CREATE TABLE IF NOT EXISTS santri_keaktifan (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		santri_id INTEGER NOT NULL,
+		bulan INTEGER NOT NULL,
+		tahun INTEGER NOT NULL,
+		is_active INTEGER NOT NULL DEFAULT 1,
+		updated_at TEXT NOT NULL,
+		UNIQUE(santri_id, bulan, tahun),
+		FOREIGN KEY (santri_id) REFERENCES santri(id)
+	);
 	CREATE TABLE IF NOT EXISTS santri_detail (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		santri_id INTEGER NOT NULL UNIQUE,
@@ -148,6 +158,12 @@ sqlite.exec(`
 
 try {
 	sqlite.exec(`ALTER TABLE users ADD COLUMN signature_url TEXT`);
+} catch (e) {
+	// column may already exist
+}
+
+try {
+	sqlite.exec(`ALTER TABLE users ADD COLUMN otp_2fa_enabled INTEGER NOT NULL DEFAULT 1`);
 } catch (e) {
 	// column may already exist
 }

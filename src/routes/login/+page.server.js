@@ -15,6 +15,14 @@ import {
 } from '$lib/server/auth.js';
 import { sendTelegramTextMessage } from '$lib/server/backup.js';
 
+// ==========================================
+// KONFIGURASI KEAMANAN LOGIN
+// ==========================================
+const ATTEMPT_WINDOW_MS = 30 * 60 * 1000;        // 30 menit — auto-reset jika tidak ada gagal login dalam 30 menit
+const SOFT_THRESHOLD = 3;                          // Setelah 3x gagal → password benar wajib OTP
+const HARD_THRESHOLD = 10;                         // Setelah 10x gagal → blokir IP total
+const HARD_BLOCK_DURATION_MS = 60 * 60 * 1000;    // Blokir IP selama 1 jam (hard block)
+
 export const actions = {
 	login: async ({ request, cookies, getClientAddress }) => {
 		const ipAddress = getClientAddress();
@@ -30,13 +38,41 @@ export const actions = {
 		const password = data.get('password')?.toString() || '';
 		const invalidCredentialsMessage = 'Username atau password tidak valid.';
 
-		const [attemptRecord] = await db.select().from(schema.loginAttempts).where(eq(schema.loginAttempts.ip, ipAddress));
-		if (attemptRecord) {
-			if (attemptRecord.lockUntil && new Date(attemptRecord.lockUntil) > new Date()) {
-				return { error: 'Terlalu banyak percobaan gagal. IP Anda diblokir selama 24 jam.' };
+		const now = new Date();
+
+		// ==========================================
+		// 1. Ambil record percobaan untuk IP ini
+		// ==========================================
+		let [attemptRecord] = await db.select().from(schema.loginAttempts).where(eq(schema.loginAttempts.ip, ipAddress));
+
+		// ==========================================
+		// 2. Auto-reset jika sudah lewat window (TTL)
+		//    Jika percobaan terakhir lebih dari 30 menit lalu, reset counter
+		// ==========================================
+		if (attemptRecord && attemptRecord.lastAttemptAt) {
+			const lastAttempt = new Date(attemptRecord.lastAttemptAt);
+			const timeSinceLastAttempt = now.getTime() - lastAttempt.getTime();
+			if (timeSinceLastAttempt > ATTEMPT_WINDOW_MS) {
+				// Sudah lewat window, reset record
+				await db.update(schema.loginAttempts)
+					.set({ attempts: 0, lockUntil: null, lastAttemptAt: null })
+					.where(eq(schema.loginAttempts.ip, ipAddress));
+				attemptRecord = { ...attemptRecord, attempts: 0, lockUntil: null, lastAttemptAt: null };
 			}
 		}
 
+		// ==========================================
+		// 3. Cek hard block (IP terblokir karena brute force >= 10x gagal)
+		// ==========================================
+		if (attemptRecord && attemptRecord.lockUntil && new Date(attemptRecord.lockUntil) > now) {
+			const lockEnd = new Date(attemptRecord.lockUntil);
+			const sisaMenit = Math.ceil((lockEnd.getTime() - now.getTime()) / 60000);
+			return { error: `IP Anda diblokir karena terlalu banyak percobaan gagal. Coba lagi dalam ${sisaMenit} menit.` };
+		}
+
+		// ==========================================
+		// 4. Validasi input dasar
+		// ==========================================
 		if (!username || !password) {
 			return { error: 'Username dan Password wajib diisi!' };
 		}
@@ -45,34 +81,46 @@ export const actions = {
 			return { error: invalidCredentialsMessage };
 		}
 
+		// ==========================================
+		// 5. Fungsi untuk mencatat percobaan gagal
+		// ==========================================
 		const handleFailedLogin = async () => {
-			const now = new Date();
+			const nowISO = now.toISOString();
 			let newAttempts = 1;
 			let newLockUntil = null;
-			
+
 			if (attemptRecord) {
-				if (attemptRecord.lockUntil && new Date(attemptRecord.lockUntil) <= now) {
-					newAttempts = 1; 
-				} else {
-					newAttempts = attemptRecord.attempts + 1;
+				newAttempts = attemptRecord.attempts + 1;
+
+				// Hard block jika mencapai threshold brute force
+				if (newAttempts >= HARD_THRESHOLD) {
+					newLockUntil = new Date(now.getTime() + HARD_BLOCK_DURATION_MS).toISOString();
 				}
-				
-				if (newAttempts >= 3) {
-					newLockUntil = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
-				}
+
 				await db.update(schema.loginAttempts)
-					.set({ attempts: newAttempts, lockUntil: newLockUntil })
+					.set({ attempts: newAttempts, lockUntil: newLockUntil, lastAttemptAt: nowISO })
 					.where(eq(schema.loginAttempts.ip, ipAddress));
 			} else {
 				await db.insert(schema.loginAttempts).values({
 					ip: ipAddress,
 					attempts: 1,
-					lockUntil: null
+					lockUntil: null,
+					lastAttemptAt: nowISO
 				});
 			}
+
+			// Update local reference
+			attemptRecord = {
+				ip: ipAddress,
+				attempts: newAttempts,
+				lockUntil: newLockUntil,
+				lastAttemptAt: nowISO
+			};
 		};
 
-		// Cari user berdasarkan username
+		// ==========================================
+		// 6. Cari user berdasarkan username
+		// ==========================================
 		const [user] = await db
 			.select()
 			.from(schema.users)
@@ -80,22 +128,131 @@ export const actions = {
 
 		if (!user) {
 			await handleFailedLogin();
+			// Pesan tambahan jika mendekati hard block
+			if (attemptRecord && attemptRecord.attempts >= HARD_THRESHOLD) {
+				return { error: `IP Anda diblokir selama ${HARD_BLOCK_DURATION_MS / 60000} menit karena terlalu banyak percobaan gagal.` };
+			}
 			return { error: invalidCredentialsMessage };
 		}
 
-		// Validasi passsword Hash
+		// ==========================================
+		// 7. Validasi password Hash
+		// ==========================================
 		const isValidPW = await bcrypt.compare(password, user.passwordHash);
-		
+
 		if (!isValidPW) {
 			await handleFailedLogin();
+			// Pesan tambahan jika mendekati hard block
+			if (attemptRecord && attemptRecord.attempts >= HARD_THRESHOLD) {
+				return { error: `IP Anda diblokir selama ${HARD_BLOCK_DURATION_MS / 60000} menit karena terlalu banyak percobaan gagal.` };
+			}
 			return { error: invalidCredentialsMessage };
 		}
 
+		// ==========================================
+		// 8. Password BENAR — cek apakah perlu security OTP challenge
+		//    Jika IP sudah gagal >= SOFT_THRESHOLD kali, wajib verifikasi OTP
+		//    meskipun password benar (untuk memastikan bukan brute force yang beruntung)
+		// ==========================================
+		const currentAttempts = attemptRecord ? attemptRecord.attempts : 0;
+		const needsSecurityChallenge = currentAttempts >= SOFT_THRESHOLD;
+
+		if (needsSecurityChallenge) {
+			// Kirim OTP challenge untuk verifikasi keamanan
+			try {
+				const [pengaturan] = await db.select().from(schema.pengaturanPesantren).limit(1);
+				const customToken = user.telegramBotToken;
+				const customChatId = user.telegramChatId;
+				const systemToken = pengaturan?.telegramBotToken;
+				const systemChatId = pengaturan?.telegramChatId;
+
+				if (!((customToken && customChatId) || (systemToken && systemChatId))) {
+					// Tidak ada Telegram yang dikonfigurasi, fallback: tetap blokir
+					return { error: 'Terlalu banyak percobaan gagal. Tidak ada kanal verifikasi keamanan yang tersedia. Hubungi administrator.' };
+				}
+
+				// Generate OTP baru untuk security challenge
+				const existingPending = pendingOtps.get(user.id);
+				const hasValidExistingOtp = existingPending && Date.now() < existingPending.expiresAt;
+
+				if (!hasValidExistingOtp) {
+					const otp = generateOTP(5);
+					const userAgent = request.headers.get('user-agent')?.trim() || 'Tidak diketahui';
+					const loginTime = now.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'medium' });
+
+					const message = [
+						'⚠️ VERIFIKASI KEAMANAN LOGIN',
+						'',
+						`Terdeteksi ${currentAttempts}x percobaan gagal login dari IP ${ipAddress}.`,
+						`Seseorang berhasil memasukkan password yang benar untuk akun ${user.namaLengkap}.`,
+						'',
+						`Kode OTP Anda: ${otp}`,
+						'',
+						`URL Login: ${loginUrl}`,
+						`Waktu: ${loginTime}`,
+						`User-Agent: ${userAgent.slice(0, 180)}`,
+						'',
+						'Masukkan kode ini di halaman verifikasi. Kode berlaku 5 menit.',
+						'Jika bukan Anda, segera ganti password!'
+					].join('\n');
+
+					let messageSent = false;
+					// Prioritas: bot personal user dulu
+					if (customToken && customChatId) {
+						try {
+							await sendTelegramTextMessage(customToken, customChatId, message);
+							messageSent = true;
+						} catch (e) {
+							console.error('[Auth] Gagal mengirim OTP ke bot custom user:', e.message);
+						}
+					}
+					// Fallback: bot sistem
+					if (!messageSent && systemToken && systemChatId) {
+						try {
+							await sendTelegramTextMessage(systemToken, systemChatId, message);
+							messageSent = true;
+						} catch (e) {
+							console.error('[Auth] Gagal mengirim OTP ke bot sistem:', e.message);
+						}
+					}
+
+					if (!messageSent) {
+						return { error: 'Gagal mengirim kode verifikasi keamanan. Hubungi administrator.' };
+					}
+
+					pendingOtps.set(user.id, {
+						otp,
+						expiresAt: Date.now() + 5 * 60 * 1000, // 5 menit
+						isSecurityChallenge: true // Tandai ini security challenge
+					});
+				}
+
+				// Set temp cookie untuk identifikasi user selama verifikasi
+				cookies.set('temp_2fa_user', user.id.toString(), {
+					path: '/',
+					maxAge: 5 * 60 // 5 menit
+				});
+
+				console.log(`[Auth] Security OTP challenge for user ${user.id} (${currentAttempts}x failed attempts from IP ${ipAddress})`);
+				throw redirect(303, '/login/2fa');
+			} catch (e) {
+				if (e?.status === 303) throw e; // Re-throw redirect
+				console.error('[Auth] Error in security challenge flow:', e.message);
+				return { error: 'Terjadi kesalahan saat verifikasi keamanan. Coba lagi nanti.' };
+			}
+		}
+
+		// ==========================================
+		// 9. Password benar & tidak perlu security challenge
+		//    Hapus record percobaan gagal (reset)
+		// ==========================================
 		if (attemptRecord) {
 			await db.delete(schema.loginAttempts).where(eq(schema.loginAttempts.ip, ipAddress));
 		}
 
-		// Prepare function for final successful login
+		// ==========================================
+		// 10. Fungsi untuk melanjutkan login sukses
+		// ==========================================
 		const proceedWithLogin = async () => {
 			const newSessionId = createSessionToken();
 
@@ -160,7 +317,9 @@ export const actions = {
 			} catch (e) {}
 		};
 
-		// 2FA Logic
+		// ==========================================
+		// 11. 2FA Logic (untuk user yang mengaktifkan OTP 2FA)
+		// ==========================================
 		let shouldRedirectTo2FA = false;
 		try {
 			const [pengaturan] = await db.select().from(schema.pengaturanPesantren).limit(1);
@@ -169,7 +328,7 @@ export const actions = {
 			const systemToken = pengaturan?.telegramBotToken;
 			const systemChatId = pengaturan?.telegramChatId;
 
-			if ((customToken && customChatId) || (systemToken && systemChatId)) {
+			if (user.otp2faEnabled !== false && ((customToken && customChatId) || (systemToken && systemChatId))) {
 				const existingPending = pendingOtps.get(user.id);
 				const hasValidExistingOtp = existingPending && Date.now() < existingPending.expiresAt;
 

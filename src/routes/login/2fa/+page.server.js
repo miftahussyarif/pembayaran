@@ -52,6 +52,13 @@ export const actions = {
 		const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
 		if (!user) return { error: 'User tidak ditemukan.' };
 
+		const ipAddress = getClientAddress();
+
+		// Hapus record login attempts untuk IP ini (reset setelah berhasil verifikasi)
+		try {
+			await db.delete(schema.loginAttempts).where(eq(schema.loginAttempts.ip, ipAddress));
+		} catch (e) {}
+
 		const newSessionId = createSessionToken();
 
 		await db.update(schema.users)
@@ -68,14 +75,17 @@ export const actions = {
 		cookies.delete('temp_2fa_user', { path: '/' });
 
 		try {
+			const isSecurityChallenge = pending.isSecurityChallenge === true;
 			await db.insert(schema.systemLogs).values({
 				userId: user.id,
 				username: user.username,
 				role: user.role,
 				aksi: 'login',
 				modul: 'auth',
-				keterangan: `Login (2FA) berhasil oleh ${user.namaLengkap}`,
-				ip: getClientAddress(),
+				keterangan: isSecurityChallenge
+					? `Login (Security Challenge OTP) berhasil oleh ${user.namaLengkap}`
+					: `Login (2FA) berhasil oleh ${user.namaLengkap}`,
+				ip: ipAddress,
 				createdAt: new Date().toISOString()
 			});
 		} catch (e) {}
@@ -83,3 +93,4 @@ export const actions = {
 		throw redirect(303, '/');
 	}
 };
+

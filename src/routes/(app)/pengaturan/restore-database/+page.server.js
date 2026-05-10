@@ -77,6 +77,7 @@ export const actions = {
 		const santriDetail = asArray(backupData.santriDetail);
 		const santriSmk = asArray(backupData.santriSmk);
 		const santriSmp = asArray(backupData.santriSmp);
+		const santriKeaktifan = asArray(backupData.santriKeaktifan);
 		const santriKategoriTahun = asArray(backupData.santriKategoriTahun);
 		const tunggakanImport = asArray(backupData.tunggakanImport);
 		const pembayarLain = asArray(backupData.pembayarLain);
@@ -101,6 +102,7 @@ export const actions = {
 				tx.delete(schema.systemLogs).run();
 				tx.delete(schema.santriSmk).run();
 				tx.delete(schema.santriSmp).run();
+				tx.delete(schema.santriKeaktifan).run();
 				tx.delete(schema.santriDetail).run();
 				tx.delete(schema.santriKategoriTahun).run();
 				tx.delete(schema.santri).run();
@@ -144,6 +146,9 @@ export const actions = {
 				if (santriSmp.length) {
 					insertInBatches(tx, schema.santriSmp, santriSmp);
 				}
+				if (santriKeaktifan.length) {
+					insertInBatches(tx, schema.santriKeaktifan, santriKeaktifan);
+				}
 				if (santriKategoriTahun.length) {
 					insertInBatches(tx, schema.santriKategoriTahun, santriKategoriTahun);
 				}
@@ -183,7 +188,7 @@ export const actions = {
 					role: locals.user?.role || null,
 					aksi: 'restore',
 					modul: 'backup-restore',
-					keterangan: `Restore backup: master(users=${users.length}, login_attempts=${loginAttempts.length}, santri=${santri.length}, santri_detail=${santriDetail.length}, smk=${santriSmk.length}, smp=${santriSmp.length}, kategori_gratis=${kategoriGratis.length}, santri_kategori_tahun=${santriKategoriTahun.length}, tunggakan_import=${tunggakanImport.length}, pembayar_lain=${pembayarLain.length}), pembayaran=${pembayaran.length}, mutasi=${mutasi.length}, files=${backupFiles.length}`,
+					keterangan: `Restore backup: master(users=${users.length}, login_attempts=${loginAttempts.length}, santri=${santri.length}, santri_detail=${santriDetail.length}, smk=${santriSmk.length}, smp=${santriSmp.length}, keaktifan=${santriKeaktifan.length}, kategori_gratis=${kategoriGratis.length}, santri_kategori_tahun=${santriKategoriTahun.length}, tunggakan_import=${tunggakanImport.length}, pembayar_lain=${pembayarLain.length}), pembayaran=${pembayaran.length}, mutasi=${mutasi.length}, files=${backupFiles.length}`,
 					ip: getClientAddress(),
 					createdAt: new Date().toISOString()
 				});

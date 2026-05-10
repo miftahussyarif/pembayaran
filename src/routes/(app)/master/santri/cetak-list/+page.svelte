@@ -3,7 +3,6 @@
 	let { data } = $props();
 
 	const sortLabel = (value) => {
-		if (value === 'kategori') return 'Kategori Santri';
 		if (value === 'kabupaten') return 'Alamat: Kabupaten';
 		if (value === 'kecamatan') return 'Alamat: Kecamatan';
 		if (value === 'provinsi') return 'Alamat: Provinsi';
@@ -11,11 +10,10 @@
 	};
 
 	const valueLabel = (santri) => {
-		if (data.sortBy === 'kategori') return santri.kategoriNama || '-';
 		if (data.sortBy === 'kabupaten') return santri.detail?.kabupaten || '-';
 		if (data.sortBy === 'kecamatan') return santri.detail?.kecamatan || '-';
 		if (data.sortBy === 'provinsi') return santri.detail?.provinsi || '-';
-		return '-';
+		return santri.kategoriNama || '-';
 	};
 </script>
 
@@ -55,6 +53,9 @@
 					<p class="text-sm text-base-content/70">Sort: {sortLabel(data.sortBy)}</p>
 					{#if data.filter}
 						<p class="text-xs text-base-content/60">Filter: {data.filter}</p>
+					{/if}
+					{#if data.search}
+						<p class="text-xs text-base-content/60">Pencarian: "{data.search}"</p>
 					{/if}
 				</div>
 			</div>

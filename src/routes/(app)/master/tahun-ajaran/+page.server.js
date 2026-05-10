@@ -2,8 +2,19 @@ import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 
+const getSortYear = (nama) => {
+	const years = String(nama || '').match(/\d{4}/g);
+	if (!years?.length) return 0;
+	return Math.max(...years.map(Number));
+};
+
 export async function load() {
 	const tahunAjarans = await db.select().from(schema.tahunAjaran);
+	tahunAjarans.sort((a, b) => {
+		const yearDiff = getSortYear(b.nama) - getSortYear(a.nama);
+		if (yearDiff !== 0) return yearDiff;
+		return b.id - a.id;
+	});
 	return { tahunAjarans };
 }
 

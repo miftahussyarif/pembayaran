@@ -1,4 +1,6 @@
 <script>
+	import { goto } from '$app/navigation';
+
 	let { data } = $props();
 
 	const formatRupiah = (n) => "Rp " + (n || 0).toLocaleString("id-ID");
@@ -11,16 +13,53 @@
 				})
 			: "-";
 
-	let searchSantri = $state("");
-	let filteredSantri = $derived.by(() => {
-		const q = searchSantri.trim().toLowerCase();
-		if (!q) return data.santriList;
-		return data.santriList.filter((s) => {
-			const nama = (s.namaLengkap || "").toLowerCase();
-			const induk = (s.nomorInduk || "").toLowerCase();
-			return nama.includes(q) || induk.includes(q);
+	const HARI_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+	const cetakWaktu = $derived.by(() => {
+		const now = new Date();
+		const hari = HARI_NAMES[now.getDay()];
+		const tanggal = now.toLocaleDateString("id-ID", {
+			day: "2-digit",
+			month: "long",
+			year: "numeric",
 		});
+		return `${hari}, ${tanggal}`;
 	});
+
+	let santriSearch = $state("");
+	let selectedSantriId = $state(data.filterSantriId || "");
+	let selectedLevel = $state(data.filterLevel || "all");
+
+	// Combobox state
+	let santriDropdownOpen = $state(false);
+	let santriHighlightIndex = $state(-1);
+	let santriComboboxRef = $state(null);
+	let santriInputRef = $state(null);
+
+	let selectedSantri = $derived(data.santriList.find(s => String(s.id) === selectedSantriId) || null);
+
+	let filteredSantris = $derived.by(() => {
+		const q = santriSearch.trim().toLowerCase();
+		let list = data.santriList;
+		if (q) {
+			list = data.santriList.filter((s) => {
+				const nama = (s.namaLengkap || "").toLowerCase();
+				const induk = (s.nomorInduk || "").toLowerCase();
+				return nama.includes(q) || induk.includes(q);
+			});
+		}
+		if (selectedSantriId && !list.some((s) => String(s.id) === selectedSantriId)) {
+			const selected = data.santriList.find((s) => String(s.id) === selectedSantriId);
+			if (selected) list = [selected, ...list];
+		}
+		return list;
+	});
+
+	function handleSubmit() {
+		const params = new URLSearchParams();
+		if (selectedSantriId) params.set('santriId', selectedSantriId);
+		if (selectedLevel && selectedLevel !== 'all') params.set('level', selectedLevel);
+		goto(`?${params.toString()}`);
+	}
 
 	function handlePrint() {
 		window.print();
@@ -84,6 +123,9 @@
 			.card-body {
 				overflow: visible !important;
 			}
+			.print-meta {
+				display: block !important;
+			}
 		}
 	</style>
 </svelte:head>
@@ -98,76 +140,142 @@
 
 <div class="no-print card bg-base-100 shadow-sm border border-base-200 mb-6">
 	<div class="card-body py-3 px-4">
-		<form method="GET" class="flex flex-wrap gap-3 items-end">
-			<div class="form-control">
-				<label class="label py-1" for="filterSantri"
-					><span class="label-text text-xs font-medium">Santri</span
-					></label
+		<div class="flex flex-wrap gap-3 items-end">
+			<div class="form-control w-full sm:w-72">
+				<label class="label py-1" for="santriSearchRekap"><span class="label-text text-xs font-medium">Santri</span></label>
+				<!-- svelte-ignore a11y_role_has_required_aria_attrs -->
+				<div
+					class="relative"
+					bind:this={santriComboboxRef}
+					role="combobox"
+					onfocusout={(e) => {
+						setTimeout(() => {
+							if (santriComboboxRef && !santriComboboxRef.contains(document.activeElement)) {
+								santriDropdownOpen = false;
+							}
+						}, 150);
+					}}
 				>
-				<input
-					id="searchSantriRekap"
-					name="searchSantri"
-					type="text"
-					class="input input-sm input-bordered mb-2"
-					placeholder="Ketik nama atau NIS..."
-					bind:value={searchSantri}
-				/>
-				<select
-					id="filterSantri"
-					name="santriId"
-					class="select select-sm select-bordered"
-				>
-					<option
-						value=""
-						disabled
-						selected={data.filterSantriId === ""}
-						>Pilih Santri...</option
-					>
-					{#each filteredSantri as s}
-						<option
-							value={s.id}
-							selected={String(s.id) === data.filterSantriId}
+					{#if selectedSantriId && selectedSantri && !santriDropdownOpen}
+						<div
+							class="input input-sm input-bordered w-full flex items-center gap-2 cursor-pointer bg-base-100 pr-2"
+							role="button"
+							tabindex="0"
+							onclick={() => {
+								santriDropdownOpen = true;
+								santriSearch = '';
+								santriHighlightIndex = -1;
+								setTimeout(() => santriInputRef?.focus(), 0);
+							}}
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') {
+									e.preventDefault();
+									santriDropdownOpen = true;
+									santriSearch = '';
+									santriHighlightIndex = -1;
+									setTimeout(() => santriInputRef?.focus(), 0);
+								}
+							}}
 						>
-							{s.nomorInduk} - {s.namaLengkap}
-						</option>
-					{/each}
-				</select>
+							<span class="flex-1 truncate text-sm">
+								<span class="font-semibold">{selectedSantri.nomorInduk}</span>
+								<span class="mx-1">—</span>
+								<span>{selectedSantri.namaLengkap}</span>
+							</span>
+							<button
+								type="button"
+								class="btn btn-ghost btn-xs btn-circle text-base-content/40 hover:text-error"
+								onclick={(e) => {
+									e.stopPropagation();
+									selectedSantriId = '';
+									santriSearch = '';
+									santriDropdownOpen = false;
+								}}
+								title="Hapus pilihan"
+							>✕</button>
+						</div>
+					{:else}
+						<input
+							id="santriSearchRekap"
+							type="text"
+							placeholder="Ketik nama atau nomor induk..."
+							class="input input-sm input-bordered w-full"
+							autocomplete="off"
+							bind:this={santriInputRef}
+							bind:value={santriSearch}
+							onfocus={() => {
+								santriDropdownOpen = true;
+								santriHighlightIndex = -1;
+							}}
+							oninput={() => {
+								santriDropdownOpen = true;
+								santriHighlightIndex = -1;
+							}}
+							onkeydown={(e) => {
+								if (e.key === 'ArrowDown') {
+									e.preventDefault();
+									santriHighlightIndex = Math.min(santriHighlightIndex + 1, filteredSantris.length - 1);
+								} else if (e.key === 'ArrowUp') {
+									e.preventDefault();
+									santriHighlightIndex = Math.max(santriHighlightIndex - 1, 0);
+								} else if (e.key === 'Enter') {
+									e.preventDefault();
+									if (santriHighlightIndex >= 0 && santriHighlightIndex < filteredSantris.length) {
+										selectedSantriId = String(filteredSantris[santriHighlightIndex].id);
+										santriSearch = '';
+										santriDropdownOpen = false;
+										santriHighlightIndex = -1;
+									}
+								} else if (e.key === 'Escape') {
+									santriDropdownOpen = false;
+									santriHighlightIndex = -1;
+								}
+							}}
+						/>
+					{/if}
+
+					{#if santriDropdownOpen}
+						<div class="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-y-auto rounded-lg border border-base-300 bg-base-100 shadow-lg">
+							{#if filteredSantris.length === 0}
+								<div class="px-4 py-3 text-sm text-base-content/50 text-center">Tidak ada santri yang cocok.</div>
+							{:else}
+								{#each filteredSantris as s, idx}
+									<button
+										type="button"
+										class="w-full text-left px-4 py-2 text-sm transition-colors flex items-center gap-2
+											{idx === santriHighlightIndex ? 'bg-primary/10 text-primary' : 'hover:bg-base-200'}
+											{String(s.id) === selectedSantriId ? 'bg-primary/5 font-semibold' : ''}"
+										onmouseenter={() => santriHighlightIndex = idx}
+										onclick={() => {
+											selectedSantriId = String(s.id);
+											santriSearch = '';
+											santriDropdownOpen = false;
+											santriHighlightIndex = -1;
+										}}
+									>
+										<span class="font-mono text-xs text-base-content/60 w-16 shrink-0">{s.nomorInduk}</span>
+										<span class="flex-1 truncate">{s.namaLengkap}</span>
+									</button>
+								{/each}
+							{/if}
+						</div>
+					{/if}
+				</div>
 			</div>
 			<div class="form-control">
-				<label class="label py-1" for="filterLevel"
-					><span class="label-text text-xs font-medium">Filter</span
-					></label
-				>
+				<label class="label py-1" for="filterLevel"><span class="label-text text-xs font-medium">Filter</span></label>
 				<select
 					id="filterLevel"
-					name="level"
 					class="select select-sm select-bordered"
+					bind:value={selectedLevel}
 				>
-					<option value="all" selected={data.filterLevel === "all"}
-						>Semua</option
-					>
-					<option value="smp" selected={data.filterLevel === "smp"}
-						>Hanya SMP</option
-					>
-					<option value="smk" selected={data.filterLevel === "smk"}
-						>Hanya SMK</option
-					>
+					<option value="all">Semua</option>
+					<option value="smp">Hanya SMP</option>
+					<option value="smk">Hanya SMK</option>
 				</select>
 			</div>
-			<button type="submit" class="btn btn-sm btn-primary">
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="h-4 w-4"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-					><path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-					/></svg
-				>
+			<button type="button" class="btn btn-sm btn-primary" onclick={handleSubmit}>
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
 				Tampilkan
 			</button>
 			<button
@@ -175,22 +283,10 @@
 				class="btn btn-sm btn-outline"
 				onclick={handlePrint}
 			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					class="h-4 w-4"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke="currentColor"
-					><path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-					/></svg
-				>
+				<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
 				Cetak A4
 			</button>
-		</form>
+		</div>
 	</div>
 </div>
 
@@ -230,18 +326,18 @@
 						>
 							<div class="text-left">
 								<div class="text-sm text-base-content/60">
-									Tagihan Konsumsi
+									Tagihan Bulanan
 								</div>
 								<div class="text-base font-semibold">
-									{formatRupiah(s.totalTagihanKonsumsi)}
+									{formatRupiah(s.totalTagihanBulananPondok)}
 								</div>
 								<div class="text-sm text-success">
 									Dibayar: {formatRupiah(
-										s.totalDibayarKonsumsi,
+										s.totalDibayarBulananPondok,
 									)}
 								</div>
 								<div class="text-sm text-error">
-									Sisa: {formatRupiah(s.totalSisaKonsumsi)}
+									Sisa: {formatRupiah(s.totalSisaBulananPondok)}
 								</div>
 							</div>
 							<div class="text-right">
@@ -279,38 +375,39 @@
 						</div>
 					</div>
 
-					<!-- Konsumsi Bulanan -->
-					{#if s.konsumsiNominalEff > 0 || s.totalDibayarKonsumsi > 0}
+					<!-- Pembayaran Pondok Bulanan -->
+					{#if s.bulananPondok && s.bulananPondok.length > 0}
 						<div class="mb-6">
 							<div class="flex items-center justify-between mb-2">
-								<h3 class="font-semibold">Konsumsi Bulanan</h3>
+								<h3 class="font-semibold">Pembayaran Pondok Bulanan</h3>
 								<span class="badge badge-outline"
-									>{s.konsumsi.length} bulan</span
+									>{s.bulananPondok.length} jenis</span
 								>
 							</div>
-							<div class="overflow-x-auto">
-								<table class="table table-sm w-full">
-									<thead>
-										<tr class="bg-base-200/60">
-											<th>Bulan</th>
-											<th class="text-right">Tagihan</th>
-											<th class="text-right">Dibayar</th>
-											<th>Tgl Bayar</th>
-											<th>No. Kwitansi</th>
-											<th>Status</th>
-										</tr>
-									</thead>
-									<tbody>
-										{#if s.konsumsi.length === 0}
-											<tr>
-												<td
-													colspan="6"
-													class="text-center text-base-content/50 py-4"
-													>Belum ada periode konsumsi.</td
-												>
-											</tr>
-										{:else}
-											{#each s.konsumsi as m}
+							{#each s.bulananPondok as jenisBulanan}
+								<div class="border border-base-200 rounded-lg mb-3 overflow-hidden">
+									<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 py-2 bg-base-200/40">
+										<div class="font-medium">{jenisBulanan.namaPembayaran}</div>
+										<div class="flex flex-wrap gap-3 text-xs">
+											<span>Tagihan: <strong>{formatRupiah(jenisBulanan.totalTagihan)}</strong></span>
+											<span>Dibayar: <strong class="text-success">{formatRupiah(jenisBulanan.totalDibayar)}</strong></span>
+											<span>Sisa: <strong class="text-error">{formatRupiah(jenisBulanan.totalSisa)}</strong></span>
+										</div>
+									</div>
+									<div class="overflow-x-auto">
+										<table class="table table-sm w-full">
+											<thead>
+												<tr class="bg-base-200/60">
+													<th>Bulan</th>
+													<th class="text-right">Tagihan</th>
+													<th class="text-right">Dibayar</th>
+													<th>Tgl Bayar</th>
+													<th>No. Kwitansi</th>
+													<th>Status</th>
+												</tr>
+											</thead>
+											<tbody>
+												{#each jenisBulanan.months as m}
 												<tr>
 													<td>
 														<div
@@ -364,11 +461,12 @@
 														{/if}
 													</td>
 												</tr>
-											{/each}
-										{/if}
-									</tbody>
-								</table>
-							</div>
+												{/each}
+											</tbody>
+										</table>
+									</div>
+								</div>
+							{/each}
 						</div>
 					{/if}
 
@@ -620,94 +718,75 @@
 								>{s.pembayaranLain.length} jenis</span
 							>
 						</div>
-						<div class="overflow-x-auto">
-							<table class="table table-sm w-full">
-								<thead>
-									<tr class="bg-base-200/60">
-										<th>Jenis</th>
-										<th>Tipe</th>
-										<th class="text-center">Transaksi</th>
-										<th class="text-right">Tagihan</th>
-										<th class="text-right">Dibayar</th>
-										<th class="text-right">Sisa</th>
-										<th>Status</th>
-										<th class="text-right"
-											>Terakhir Bayar</th
-										>
-									</tr>
-								</thead>
-								<tbody>
-									{#if s.pembayaranLain.length === 0}
-										<tr>
-											<td
-												colspan="8"
-												class="text-center text-base-content/50 py-4"
-												>Tidak ada jenis pembayaran
-												non-bulanan.</td
-											>
-										</tr>
+						{#if s.pembayaranLain.length === 0}
+							<div class="border border-base-200 rounded-lg p-4 text-center text-base-content/50 text-sm">
+								Tidak ada jenis pembayaran non-bulanan.
+							</div>
+						{:else}
+							{#each s.pembayaranLain as p}
+								<div class="border border-base-200 rounded-lg mb-3 overflow-hidden">
+									<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-3 py-2 bg-base-200/40">
+										<div class="flex items-center gap-2">
+											<span class="font-medium">{p.namaPembayaran || "-"}</span>
+											<span class="badge badge-xs badge-outline text-base-content/50">{p.tipe || "-"}</span>
+											{#if p.isTambahanDariPembayaran}
+												<span class="badge badge-warning badge-xs">Dari pembayaran</span>
+											{/if}
+										</div>
+										<div class="flex flex-wrap gap-3 text-xs">
+											<span>Tagihan: <strong>{formatRupiah(p.totalTagihan)}</strong></span>
+											<span>Dibayar: <strong class="text-success">{formatRupiah(p.totalNominal)}</strong></span>
+											<span>Sisa: <strong class="text-error">{formatRupiah(p.sisa)}</strong></span>
+										</div>
+									</div>
+									{#if p.tahunDetails && p.tahunDetails.length > 0}
+										<div class="overflow-x-auto">
+											<table class="table table-sm w-full">
+												<thead>
+													<tr class="bg-base-200/60">
+														<th>Tahun Ajaran</th>
+														<th class="text-right">Tagihan</th>
+														<th class="text-right">Dibayar</th>
+														<th class="text-right">Sisa</th>
+														<th class="text-center">Transaksi</th>
+														<th>Status</th>
+														<th class="text-right">Terakhir Bayar</th>
+													</tr>
+												</thead>
+												<tbody>
+													{#each p.tahunDetails as td}
+														<tr>
+															<td>
+																<div class="flex items-center gap-2">
+																	<span class="font-medium">{td.namaTahun}</span>
+																	{#if td.isTambahanDariPembayaran}
+																		<span class="badge badge-warning badge-xs">Dari pembayaran</span>
+																	{/if}
+																</div>
+															</td>
+															<td class="text-right">{formatRupiah(td.nominalTagihan)}</td>
+															<td class="text-right font-semibold">{formatRupiah(td.totalDibayar)}</td>
+															<td class="text-right text-error">{formatRupiah(td.sisa)}</td>
+															<td class="text-center">{td.jumlahTransaksi}</td>
+															<td>
+																<span class={`badge badge-sm ${td.sisa <= 0 && td.nominalTagihan > 0 ? "badge-success" : td.totalDibayar > 0 ? "badge-warning badge-outline" : "badge-outline"}`}>
+																	{td.sisa <= 0 && td.nominalTagihan > 0 ? "Lunas" : td.totalDibayar > 0 ? "Cicilan" : "Belum"}
+																</span>
+															</td>
+															<td class="text-right text-xs text-base-content/60">{formatTanggal(td.terakhirBayar)}</td>
+														</tr>
+													{/each}
+												</tbody>
+											</table>
+										</div>
 									{:else}
-										{#each s.pembayaranLain as p}
-											<tr>
-												<td>
-													<div
-														class="flex items-center gap-2"
-													>
-														<span
-															>{p.namaPembayaran ||
-																"-"}</span
-														>
-														{#if p.isTambahanDariPembayaran}
-															<span
-																class="badge badge-warning badge-xs"
-																>Dari pembayaran</span
-															>
-														{/if}
-													</div>
-												</td>
-												<td
-													class="text-xs text-base-content/60"
-													>{p.tipe || "-"}</td
-												>
-												<td class="text-center"
-													>{p.jumlahTransaksi}</td
-												>
-												<td class="text-right"
-													>{formatRupiah(
-														p.totalTagihan,
-													)}</td
-												>
-												<td
-													class="text-right font-semibold"
-													>{formatRupiah(
-														p.totalNominal,
-													)}</td
-												>
-												<td
-													class="text-right text-error"
-													>{formatRupiah(p.sisa)}</td
-												>
-												<td>
-													<span
-														class={`badge badge-sm ${p.sisa <= 0 ? "badge-success" : "badge-warning badge-outline"}`}
-													>
-														{p.sisa <= 0
-															? "Lunas"
-															: "Belum Lunas"}
-													</span>
-												</td>
-												<td
-													class="text-right text-xs text-base-content/60"
-													>{formatTanggal(
-														p.terakhirBayar,
-													)}</td
-												>
-											</tr>
-										{/each}
+										<div class="px-3 py-2 text-sm text-base-content/50">
+											Belum ada detail tagihan.
+										</div>
 									{/if}
-								</tbody>
-							</table>
-						</div>
+								</div>
+							{/each}
+						{/if}
 					</div>
 
 					<!-- Pembayaran Khusus (hanya tampil jika ada) -->
@@ -840,7 +919,11 @@
 							</div>
 						</div>
 					{/if}
-					<div class="flex justify-end mt-6">
+					<div class="flex justify-between items-end mt-6">
+						<div class="text-xs text-base-content/70 hidden print-meta">
+							<div>Dicetak pada {cetakWaktu}</div>
+							<div>Oleh {data.user?.namaLengkap || data.user?.username || '-'}</div>
+						</div>
 						<div
 							class="rounded-xl border border-error/20 bg-error/5 px-4 py-3 min-w-[280px]"
 						>

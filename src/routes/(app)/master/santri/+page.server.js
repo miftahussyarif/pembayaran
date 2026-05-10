@@ -77,11 +77,61 @@ const insertInBatches = async (tx, table, rows, batchSize = 100) => {
 	}
 };
 
+const getSortYear = (nama) => {
+	const years = String(nama || '').match(/\d{4}/g);
+	if (!years?.length) return 0;
+	return Math.max(...years.map(Number));
+};
+
+const sortTahunAjarans = (tahunAjarans) => {
+	return [...tahunAjarans].sort((a, b) => {
+		const yearDiff = getSortYear(b.nama) - getSortYear(a.nama);
+		if (yearDiff !== 0) return yearDiff;
+		return b.id - a.id;
+	});
+};
+
+const getTanggalMasukYear = (tanggalMasuk, tahunAjarans) => {
+	if (tanggalMasuk) {
+		const parsed = new Date(`${tanggalMasuk}T00:00:00`);
+		if (!Number.isNaN(parsed.getTime())) return parsed.getFullYear();
+	}
+
+	const years = tahunAjarans.map((tahun) => getSortYear(tahun.nama)).filter(Boolean);
+	return years.length ? Math.min(...years) : 0;
+};
+
+const expandKategoriTahunRows = ({ kategoriTahunList, tahunAjarans, tanggalMasuk }) => {
+	const rows = [];
+	const seen = new Set();
+	const startYear = getTanggalMasukYear(tanggalMasuk, tahunAjarans);
+
+	for (const entry of kategoriTahunList) {
+		const kategoriIds = Array.isArray(entry.kategoriIds) ? entry.kategoriIds : [];
+		const targetTahunAjarans = entry.tahunAjaranId === 'all'
+			? tahunAjarans.filter((tahun) => getSortYear(tahun.nama) >= startYear)
+			: tahunAjarans.filter((tahun) => tahun.id === Number(entry.tahunAjaranId));
+
+		for (const tahunAjaran of targetTahunAjarans) {
+			for (const kategoriId of kategoriIds) {
+				const kid = Number(kategoriId);
+				if (!tahunAjaran.id || !kid) continue;
+				const key = `${tahunAjaran.id}:${kid}`;
+				if (seen.has(key)) continue;
+				seen.add(key);
+				rows.push({ tahunAjaranId: tahunAjaran.id, kategoriId: kid });
+			}
+		}
+	}
+
+	return rows;
+};
+
 export async function load() {
 	const santris = await db.select().from(schema.santri);
 	const santriDetails = await db.select().from(schema.santriDetail);
 	const kategoris = await db.select().from(schema.kategoriSantri).orderBy(schema.kategoriSantri.namaKategori);
-	const tahunAjarans = await db.select().from(schema.tahunAjaran);
+	const tahunAjarans = sortTahunAjarans(await db.select().from(schema.tahunAjaran));
 	const kategoriTahunRows = await db.select().from(schema.santriKategoriTahun);
 
 	const detailBySantriId = new Map(santriDetails.map((d) => [d.santriId, d]));
@@ -177,15 +227,10 @@ export const actions = {
 				tx.insert(schema.santriDetail).values({ santriId: newSantri.id, ...detailData }).run();
 
 				// Insert relasi multi-kategori per tahun ajaran
-				for (const entry of kategoriTahunList) {
-					const tahunAjaranId = Number(entry.tahunAjaranId);
-					const kategoriIds = Array.isArray(entry.kategoriIds) ? entry.kategoriIds : [];
-					for (const kategoriId of kategoriIds) {
-						const kid = Number(kategoriId);
-						if (tahunAjaranId && kid) {
-							tx.insert(schema.santriKategoriTahun).values({ santriId: newSantri.id, tahunAjaranId, kategoriId: kid }).run();
-						}
-					}
+				const tahunAjarans = tx.select().from(schema.tahunAjaran).all();
+				const expandedKategoriRows = expandKategoriTahunRows({ kategoriTahunList, tahunAjarans, tanggalMasuk });
+				for (const row of expandedKategoriRows) {
+					tx.insert(schema.santriKategoriTahun).values({ santriId: newSantri.id, ...row }).run();
 				}
 
 				try {
@@ -290,15 +335,10 @@ export const actions = {
 
 			// Reset dan insert ulang relasi kategori-tahun
 			await db.delete(schema.santriKategoriTahun).where(eq(schema.santriKategoriTahun.santriId, id));
-			for (const entry of kategoriTahunList) {
-				const tahunAjaranId = Number(entry.tahunAjaranId);
-				const kategoriIds = Array.isArray(entry.kategoriIds) ? entry.kategoriIds : [];
-				for (const kategoriId of kategoriIds) {
-					const kid = Number(kategoriId);
-					if (tahunAjaranId && kid) {
-						await db.insert(schema.santriKategoriTahun).values({ santriId: id, tahunAjaranId, kategoriId: kid });
-					}
-				}
+			const tahunAjarans = await db.select().from(schema.tahunAjaran);
+			const expandedKategoriRows = expandKategoriTahunRows({ kategoriTahunList, tahunAjarans, tanggalMasuk });
+			for (const row of expandedKategoriRows) {
+				await db.insert(schema.santriKategoriTahun).values({ santriId: id, ...row });
 			}
 
 			try {
@@ -351,6 +391,7 @@ export const actions = {
 		const id = Number(data.get('id'));
 		try {
 			// Hapus relasi kategori-tahun dulu
+			await db.delete(schema.santriKeaktifan).where(eq(schema.santriKeaktifan.santriId, id));
 			await db.delete(schema.santriKategoriTahun).where(eq(schema.santriKategoriTahun.santriId, id));
 			await db.delete(schema.santriDetail).where(eq(schema.santriDetail.santriId, id));
 			await db.delete(schema.santri).where(eq(schema.santri.id, id));
@@ -376,6 +417,8 @@ export const actions = {
 			if (msg.includes('foreign key') || msg.includes('constraint')) {
 				// Cek relasi yang masih ada
 				const relasi = [];
+				const [keaktifan] = await db.select({ id: schema.santriKeaktifan.id }).from(schema.santriKeaktifan).where(eq(schema.santriKeaktifan.santriId, id));
+				if (keaktifan) relasi.push('Keaktifan Santri');
 				const [smk] = await db.select({ id: schema.santriSmk.id }).from(schema.santriSmk).where(eq(schema.santriSmk.santriId, id));
 				if (smk) relasi.push('Data Siswa SMK');
 				const [smp] = await db.select({ id: schema.santriSmp.id }).from(schema.santriSmp).where(eq(schema.santriSmp.santriId, id));
@@ -404,6 +447,7 @@ export const actions = {
 
 		try {
 			// Hapus relasi kategori-tahun dulu
+			await db.delete(schema.santriKeaktifan).where(inArray(schema.santriKeaktifan.santriId, ids));
 			await db.delete(schema.santriKategoriTahun).where(inArray(schema.santriKategoriTahun.santriId, ids));
 			await db.delete(schema.santriDetail).where(inArray(schema.santriDetail.santriId, ids));
 			await db.delete(schema.santri).where(inArray(schema.santri.id, ids));

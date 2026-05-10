@@ -5,12 +5,17 @@
 	let editSantri = $state(null);
 	let sortBy = $state('nama');
 	let filterValue = $state('');
+	let searchQuery = $state('');
 	let selectedSantris = $state([]);
 	const isAdmin = $derived($page.data.user?.role === 'admin');
 
 	// === Helper ===
 	const getKategoriName = (id) => data.kategoris.find((k) => k.id === id)?.namaKategori || '';
 	const getTahunNama = (id) => data.tahunAjarans.find((t) => t.id === id)?.nama || '';
+	const getTahunOrder = (id) => {
+		const index = data.tahunAjarans.findIndex((t) => t.id === Number(id));
+		return index === -1 ? Number.MAX_SAFE_INTEGER : index;
+	};
 
 	// Ambil daftar kategori+tahun terakhir untuk display di tabel
 	const getLatestKategoriLabels = (santri) => {
@@ -21,8 +26,8 @@
 			if (!byTahun.has(kt.tahunAjaranId)) byTahun.set(kt.tahunAjaranId, []);
 			byTahun.get(kt.tahunAjaranId).push(kt.kategoriId);
 		}
-		// Ambil semua tahun, urutkan descending berdasarkan id
-		const allTahunIds = [...byTahun.keys()].sort((a, b) => b - a);
+		// Ambil semua tahun, ikuti urutan master tahun ajaran terbaru di atas
+		const allTahunIds = [...byTahun.keys()].sort((a, b) => getTahunOrder(a) - getTahunOrder(b));
 		// Tampilkan kategori dari tahun terbaru saja (untuk kolom tabel)
 		const latestTahunId = allTahunIds[0];
 		const latestKatIds = byTahun.get(latestTahunId) || [];
@@ -46,18 +51,34 @@
 	});
 
 	const filteredSantris = $derived.by(() => {
-		if (!filterValue) return data.santris;
-		const needle = filterValue.toString().toLowerCase();
-		if (sortBy === 'kategori') {
-			return data.santris.filter((s) => getLatestKategoriLabels(s).some((l) => l.toLowerCase() === needle));
+		let list = data.santris;
+
+		// Text search filter (name / nomor induk)
+		const sq = searchQuery.trim().toLowerCase();
+		if (sq) {
+			list = list.filter((s) => {
+				const nama = String(s.namaLengkap || '').toLowerCase();
+				const nomor = String(s.nomorInduk || '').toLowerCase();
+				return nama.includes(sq) || nomor.includes(sq);
+			});
 		}
-		if (sortBy === 'tahun_ajaran') {
-			return data.santris.filter((s) => s.kategoriTahun?.some((kt) => getTahunNama(kt.tahunAjaranId).toLowerCase() === needle));
+
+		// Dropdown filter
+		if (filterValue) {
+			const needle = filterValue.toString().toLowerCase();
+			if (sortBy === 'kategori') {
+				list = list.filter((s) => getLatestKategoriLabels(s).some((l) => l.toLowerCase() === needle));
+			} else if (sortBy === 'tahun_ajaran') {
+				list = list.filter((s) => s.kategoriTahun?.some((kt) => getTahunNama(kt.tahunAjaranId).toLowerCase() === needle));
+			} else {
+				list = list.filter((s) => {
+					const value = s.detail?.[sortBy];
+					return value && value.toString().toLowerCase() === needle;
+				});
+			}
 		}
-		return data.santris.filter((s) => {
-			const value = s.detail?.[sortBy];
-			return value && value.toString().toLowerCase() === needle;
-		});
+
+		return list;
 	});
 
 	const sortedSantris = $derived.by(() => {
@@ -99,7 +120,9 @@
 		if (byTahun.size === 0) {
 			editKategoriRows = [{ tahunAjaranId: '', kategoriIds: [] }];
 		} else {
-			editKategoriRows = [...byTahun.entries()].map(([tid, kids]) => ({ tahunAjaranId: tid, kategoriIds: kids }));
+			editKategoriRows = [...byTahun.entries()]
+				.sort(([a], [b]) => getTahunOrder(a) - getTahunOrder(b))
+				.map(([tid, kids]) => ({ tahunAjaranId: tid, kategoriIds: kids }));
 		}
 		my_modal_edit_santri.showModal();
 	};
@@ -114,9 +137,58 @@
 		}
 		editKategoriRows = [...editKategoriRows];
 	};
+	const HARI_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+	const cetakWaktu = $derived.by(() => {
+		const now = new Date();
+		const hari = HARI_NAMES[now.getDay()];
+		const tanggal = now.toLocaleDateString("id-ID", {
+			day: "2-digit",
+			month: "long",
+			year: "numeric",
+		});
+		return `${hari}, ${tanggal}`;
+	});
 </script>
 
-<div class="flex flex-col lg:flex-row lg:items-end gap-3 mb-6">
+<svelte:head>
+	<title>Data Santri</title>
+	<style>
+		@media print {
+			@page {
+				size: landscape;
+			}
+			:global(body) {
+				background-color: white !important;
+			}
+			:global(.drawer-toggle), :global(.drawer-side), :global(.navbar), :global(footer) {
+				display: none !important;
+			}
+			.print-meta {
+				display: block !important;
+			}
+			.card {
+				border: none !important;
+				box-shadow: none !important;
+			}
+			table {
+				font-size: 12px;
+			}
+		}
+		.print-meta {
+			display: none;
+		}
+		.print-only {
+			display: none;
+		}
+		@media print {
+			.print-only {
+				display: block;
+			}
+		}
+	</style>
+</svelte:head>
+
+<div class="flex flex-col lg:flex-row lg:items-end gap-3 mb-6 print:hidden">
 	<div class="form-control w-full sm:w-56">
 		<label class="label py-0" for="sort-select"><span class="label-text text-xs">Sorting</span></label>
 		<select id="sort-select" class="select select-sm select-bordered w-full" bind:value={sortBy} onchange={() => { filterValue = ''; }}>
@@ -137,13 +209,13 @@
 			{/each}
 		</select>
 	</div>
-	<a class="btn btn-sm btn-outline btn-secondary w-full sm:w-auto" href={`/master/santri/cetak-list?sortBy=${sortBy}&filter=${encodeURIComponent(filterValue)}`} target="_blank" rel="noopener">
+	<button type="button" class="btn btn-sm btn-outline btn-secondary w-full sm:w-auto" onclick={() => window.print()}>
 		<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
 			<path d="M6 2a1 1 0 00-1 1v2h10V3a1 1 0 00-1-1H6z" />
 			<path fill-rule="evenodd" d="M4 7a2 2 0 00-2 2v5a2 2 0 002 2h1v2a1 1 0 001 1h8a1 1 0 001-1v-2h1a2 2 0 002-2V9a2 2 0 00-2-2H4zm2 9v-4h8v4H6z" clip-rule="evenodd" />
 		</svg>
 		Cetak List
-	</a>
+	</button>
 	<button class="btn btn-sm btn-outline w-full sm:w-auto" onclick={() => my_modal_import_santri.showModal()}>
 		<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
 			<path d="M3 14a1 1 0 011-1h3v-2H5a1 1 0 110-2h2V7a1 1 0 112 0v2h2a1 1 0 110 2H9v2h3a1 1 0 011 1v2H3v-2z" />
@@ -153,7 +225,7 @@
 	</button>
 	<div class="form-control w-full sm:w-56">
 		<label class="label py-0" for="search-input"><span class="label-text text-xs">Cari Santri</span></label>
-		<input id="search-input" type="text" placeholder="Cari santri..." class="input input-sm input-bordered w-full" />
+		<input id="search-input" type="text" placeholder="Cari santri..." class="input input-sm input-bordered w-full" bind:value={searchQuery} />
 	</div>
 	<button class="btn btn-sm btn-primary w-full sm:w-auto" onclick={() => my_modal_santri.showModal()}>
 		<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -180,16 +252,44 @@
 </div>
 
 {#if form?.type}
-	<div class={`alert ${form.type === 'success' ? 'alert-success' : 'alert-error'} mb-4 shadow-sm`}>
+	<div class={`alert ${form.type === 'success' ? 'alert-success' : 'alert-error'} mb-4 shadow-sm print:hidden`}>
 		<span>{form.message}</span>
 	</div>
 {/if}
 {#if form?.success === false && form?.error}
-	<div class="alert alert-error mb-4 shadow-sm">
+	<div class="alert alert-error mb-4 shadow-sm print:hidden">
 		<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
 		<span>{form.error}</span>
 	</div>
 {/if}
+
+<!-- Print Header -->
+<div class="print-only mb-4">
+	<div class="flex justify-between items-center border-b-2 border-base-300 pb-2 mb-4">
+		<div class="flex items-center gap-4">
+			<div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary font-bold text-lg overflow-hidden">
+				{#if $page.data.profilPesantren?.logoUrl}
+					<img src={$page.data.profilPesantren.logoUrl} alt="Logo" class="w-full h-full object-cover" />
+				{:else}
+					{$page.data.profilPesantren?.namaPesantren?.charAt(0) || 'P'}
+				{/if}
+			</div>
+			<div>
+				<h1 class="text-2xl font-bold">{$page.data.profilPesantren?.namaPesantren || 'Aplikasi Pesantren'}</h1>
+				<p class="text-base-content/60 text-sm">{$page.data.profilPesantren?.alamat || 'Alamat Pesantren'}</p>
+			</div>
+		</div>
+		<div class="text-right">
+			<h2 class="text-xl font-bold tracking-wide text-primary">LIST SANTRI</h2>
+			{#if filterValue}
+				<p class="text-xs text-base-content/60">Filter: {filterValue}</p>
+			{/if}
+			{#if searchQuery}
+				<p class="text-xs text-base-content/60">Pencarian: "{searchQuery}"</p>
+			{/if}
+		</div>
+	</div>
+</div>
 
 <div class="card bg-base-100 shadow-sm border border-base-200">
 	<div class="overflow-x-auto">
@@ -197,7 +297,7 @@
 			<thead>
 				<tr>
 					{#if isAdmin}
-						<th>
+						<th class="print:hidden">
 							<input id="selectAllSantri" type="checkbox" class="checkbox checkbox-sm"
 								checked={selectedSantris.length > 0 && selectedSantris.length === sortedSantris.length}
 								onchange={(e) => {
@@ -213,7 +313,7 @@
 					<th>Tanggal Masuk</th>
 					<th>Tanggal Keluar</th>
 					<th>Status</th>
-					<th>Aksi</th>
+					<th class="print:hidden">Aksi</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -261,7 +361,7 @@
 								<div class="badge badge-ghost badge-sm">Berhenti</div>
 							{/if}
 						</td>
-						<td class="flex gap-1 flex-wrap">
+						<td class="flex gap-1 flex-wrap print:hidden">
 							<button class="btn btn-xs btn-outline btn-primary" onclick={() => openEdit(santri)}>
 								<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
 								Edit
@@ -285,6 +385,16 @@
 				{/each}
 			</tbody>
 		</table>
+	</div>
+</div>
+
+<!-- Print Metadata Footer -->
+<div class="print-meta mt-8 text-sm">
+	<div class="flex justify-between items-start">
+		<div class="flex-1">
+			<p>Dicetak pada {cetakWaktu}</p>
+			<p>Oleh <span class="font-medium">{$page.data.user?.namaLengkap || $page.data.user?.username || 'Petugas'}</span></p>
+		</div>
 	</div>
 </div>
 
@@ -355,6 +465,7 @@
 						<div class="form-control flex-1">
 							<select id={`addKategoriTahun-${rowIdx}`} class="select select-sm select-bordered w-full" bind:value={row.tahunAjaranId}>
 								<option value="">-- Pilih Tahun Ajaran --</option>
+								<option value="all">Semua Tahun</option>
 								{#each data.tahunAjarans as ta}
 									<option value={ta.id}>{ta.nama}</option>
 								{/each}
@@ -616,7 +727,7 @@
 
 <!-- Modal Edit Santri -->
 <dialog id="my_modal_edit_santri" class="modal">
-	<div class="modal-box max-w-lg">
+	<div class="modal-box max-w-5xl">
 		<h3 class="font-bold text-lg mb-4">Edit Data Santri</h3>
 		{#if editSantri}
 		<form method="POST" action="?/update" use:enhance={() => {
@@ -644,6 +755,7 @@
 							<div class="form-control flex-1">
 								<select id={`editKategoriTahun-${rowIdx}`} class="select select-sm select-bordered w-full" bind:value={row.tahunAjaranId}>
 									<option value="">-- Pilih Tahun Ajaran --</option>
+									<option value="all">Semua Tahun</option>
 									{#each data.tahunAjarans as ta}
 										<option value={ta.id}>{ta.nama}</option>
 									{/each}

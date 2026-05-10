@@ -154,6 +154,32 @@ export const actions = {
 		}
 	},
 
+	toggleOtp2fa: async ({ request }) => {
+		const data = await request.formData();
+		const id = Number(data.get('id'));
+
+		if (!Number.isInteger(id) || id <= 0) {
+			return { type: 'error', message: 'ID user tidak valid.' };
+		}
+
+		try {
+			const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id));
+			if (!user) return { type: 'error', message: 'User tidak ditemukan.' };
+
+			const nextValue = user.otp2faEnabled === false ? true : false;
+			await db.update(schema.users)
+				.set({ otp2faEnabled: nextValue })
+				.where(eq(schema.users.id, id));
+
+			return {
+				type: 'success',
+				message: `OTP 2FA untuk ${user.namaLengkap} berhasil ${nextValue ? 'diaktifkan' : 'dinonaktifkan'}.`
+			};
+		} catch (e) {
+			return { type: 'error', message: 'Gagal mengubah status OTP 2FA.' };
+		}
+	},
+
 	deleteUser: async ({ request }) => {
 		const data = await request.formData();
 		const id = Number(data.get('id'));
