@@ -177,16 +177,26 @@ export async function load() {
 				kategoriLabels,
 				periods,
 				activeKeys,
-				currentMonthActive: activeKeys.includes(currentPeriod.key)
+				currentMonthActive: activeKeys.includes(currentPeriod.key),
+				tahunMasuk: santri.tanggalMasuk ? parseInt(santri.tanggalMasuk.split('-')[0]) : null
 			};
 		})
 		.sort((a, b) => a.namaLengkap.localeCompare(b.namaLengkap, 'id'));
+
+	const tahunMasukOptions = tahunAjarans
+		.map((t) => ({
+			label: t.nama,
+			value: parseTahunAjaranStartYear(t.nama)
+		}))
+		.filter((t) => t.value)
+		.sort((a, b) => b.value - a.value);
 
 	return {
 		santris: santrisWithKeaktifan,
 		tahunAjarans,
 		currentPeriod,
-		monthNames: BULAN
+		monthNames: BULAN,
+		tahunMasukOptions
 	};
 }
 

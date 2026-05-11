@@ -4,6 +4,7 @@
 	let { data, form } = $props();
 
 	let search = $state('');
+	let selectedTahunMasuk = $state('');
 	let editSantri = $state(null);
 	let editActiveKeys = $state([]);
 
@@ -13,9 +14,15 @@
 
 	const filteredSantris = $derived.by(() => {
 		const needle = search.trim().toLowerCase();
-		if (!needle) return data.santris;
+		let result = data.santris;
 
-		return data.santris.filter((santri) => {
+		if (selectedTahunMasuk) {
+			result = result.filter((santri) => String(santri.tahunMasuk) === String(selectedTahunMasuk));
+		}
+
+		if (!needle) return result;
+
+		return result.filter((santri) => {
 			return (
 				santri.namaLengkap.toLowerCase().includes(needle) ||
 				santri.nomorInduk.toLowerCase().includes(needle) ||
@@ -67,6 +74,15 @@
 			class="input input-sm input-bordered w-full"
 			bind:value={search}
 		/>
+	</div>
+	<div class="form-control w-full sm:w-48">
+		<label class="label py-0" for="filter-tahun"><span class="label-text text-xs">Tahun Masuk</span></label>
+		<select id="filter-tahun" class="select select-sm select-bordered w-full" bind:value={selectedTahunMasuk}>
+			<option value="">Semua Tahun Masuk</option>
+			{#each data.tahunMasukOptions as option}
+				<option value={option.value}>{option.label}</option>
+			{/each}
+		</select>
 	</div>
 	<div class="stats stats-horizontal shadow-sm border border-base-200 bg-base-100 w-full sm:w-auto">
 		<div class="stat py-2 px-4">

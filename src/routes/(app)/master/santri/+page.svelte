@@ -5,6 +5,7 @@
 	let editSantri = $state(null);
 	let sortBy = $state('nama');
 	let filterValue = $state('');
+	let selectedTahunMasuk = $state('');
 	let searchQuery = $state('');
 	let selectedSantris = $state([]);
 	const isAdmin = $derived($page.data.user?.role === 'admin');
@@ -52,6 +53,10 @@
 
 	const filteredSantris = $derived.by(() => {
 		let list = data.santris;
+
+		if (selectedTahunMasuk) {
+			list = list.filter((santri) => String(santri.tahunMasuk) === String(selectedTahunMasuk));
+		}
 
 		// Text search filter (name / nomor induk)
 		const sq = searchQuery.trim().toLowerCase();
@@ -299,6 +304,15 @@
 			<option value="">Semua</option>
 			{#each filterOptions as opt}
 				<option value={opt}>{opt}</option>
+			{/each}
+		</select>
+	</div>
+	<div class="form-control w-full sm:w-48">
+		<label class="label py-0" for="filter-tahun"><span class="label-text text-xs">Tahun Masuk</span></label>
+		<select id="filter-tahun" class="select select-sm select-bordered w-full" bind:value={selectedTahunMasuk}>
+			<option value="">Semua Tahun Masuk</option>
+			{#each data.tahunMasukOptions as option}
+				<option value={option.value}>{option.label}</option>
 			{/each}
 		</select>
 	</div>

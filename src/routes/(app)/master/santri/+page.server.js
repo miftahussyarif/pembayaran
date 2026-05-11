@@ -148,10 +148,28 @@ export async function load() {
 	const santrisWithDetail = santris.map((s) => ({
 		...s,
 		detail: detailBySantriId.get(s.id) || null,
-		kategoriTahun: kategoriTahunBySantriId.get(s.id) || []
+		kategoriTahun: kategoriTahunBySantriId.get(s.id) || [],
+		tahunMasuk: s.tanggalMasuk ? parseInt(s.tanggalMasuk.split('-')[0]) : null
 	}));
 
-	return { santris: santrisWithDetail, kategoris, tahunAjarans };
+	const parseTahunAjaranStartYear = (nama) => {
+		const normalized = String(nama || '').trim();
+		const slashMatch = normalized.match(/^(\d{4})\s*\/\s*(\d{4})$/);
+		if (slashMatch) return Number(slashMatch[1]);
+		const years = normalized.match(/\d{4}/g);
+		if (years?.length) return Math.min(...years.map(Number));
+		return null;
+	};
+
+	const tahunMasukOptions = tahunAjarans
+		.map((t) => ({
+			label: t.nama,
+			value: parseTahunAjaranStartYear(t.nama)
+		}))
+		.filter((t) => t.value)
+		.sort((a, b) => b.value - a.value);
+
+	return { santris: santrisWithDetail, kategoris, tahunAjarans, tahunMasukOptions };
 }
 
 export const actions = {
