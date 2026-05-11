@@ -362,28 +362,33 @@ export const actions = {
 	},
 
 	toggleAktif: async ({ request, locals, getClientAddress }) => {
-		const data = await request.formData();
-		const id = Number(data.get('id'));
-
-		const [current] = await db.select().from(schema.santri).where(eq(schema.santri.id, id));
-		if (!current) return { success: false };
-
-		await db.update(schema.santri).set({ isActive: !current.isActive }).where(eq(schema.santri.id, id));
 		try {
-			await db.insert(schema.systemLogs).values({
-				userId: locals.user?.id || null,
-				username: locals.user?.username || null,
-				role: locals.user?.role || null,
-				aksi: 'update',
-				modul: 'master-santri',
-				keterangan: `Toggle aktif santri id=${id} -> ${!current.isActive}`,
-				ip: getClientAddress(),
-				createdAt: new Date().toISOString()
-			});
-		} catch (e) {
-			// ignore logging errors
+			const data = await request.formData();
+			const id = Number(data.get('id'));
+
+			const [current] = await db.select().from(schema.santri).where(eq(schema.santri.id, id));
+			if (!current) return { success: false, error: 'Santri tidak ditemukan.' };
+
+			await db.update(schema.santri).set({ isActive: !current.isActive }).where(eq(schema.santri.id, id));
+			try {
+				await db.insert(schema.systemLogs).values({
+					userId: locals.user?.id || null,
+					username: locals.user?.username || null,
+					role: locals.user?.role || null,
+					aksi: 'update',
+					modul: 'master-santri',
+					keterangan: `Toggle aktif santri id=${id} -> ${!current.isActive}`,
+					ip: getClientAddress(),
+					createdAt: new Date().toISOString()
+				});
+			} catch (e) {
+				// ignore logging errors
+			}
+			return { success: true };
+		} catch (error) {
+			console.error("Error toggleAktif:", error);
+			return { success: false, error: 'Terjadi kesalahan saat mengubah status santri.' };
 		}
-		return { success: true };
 	},
 
 	delete: async ({ request, locals, getClientAddress }) => {

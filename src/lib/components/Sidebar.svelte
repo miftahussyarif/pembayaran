@@ -33,6 +33,24 @@
 			// ignore invalid storage
 		}
 	});
+
+	function isMenuAllowed(routeId) {
+		if ($page.data.user?.role === 'admin') return true;
+		const accessList = $page.data.roleAccessList || [];
+		const blocked = accessList.find(r => r.routeId === routeId && !r.isAllowed);
+		if (blocked) return false;
+		
+		// apply existing hardcoded defaults visually
+		if ($page.data.user?.role === 'petugas') {
+			if (routeId === '/master/tahun-ajaran' || routeId === '/master/kategori-santri' || routeId === '/master/jenis-pembayaran') return false;
+			if (routeId.startsWith('/pengaturan')) return false;
+		}
+		if ($page.data.user?.role === 'bendahara') {
+			if (routeId.startsWith('/pengaturan')) return false;
+		}
+		
+		return true;
+	}
 </script>
 
 <div class="drawer-side z-40">
@@ -121,7 +139,7 @@
 		</li>
 		{#if openMaster}
 			<!-- For Admin & Bendahara: Show all master data -->
-			{#if $page.data.user?.role !== "petugas"}
+			{#if isMenuAllowed('/master/tahun-ajaran')}
 				<li>
 					<a
 						href="/master/tahun-ajaran"
@@ -147,6 +165,8 @@
 						Tahun
 					</a>
 				</li>
+			{/if}
+			{#if isMenuAllowed('/master/kategori-santri')}
 				<li>
 					<a
 						href="/master/kategori-santri"
@@ -172,6 +192,8 @@
 						Kategori Santri
 					</a>
 				</li>
+			{/if}
+			{#if isMenuAllowed('/master/jenis-pembayaran')}
 				<li>
 					<a
 						href="/master/jenis-pembayaran"
@@ -199,101 +221,109 @@
 				</li>
 			{/if}
 			<!-- For All Users: Show Data Santri -->
-			<li>
-				<a
-					href="/master/santri"
-					class={$page.url.pathname.includes("/master/santri")
-						? "active bg-primary text-primary-content"
-						: ""}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-						/></svg
+			{#if isMenuAllowed('/master/santri')}
+				<li>
+					<a
+						href="/master/santri"
+						class={$page.url.pathname.includes("/master/santri")
+							? "active bg-primary text-primary-content"
+							: ""}
 					>
-					Data Santri
-				</a>
-			</li>
-			<li>
-				<a
-					href="/master/keaktifan-santri"
-					class={$page.url.pathname.includes(
-						"/master/keaktifan-santri",
-					)
-						? "active bg-primary text-primary-content"
-						: ""}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-						/></svg
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+							/></svg
+						>
+						Data Santri
+					</a>
+				</li>
+			{/if}
+			{#if isMenuAllowed('/master/keaktifan-santri')}
+				<li>
+					<a
+						href="/master/keaktifan-santri"
+						class={$page.url.pathname.includes(
+							"/master/keaktifan-santri",
+						)
+							? "active bg-primary text-primary-content"
+							: ""}
 					>
-					Keaktifan Santri
-				</a>
-			</li>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+							/></svg
+						>
+						Keaktifan Santri
+					</a>
+				</li>
+			{/if}
 			<!-- For All Users: Show Data Siswa SMK & SMP -->
-			<li>
-				<a
-					href="/master/data-siswa-smk"
-					class={$page.url.pathname.includes("/master/data-siswa-smk")
-						? "active bg-primary text-primary-content"
-						: ""}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m0-6L3 9m9 5l9-5"
-						/></svg
+			{#if isMenuAllowed('/master/data-siswa-smk')}
+				<li>
+					<a
+						href="/master/data-siswa-smk"
+						class={$page.url.pathname.includes("/master/data-siswa-smk")
+							? "active bg-primary text-primary-content"
+							: ""}
 					>
-					Data Siswa SMK
-				</a>
-			</li>
-			<li>
-				<a
-					href="/master/data-siswa-smp"
-					class={$page.url.pathname.includes("/master/data-siswa-smp")
-						? "active bg-primary text-primary-content"
-						: ""}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m0-6L3 9m9 5l9-5"
-						/></svg
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m0-6L3 9m9 5l9-5"
+							/></svg
+						>
+						Data Siswa SMK
+					</a>
+				</li>
+			{/if}
+			{#if isMenuAllowed('/master/data-siswa-smp')}
+				<li>
+					<a
+						href="/master/data-siswa-smp"
+						class={$page.url.pathname.includes("/master/data-siswa-smp")
+							? "active bg-primary text-primary-content"
+							: ""}
 					>
-					Data Siswa SMP
-				</a>
-			</li>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m0-6L3 9m9 5l9-5"
+							/></svg
+						>
+						Data Siswa SMP
+					</a>
+				</li>
+			{/if}
 		{/if}
 		<div class="divider my-0"></div>
 		<li>
@@ -315,159 +345,171 @@
 			</button>
 		</li>
 		{#if openTransaksi}
-			<li>
-				<a
-					href="/transaksi/input"
-					class={$page.url.pathname.includes("/transaksi/input")
-						? "active bg-primary text-primary-content"
-						: ""}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-						/></svg
-					>
-					Input Pembayaran
-				</a>
-			</li>
-			<li>
-				<a
-					href="/transaksi/tambah-tagihan-khusus"
-					class={$page.url.pathname.includes(
-						"/transaksi/tambah-tagihan-khusus",
-					)
-						? "active bg-primary text-primary-content"
-						: ""}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M12 4v16m8-8H4m3-7h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2z"
-						/></svg
-					>
-					Tagihan Khusus
-				</a>
-			</li>
-			<li>
-				<a
-					href="/transaksi/riwayat"
-					class={$page.url.pathname.includes("/transaksi/riwayat")
-						? "active bg-primary text-primary-content"
-						: ""}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-						/></svg
-					>
-					Riwayat Pembayaran
-				</a>
-			</li>
-			<li>
-				<a
-					href="/transaksi/rekapitulasi"
-					class={$page.url.pathname.includes(
-						"/transaksi/rekapitulasi",
-					)
-						? "active bg-primary text-primary-content"
-						: ""}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-						/></svg
-					>
-					Rekapitulasi
-				</a>
-			</li>
-			<li>
-				<a
-					href="/transaksi/rekap-individu"
-					class={$page.url.pathname.includes(
-						"/transaksi/rekap-individu",
-					)
-						? "active bg-primary text-primary-content"
-						: ""}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-						/></svg
-					>
-					Rekap Individu
-				</a>
-			</li>
-			<li>
-				<a
-					href="/transaksi/rekap-petugas"
-					class={$page.url.pathname.includes(
-						"/transaksi/rekap-petugas",
-					)
-						? "active bg-primary text-primary-content"
-						: ""}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="h-5 w-5"
-						fill="none"
-						viewBox="0 0 24 24"
-						stroke="currentColor"
-						><path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M17 20h5V4H2v16h5m10 0v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4m10 0H7m5-10a2 2 0 100-4 2 2 0 000 4z"
-						/></svg
-					>
-					Rekap Petugas
-				</a>
-			</li>
-
-			{#if $page.data.user?.role === "admin" || $page.data.user?.role === "bendahara"}
+			{#if isMenuAllowed('/transaksi/input')}
 				<li>
 					<a
-						href="/pengaturan/saldo-keuangan"
+						href="/transaksi/input"
+						class={$page.url.pathname.includes("/transaksi/input")
+							? "active bg-primary text-primary-content"
+							: ""}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+							/></svg
+						>
+						Input Pembayaran
+					</a>
+				</li>
+			{/if}
+			{#if isMenuAllowed('/transaksi/rekap-individu')}
+				<li>
+					<a
+						href="/transaksi/rekap-individu"
 						class={$page.url.pathname.includes(
-							"/pengaturan/saldo-keuangan",
+							"/transaksi/rekap-individu",
+						)
+							? "active bg-primary text-primary-content"
+							: ""}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+							/></svg
+						>
+						Rekap Individu Santri
+					</a>
+				</li>
+			{/if}
+			{#if isMenuAllowed('/transaksi/riwayat')}
+				<li>
+					<a
+						href="/transaksi/riwayat"
+						class={$page.url.pathname.includes("/transaksi/riwayat")
+							? "active bg-primary text-primary-content"
+							: ""}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+							/></svg
+						>
+						Riwayat Pembayaran
+					</a>
+				</li>
+			{/if}
+			{#if isMenuAllowed('/transaksi/tambah-tagihan-khusus')}
+				<li>
+					<a
+						href="/transaksi/tambah-tagihan-khusus"
+						class={$page.url.pathname.includes(
+							"/transaksi/tambah-tagihan-khusus",
+						)
+							? "active bg-primary text-primary-content"
+							: ""}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M12 4v16m8-8H4m3-7h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2z"
+							/></svg
+						>
+						Input Tagihan Khusus
+					</a>
+				</li>
+			{/if}
+			{#if isMenuAllowed('/transaksi/rekapitulasi')}
+				<li>
+					<a
+						href="/transaksi/rekapitulasi"
+						class={$page.url.pathname.includes(
+							"/transaksi/rekapitulasi",
+						)
+							? "active bg-primary text-primary-content"
+							: ""}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+							/></svg
+						>
+						Rekapitulasi Pembayaran
+					</a>
+				</li>
+			{/if}
+			{#if isMenuAllowed('/transaksi/rekap-petugas')}
+				<li>
+					<a
+						href="/transaksi/rekap-petugas"
+						class={$page.url.pathname.includes(
+							"/transaksi/rekap-petugas",
+						)
+							? "active bg-primary text-primary-content"
+							: ""}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M17 20h5V4H2v16h5m10 0v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4m10 0H7m5-10a2 2 0 100-4 2 2 0 000 4z"
+							/></svg
+						>
+						Rekap Individu Petugas
+					</a>
+				</li>
+			{/if}
+
+			{#if isMenuAllowed('/transaksi/saldo-keuangan')}
+				<li>
+					<a
+						href="/transaksi/saldo-keuangan"
+						class={$page.url.pathname.includes(
+							"/transaksi/saldo-keuangan",
 						)
 							? "active bg-primary text-primary-content"
 							: ""}
@@ -485,7 +527,7 @@
 								d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
 							/></svg
 						>
-						Saldo Keuangan
+						Saldo Keuangan Masuk
 					</a>
 				</li>
 			{/if}
@@ -681,6 +723,31 @@
 							/></svg
 						>
 						Restore Database
+					</a>
+				</li>
+				<li>
+					<a
+						href="/pengaturan/akses-halaman"
+						class={$page.url.pathname.includes(
+							"/pengaturan/akses-halaman",
+						)
+							? "active bg-primary text-primary-content"
+							: ""}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5 opacity-70"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+							/></svg
+						>
+						Pengaturan Halaman
 					</a>
 				</li>
 			{/if}

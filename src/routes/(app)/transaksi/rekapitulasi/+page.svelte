@@ -10,11 +10,11 @@
 </script>
 
 <svelte:head>
-	<title>Rekapitulasi Pembayaran — {data.filterBulan} {data.filterTahun}</title>
+	<title>Rekapitulasi Pembayaran — {data.filterMode === 'bayar' ? formatTanggal(data.filterTanggal) : (data.filterBulan === 'all' ? 'Semua Bulan' : data.filterBulan) + ' ' + data.filterTahun}</title>
 	<style>
 		@media print {
 			@page {
-				size: A4 portrait;
+				size: A4 landscape;
 				margin: 15mm 12mm;
 			}
 			html, body { background: white !important; height: auto !important; }
@@ -39,7 +39,7 @@
 		<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
 		</svg>
-		Cetak Rekap (A4)
+		Cetak Rekap (A4 Landscape)
 	</button>
 </div>
 
@@ -48,22 +48,38 @@
 	<div class="card-body py-3 px-4">
 		<form method="GET" class="flex flex-wrap gap-3 items-end">
 			<div class="form-control">
-				<label class="label py-1" for="filterBulan"><span class="label-text text-xs font-medium">Bulan</span></label>
-				<select id="filterBulan" name="bulan" class="select select-sm select-bordered">
-					<option value="all" selected={data.filterBulan === 'all'}>Semua Bulan</option>
-					{#each data.bulanList as b}
-						<option value={b} selected={b === data.filterBulan}>{b}</option>
-					{/each}
+				<label class="label py-1" for="filterMode"><span class="label-text text-xs font-medium">Metode Sortir</span></label>
+				<select id="filterMode" name="mode" class="select select-sm select-bordered" onchange={(e) => e.target.form.submit()}>
+					<option value="tagihan" selected={data.filterMode === 'tagihan'}>Per Bulan Tagihan</option>
+					<option value="bayar" selected={data.filterMode === 'bayar'}>Per Tanggal Bayar</option>
 				</select>
 			</div>
-			<div class="form-control">
-				<label class="label py-1" for="filterTahun"><span class="label-text text-xs font-medium">Tahun</span></label>
-				<select id="filterTahun" name="tahun" class="select select-sm select-bordered">
-					{#each data.tahunList as ta}
-						<option value={ta.nama} selected={ta.nama === data.filterTahun}>{ta.nama}</option>
-					{/each}
-				</select>
-			</div>
+
+			{#if data.filterMode === 'bayar'}
+				<div class="form-control">
+					<label class="label py-1" for="filterTanggal"><span class="label-text text-xs font-medium">Tanggal Bayar</span></label>
+					<input type="date" id="filterTanggal" name="tanggal" class="input input-sm input-bordered" value={data.filterTanggal} />
+				</div>
+			{:else}
+				<div class="form-control">
+					<label class="label py-1" for="filterBulan"><span class="label-text text-xs font-medium">Bulan</span></label>
+					<select id="filterBulan" name="bulan" class="select select-sm select-bordered">
+						<option value="all" selected={data.filterBulan === 'all'}>Semua Bulan</option>
+						{#each data.bulanList as b}
+							<option value={b} selected={b === data.filterBulan}>{b}</option>
+						{/each}
+					</select>
+				</div>
+				<div class="form-control">
+					<label class="label py-1" for="filterTahun"><span class="label-text text-xs font-medium">Tahun</span></label>
+					<select id="filterTahun" name="tahun" class="select select-sm select-bordered">
+						{#each data.tahunList as ta}
+							<option value={ta.nama} selected={ta.nama === data.filterTahun}>{ta.nama}</option>
+						{/each}
+					</select>
+				</div>
+			{/if}
+
 			<div class="form-control">
 				<label class="label py-1" for="filterJenis"><span class="label-text text-xs font-medium">Jenis</span></label>
 				<select id="filterJenis" name="jenis" class="select select-sm select-bordered">
@@ -90,7 +106,7 @@
 <!-- Judul untuk versi cetak -->
 <div class="print-only mb-6 text-center border-b-2 border-gray-300 pb-4">
 	<h1 class="text-xl font-bold uppercase tracking-widest">Rekapitulasi Pembayaran</h1>
-	<p class="text-sm mt-1">Periode: <strong>{data.filterBulan === 'all' ? 'Semua Bulan' : data.filterBulan} {data.filterTahun}</strong></p>
+	<p class="text-sm mt-1">Periode: <strong>{data.filterMode === 'bayar' ? formatTanggal(data.filterTanggal) : (data.filterBulan === 'all' ? 'Semua Bulan' : data.filterBulan) + ' ' + data.filterTahun}</strong></p>
 	<p class="text-xs text-gray-500 mt-1">Dicetak pada: {new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
 </div>
 
@@ -174,7 +190,7 @@
 <div class="card bg-base-100 shadow-sm border border-base-200">
 	<div class="card-body p-4">
 		<div class="flex justify-between items-center mb-3">
-			<h3 class="font-bold text-base">Detail Transaksi — {data.filterBulan} {data.filterTahun}</h3>
+			<h3 class="font-bold text-base">Detail Transaksi — {data.filterMode === 'bayar' ? formatTanggal(data.filterTanggal) : (data.filterBulan === 'all' ? 'Semua Bulan' : data.filterBulan) + ' ' + data.filterTahun}</h3>
 			<span class="badge badge-outline">{data.rekap.length} data</span>
 		</div>
 		<div class="overflow-x-auto">
@@ -199,7 +215,7 @@
 							<td colspan="10" class="text-center py-8 text-base-content/50">
 								<div class="flex flex-col items-center gap-2">
 									<svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-									<span>Tidak ada data untuk <strong>{data.filterBulan} {data.filterTahun}</strong></span>
+									<span>Tidak ada data untuk <strong>{data.filterMode === 'bayar' ? formatTanggal(data.filterTanggal) : (data.filterBulan === 'all' ? 'Semua Bulan' : data.filterBulan) + ' ' + data.filterTahun}</strong></span>
 								</div>
 							</td>
 						</tr>
@@ -249,5 +265,5 @@
 <!-- Footer cetak -->
 <div class="print-only mt-8 pt-4 border-t border-gray-300 text-xs text-gray-500 flex justify-between">
 	<span>Sistem Pembayaran Pesantren</span>
-	<span>Periode: {data.filterBulan} {data.filterTahun}</span>
+	<span>Periode: {data.filterMode === 'bayar' ? formatTanggal(data.filterTanggal) : (data.filterBulan === 'all' ? 'Semua Bulan' : data.filterBulan) + ' ' + data.filterTahun}</span>
 </div>

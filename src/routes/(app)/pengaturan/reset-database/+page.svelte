@@ -2,6 +2,10 @@
 	let { form } = $props();
 </script>
 
+<svelte:head>
+	<title>Reset Database</title>
+</svelte:head>
+
 <div class="mb-6">
 	<h2 class="text-2xl font-bold">Reset Database</h2>
 	<p class="text-sm text-base-content/60">Hanya menghapus riwayat pembayaran, mutasi saldo, dan system log.</p>

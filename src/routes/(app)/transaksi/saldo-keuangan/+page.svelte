@@ -4,6 +4,10 @@
 	const formatRupiah = (n) => 'Rp ' + (n || 0).toLocaleString('id-ID');
 </script>
 
+<svelte:head>
+	<title>Saldo Keuangan</title>
+</svelte:head>
+
 <div class="mb-6">
 	<h2 class="text-2xl font-bold">Saldo Keuangan</h2>
 	<p class="text-sm text-base-content/60">Rekap total uang diterima per penerima dan mutasi saldo.</p>

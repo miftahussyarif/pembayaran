@@ -9,6 +9,10 @@
 	let testLoading = false;
 </script>
 
+<svelte:head>
+	<title>Backup Database</title>
+</svelte:head>
+
 <div class="mb-6">
 	<h2 class="text-2xl font-bold">Backup Database</h2>
 	<p class="text-sm text-base-content/60">Backup data master, transaksi, mutasi saldo, dan system log.</p>

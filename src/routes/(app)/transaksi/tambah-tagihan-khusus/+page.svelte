@@ -47,6 +47,10 @@
 	const formatRupiah = (n) => 'Rp ' + (n || 0).toLocaleString('id-ID');
 </script>
 
+<svelte:head>
+	<title>Tambah Tagihan Khusus</title>
+</svelte:head>
+
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
 	<div class="xl:col-span-2">
 		<div class="card bg-base-100 shadow-sm border border-base-200">
@@ -206,7 +210,7 @@
 						</div>
 
 						<div class="form-control">
-							<label class="label" for="tahunAjaranId"><span class="label-text font-medium">Tahun Ajaran</span></label>
+							<label class="label" for="tahunAjaranId"><span class="label-text font-medium">Tahun Tagihan</span></label>
 							<select id="tahunAjaranId" name="tahunAjaranId" class="select select-bordered" bind:value={selectedTahunAjaranId} required>
 								{#each data.tahunAjarans as tahun}
 									<option value={String(tahun.id)} selected={tahun.isActive}>{tahun.nama}</option>

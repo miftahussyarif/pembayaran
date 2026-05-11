@@ -13,6 +13,10 @@
 	};
 </script>
 
+<svelte:head>
+	<title>Rekap Petugas</title>
+</svelte:head>
+
 <div class="mb-6">
 	<h2 class="text-2xl font-bold">Rekap Petugas Pembayaran</h2>
 	<p class="text-sm text-base-content/60">Daftar pembayaran yang diterima tiap petugas beserta status apakah saldo sudah dimutasi atau masih dibawa petugas.</p>

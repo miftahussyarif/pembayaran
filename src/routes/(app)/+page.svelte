@@ -15,62 +15,75 @@
 	const maxKategori = $derived(Math.max(1, ...data.santriPerKategori.map(k => k.jumlah)));
 </script>
 
+<svelte:head>
+	<title>Dashboard</title>
+</svelte:head>
+
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
 	<div class="card bg-base-100 shadow-sm border border-base-200">
 		<div class="card-body p-6">
-			<div class="flex items-center justify-between">
-				<div>
-					<div class="text-base-content/70 font-semibold mb-1">Total Santri Aktif</div>
-					<div class="text-3xl font-bold">{data.stats.totalSantri}</div>
+			<div class="flex items-start justify-between gap-2">
+				<div class="min-w-0 flex-1">
+					<div class="text-base-content/70 text-sm font-semibold mb-1 leading-tight">Total Santri Aktif</div>
+					<div class="text-xl md:text-2xl font-bold break-words">{data.stats.totalSantri}</div>
 				</div>
-				<div class="p-3 bg-primary/10 rounded-xl text-primary">
+				<div class="p-3 bg-primary/10 rounded-xl text-primary shrink-0">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
 				</div>
 			</div>
+			<div class="text-[10px] text-base-content/50 mt-2 leading-tight">
+				Total santri aktif keseluruhan yang saat ini tercatat di dalam sistem
+			</div>
 		</div>
 	</div>
 
 	<div class="card bg-base-100 shadow-sm border border-base-200">
 		<div class="card-body p-6">
-			<div class="flex items-center justify-between">
-				<div>
-					<div class="text-base-content/70 font-semibold mb-1">Jenis Pembayaran</div>
-					<div class="text-3xl font-bold text-info">{data.stats.totalJenisPembayaran}</div>
+			<div class="flex items-start justify-between gap-2">
+				<div class="min-w-0 flex-1">
+					<div class="text-base-content/70 text-sm font-semibold mb-1 leading-tight">Jenis Pembayaran</div>
+					<div class="text-xl md:text-2xl font-bold text-info break-words">{data.stats.totalJenisPembayaran}</div>
 				</div>
-				<div class="p-3 bg-info/10 rounded-xl text-info">
+				<div class="p-3 bg-info/10 rounded-xl text-info shrink-0">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
 				</div>
 			</div>
+			<div class="text-[10px] text-base-content/50 mt-2 leading-tight">
+				Total jenis pembayaran yang tersedia dan tercatat pada master data
+			</div>
 		</div>
 	</div>
 
 	<div class="card bg-base-100 shadow-sm border border-base-200">
 		<div class="card-body p-6">
-			<div class="flex items-center justify-between">
-				<div>
-					<div class="text-base-content/70 font-semibold mb-1">Pemasukan Bulan Ini</div>
-					<div class="text-3xl font-bold text-success">Rp {data.stats.pemasukanBulanIni.toLocaleString('id-ID')}</div>
+			<div class="flex items-start justify-between gap-2">
+				<div class="min-w-0 flex-1">
+					<div class="text-base-content/70 text-sm font-semibold mb-1 leading-tight">Pemasukan Bulan Ini</div>
+					<div class="text-xl md:text-2xl font-bold text-success break-words">Rp {data.stats.pemasukanBulanIni.toLocaleString('id-ID')}</div>
 				</div>
-				<div class="p-3 bg-success/10 rounded-xl text-success">
+				<div class="p-3 bg-success/10 rounded-xl text-success shrink-0">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
 				</div>
 			</div>
+			<div class="text-[10px] text-base-content/50 mt-2 leading-tight">
+				Total pemasukan pembayaran keseluruhan yang tercatat pada bulan ini
+			</div>
 		</div>
 	</div>
 
 	<div class="card bg-base-100 shadow-sm border border-base-200">
 		<div class="card-body p-6">
-			<div class="flex items-center justify-between">
-				<div>
-					<div class="text-base-content/70 font-semibold mb-1">Total Tunggakan</div>
-					<div class="text-3xl font-bold text-error">Rp {(data.stats.totalTunggakan || 0).toLocaleString('id-ID')}</div>
+			<div class="flex items-start justify-between gap-2">
+				<div class="min-w-0 flex-1">
+					<div class="text-base-content/70 text-sm font-semibold mb-1 leading-tight">Total Tunggakan</div>
+					<div class="text-xl md:text-2xl font-bold text-error break-words">Rp {(data.stats.totalTunggakan || 0).toLocaleString('id-ID')}</div>
 				</div>
-				<div class="p-3 bg-error/10 rounded-xl text-error">
+				<div class="p-3 bg-error/10 rounded-xl text-error shrink-0">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
 				</div>
 			</div>
-			<div class="text-xs text-base-content/50 mt-2">
-				{data.tahunAjaranAktif ? `Tunggakan syahriyah TA ${data.tahunAjaranAktif.nama}` : 'Tidak ada TA aktif'}
+			<div class="text-[10px] text-base-content/50 mt-2 leading-tight">
+				Total tunggakan keseluruhan dari total kekurangan tagihan dari rekap individu secara total yang tercatat
 			</div>
 		</div>
 	</div>
@@ -84,7 +97,7 @@
 				<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
 				Tindakan Cepat
 			</h2>
-			<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+			<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 				<a href="/transaksi/input" class="btn btn-primary h-auto py-4">
 					<div class="flex flex-col items-center">
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
@@ -101,6 +114,12 @@
 					<div class="flex flex-col items-center">
 						<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
 						Cetak Laporan Bulan Ini
+					</div>
+				</a>
+				<a href="/master/keaktifan-santri" class="btn btn-outline btn-info h-auto py-4">
+					<div class="flex flex-col items-center">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+						Keaktifan Santri
 					</div>
 				</a>
 			</div>

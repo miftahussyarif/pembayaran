@@ -90,6 +90,37 @@ export const actions = {
 			});
 		} catch (e) {}
 
+		// Send telegram notification to system backup bot
+		try {
+			const { sendTelegramTextMessage } = await import('$lib/server/backup.js');
+			const [pengaturan] = await db.select().from(schema.pengaturanPesantren).limit(1);
+			const systemToken = pengaturan?.telegramBotToken;
+			const systemChatId = pengaturan?.telegramChatId;
+
+			if (systemToken && systemChatId) {
+				const userAgent = request.headers.get('user-agent')?.trim() || 'Tidak diketahui';
+				const loginTime = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'medium' });
+				
+				const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+				const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+				const requestUrl = new URL(request.url);
+				const loginOrigin = forwardedProto && forwardedHost ? `${forwardedProto}://${forwardedHost}` : requestUrl.origin;
+
+				const message = [
+					`🔐 Login user berhasil (${pending.isSecurityChallenge ? 'Security Challenge' : 'Dengan 2FA'})`,
+					`URL Login: ${loginOrigin}/login`,
+					`Nama: ${user.namaLengkap}`,
+					`Username: ${user.username}`,
+					`Role: ${user.role}`,
+					`IP: ${ipAddress}`,
+					`Waktu: ${loginTime}`,
+					`User-Agent: ${userAgent.slice(0, 180)}`
+				].join('\n');
+				
+				await sendTelegramTextMessage(systemToken, systemChatId, message).catch(() => {});
+			}
+		} catch (e) {}
+
 		throw redirect(303, '/');
 	}
 };

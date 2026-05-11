@@ -2,6 +2,10 @@
 	let { form } = $props();
 </script>
 
+<svelte:head>
+	<title>Restore Database</title>
+</svelte:head>
+
 <div class="mb-6">
 	<h2 class="text-2xl font-bold">Restore Database</h2>
 	<p class="text-sm text-base-content/60">Restore akan mengganti semua data master, transaksi, mutasi, dan log sesuai file backup.</p>

@@ -6,6 +6,10 @@
 	const formatRupiah = (n) => n === 0 ? 'GRATIS' : `Rp ${n.toLocaleString('id-ID')}`;
 </script>
 
+<svelte:head>
+	<title>Master Kategori Santri</title>
+</svelte:head>
+
 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
 	<div>
 		<h2 class="text-2xl font-bold">Kategori Santri</h2>

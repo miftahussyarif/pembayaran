@@ -5,6 +5,10 @@
 	let hapusTahun = $state(null);
 </script>
 
+<svelte:head>
+	<title>Master Tahun Ajaran</title>
+</svelte:head>
+
 <div class="flex justify-between items-center mb-6">
 	<div>
 		<h2 class="text-2xl font-bold">Data Tahun</h2>

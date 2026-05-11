@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
 
 export const tahunAjaran = sqliteTable('tahun_ajaran', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
@@ -166,6 +167,7 @@ export const systemLogs = sqliteTable('system_logs', {
 	modul: text('modul').notNull(),
 	keterangan: text('keterangan'),
 	ip: text('ip'),
+	stackTrace: text('stack_trace'),
 	createdAt: text('created_at').notNull()
 });
 
@@ -200,3 +202,13 @@ export const loginAttempts = sqliteTable('login_attempts', {
 	lockUntil: text('lock_until'),
 	lastAttemptAt: text('last_attempt_at')
 });
+
+export const roleAccess = sqliteTable('role_access', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	role: text('role').notNull(),
+	routeId: text('route_id').notNull(),
+	isAllowed: integer('is_allowed', { mode: 'boolean' }).notNull().default(true),
+	updatedAt: text('updated_at')
+});
+
+

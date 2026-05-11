@@ -981,6 +981,10 @@
 
 </script>
 
+<svelte:head>
+	<title>Input Pembayaran</title>
+</svelte:head>
+
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 	<!-- Form Input Start -->
 	<div class="lg:col-span-2">

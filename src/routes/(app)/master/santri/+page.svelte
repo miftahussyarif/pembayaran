@@ -107,6 +107,21 @@
 			       const bv = b.tanggalMasuk ? new Date(b.tanggalMasuk) : new Date(0);
 			       return av - bv;
 		       });
+	       } else if (sortBy === 'tanggalKeluarTerbaru') {
+		       list.sort((a, b) => {
+			       // Untuk terbaru, data kosong/belum keluar diletakkan di akhir (atau di awal? biasanya di akhir)
+			       const av = a.tanggalKeluar ? new Date(a.tanggalKeluar) : new Date(0);
+			       const bv = b.tanggalKeluar ? new Date(b.tanggalKeluar) : new Date(0);
+			       return bv - av;
+		       });
+	       } else if (sortBy === 'tanggalKeluarTerlama') {
+		       list.sort((a, b) => {
+			       // Untuk terlama, yang punya tanggal keluar lebih dulu diurutkan pertama.
+			       // Yang belum keluar (Date(0) atau MAX_VALUE) kita letakkan di akhir agar tidak muncul pertama.
+			       const av = a.tanggalKeluar ? new Date(a.tanggalKeluar).getTime() : Number.MAX_SAFE_INTEGER;
+			       const bv = b.tanggalKeluar ? new Date(b.tanggalKeluar).getTime() : Number.MAX_SAFE_INTEGER;
+			       return av - bv;
+		       });
 	       } else {
 		       // fallback ke nama
 		       list.sort((a, b) => {
@@ -136,6 +151,51 @@
 	// === Multi-kategori form state untuk Edit ===
 	let editKategoriRows = $state([]);
 
+	function autoFillEditKategoriRows() {
+		if (!editSantri || !editSantri.isActive || !editSantri.tanggalMasuk) return;
+		const masukYear = new Date(editSantri.tanggalMasuk).getFullYear();
+		let keluarYear = new Date().getFullYear();
+		if (editSantri.tanggalKeluar) {
+			keluarYear = new Date(editSantri.tanggalKeluar).getFullYear();
+		}
+
+		const byTahun = new Map();
+		for (const row of editKategoriRows) {
+			if (row.tahunAjaranId) byTahun.set(row.tahunAjaranId, row.kategoriIds);
+		}
+
+		let modified = false;
+		for (const ta of data.tahunAjarans) {
+			const match = ta.nama.match(/^(\d{4})/);
+			if (match) {
+				const startYear = parseInt(match[1], 10);
+				if (startYear >= masukYear && startYear <= keluarYear) {
+					if (!byTahun.has(ta.id)) {
+						byTahun.set(ta.id, []);
+						modified = true;
+					}
+				}
+			}
+		}
+
+		if (modified) {
+			const newRows = [...byTahun.entries()]
+				.sort(([a], [b]) => getTahunOrder(a) - getTahunOrder(b))
+				.map(([tid, kids]) => ({ tahunAjaranId: tid, kategoriIds: kids }));
+
+			const oldestFirst = [...newRows].reverse();
+			let lastKids = [];
+			for (const row of oldestFirst) {
+				if (row.kategoriIds.length === 0 && lastKids.length > 0) {
+					row.kategoriIds = [...lastKids];
+				} else if (row.kategoriIds.length > 0) {
+					lastKids = [...row.kategoriIds];
+				}
+			}
+			editKategoriRows = oldestFirst.reverse();
+		}
+	}
+
 	const openEdit = (santri) => {
 		editSantri = { ...santri, detail: santri.detail || {} };
 		// Build editKategoriRows dari kategoriTahun santri
@@ -151,6 +211,7 @@
 				.sort(([a], [b]) => getTahunOrder(a) - getTahunOrder(b))
 				.map(([tid, kids]) => ({ tahunAjaranId: tid, kategoriIds: kids }));
 		}
+		autoFillEditKategoriRows();
 		my_modal_edit_santri.showModal();
 	};
 	const addEditKategoriRow = () => { editKategoriRows = [...editKategoriRows, { tahunAjaranId: '', kategoriIds: [] }]; };
@@ -223,6 +284,8 @@
 			   <option value="nomorInduk">Nomor Induk</option>
 			   <option value="tanggalMasukTerbaru">Tanggal Masuk Terbaru</option>
 			   <option value="tanggalMasukTerlama">Tanggal Masuk Terlama</option>
+			   <option value="tanggalKeluarTerbaru">Tanggal Keluar Terbaru</option>
+			   <option value="tanggalKeluarTerlama">Tanggal Keluar Terlama</option>
 			   <option value="kategori">Kategori Santri</option>
 			   <option value="tahun_ajaran">Tahun Ajaran</option>
 			   <option value="kabupaten">Alamat: Kabupaten</option>
@@ -397,13 +460,13 @@
 								   <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
 								   Cetak
 							   </a>
-							   <form method="POST" action="?/toggleAktif" class="inline">
+							   <form method="POST" action="?/toggleAktif" class="inline" use:enhance>
 								   <input type="hidden" name="id" value={santri.id} />
 								   <button type="submit" class="btn btn-xs btn-outline {santri.isActive ? 'btn-error' : 'btn-success'}">
 									   {santri.isActive ? 'Nonaktifkan' : 'Aktifkan'}
 								   </button>
 							   </form>
-							   <form method="POST" action="?/delete" class="inline">
+							   <form method="POST" action="?/delete" class="inline" use:enhance>
 								   <input type="hidden" name="id" value={santri.id} />
 								   <button type="submit" class="btn btn-xs btn-ghost text-error" onclick={(e) => { if(!confirm('Hapus santri ini?')) e.preventDefault() }}>Hapus</button>
 							   </form>
@@ -811,16 +874,16 @@
 			<div class="flex gap-4 mb-3">
 				<div class="form-control w-1/2">
 					<label class="label" for="editTanggalMasuk"><span class="label-text">Tanggal Masuk</span></label>
-					<input type="date" id="editTanggalMasuk" name="tanggalMasuk" value={editSantri.tanggalMasuk || ''} class="input input-bordered w-full" />
+					<input type="date" id="editTanggalMasuk" name="tanggalMasuk" bind:value={editSantri.tanggalMasuk} class="input input-bordered w-full" onchange={autoFillEditKategoriRows} />
 				</div>
 				<div class="form-control w-1/2">
 					<label class="label" for="editTanggalKeluar"><span class="label-text">Tanggal Keluar (Opsional)</span></label>
-					<input type="date" id="editTanggalKeluar" name="tanggalKeluar" value={editSantri.tanggalKeluar || ''} class="input input-bordered w-full" />
+					<input type="date" id="editTanggalKeluar" name="tanggalKeluar" bind:value={editSantri.tanggalKeluar} class="input input-bordered w-full" onchange={autoFillEditKategoriRows} />
 				</div>
 			</div>
 			<div class="form-control w-full mb-4">
 				<label class="label cursor-pointer justify-start gap-4" for="isActiveEdit">
-					<input type="checkbox" id="isActiveEdit" name="isActive" class="toggle toggle-primary" checked={editSantri.isActive} />
+					<input type="checkbox" id="isActiveEdit" name="isActive" class="toggle toggle-primary" bind:checked={editSantri.isActive} onchange={autoFillEditKategoriRows} />
 					<span class="label-text">Santri Aktif</span>
 				</label>
 			</div>

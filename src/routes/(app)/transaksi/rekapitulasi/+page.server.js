@@ -9,6 +9,8 @@ const BULAN_LIST = [
 
 export async function load({ url }) {
 	const nowDate = new Date(); // 2026-03-12
+	const modeParam = url.searchParams.get('mode') || 'tagihan'; // 'bayar' | 'tagihan'
+	const tanggalParam = url.searchParams.get('tanggal') || nowDate.toISOString().split('T')[0];
 	const bulanParam = url.searchParams.get('bulan') || BULAN_LIST[nowDate.getMonth()];
 	const tahunParam = url.searchParams.get('tahun') || String(nowDate.getFullYear());
 	const jenisParam = url.searchParams.get('jenis') || 'all';
@@ -62,24 +64,28 @@ export async function load({ url }) {
 		totalTahunanByKey.set(key, (totalTahunanByKey.get(key) || 0) + Number(row.nominalDibayar || 0));
 	}
 
-	// Filter: tahun yang dipilih, dan bulan yang dipilih (khusus tipe bulanan)
-	// sekali / tahunan: cek di bulan tanggal bayar
+	// Filter
 	const rekap = semuaPembayaran.filter(p => {
-		const cocokTahun = p.tahunNama === tahunParam;
 		const cocokJenis = jenisParam === 'all' ? true : String(p.namaPembayaran || '') === jenisParam;
-		// cocok bulan: cek field bulan (bulanan) atau bulan dari tanggalBayar (sekali/tahunan)
-		let cocokBulan = false;
-		if (bulanParam === 'all') {
-			cocokBulan = true;
-		} else if (p.bulan) {
-			// tipe bulanan: gunakan field bulan
-			cocokBulan = p.bulan === bulanParam;
-		} else if (p.tanggalBayar) {
-			// tipe sekali/tahunan: gunakan bulan dari tanggal bayar
-			const tglBayar = new Date(p.tanggalBayar);
-			cocokBulan = BULAN_LIST[tglBayar.getMonth()] === bulanParam;
+		
+		if (modeParam === 'bayar') {
+			// Mode Per Tanggal Bayar
+			const tglBayar = p.tanggalBayar ? new Date(p.tanggalBayar).toISOString().split('T')[0] : '';
+			return tglBayar === tanggalParam && cocokJenis;
+		} else {
+			// Mode Per Bulan/Tahun Tagihan
+			const cocokTahun = p.tahunNama === tahunParam;
+			let cocokBulan = false;
+			if (bulanParam === 'all') {
+				cocokBulan = true;
+			} else if (p.bulan) {
+				cocokBulan = p.bulan === bulanParam;
+			} else if (p.tanggalBayar) {
+				const tglBayar = new Date(p.tanggalBayar);
+				cocokBulan = BULAN_LIST[tglBayar.getMonth()] === bulanParam;
+			}
+			return cocokTahun && cocokBulan && cocokJenis;
 		}
-		return cocokTahun && cocokBulan && cocokJenis;
 	}).map((p) => {
 		const namaPembayar = p.namaLengkap || p.namaPembayarLain || '-';
 		const kategoriRekap = p.namaPembayarLain ? 'Pembayar Umum' : 'Santri';
@@ -133,6 +139,8 @@ export async function load({ url }) {
 		bulanList: BULAN_LIST,
 		tahunList,
 		jenisList,
+		filterMode: modeParam,
+		filterTanggal: tanggalParam,
 		filterBulan: bulanParam,
 		filterTahun: tahunParam,
 		filterJenis: jenisParam

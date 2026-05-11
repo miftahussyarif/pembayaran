@@ -1,6 +1,7 @@
 import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { sql, count, sum, eq, desc } from 'drizzle-orm';
+import { getSemuaRekap } from '$lib/server/rekapIndividu.js';
 
 const BULAN_NAMES = ['Januari','Februari','Maret','April','Mei','Juni',
 	'Juli','Agustus','September','Oktober','November','Desember'];
@@ -95,8 +96,16 @@ export async function load() {
 		.orderBy(desc(schema.pembayaran.id))
 		.limit(7);
 
+	const { rekapIndividu } = await getSemuaRekap();
 	let totalTunggakan = 0;
 	let rincianTunggakan = [];
+	
+	for (const rekap of rekapIndividu) {
+		if (rekap.isActive && rekap.totalBelumTerbayarKeseluruhan > 0) {
+			totalTunggakan += rekap.totalBelumTerbayarKeseluruhan;
+		}
+	}
+
 	let progressBulanan = [];
 
 	if (tahunAjaranAktif) {
@@ -203,95 +212,6 @@ export async function load() {
 		}
 		progressBulanan = bulanTampil;
 
-		// --- Kalkulasi Tunggakan ---
-		for (const santri of santris) {
-			// Kumpulkan semua kategoriId santri ini
-			const allKategoriIds = new Set(kategoriIdsBySantriId.get(santri.id) || []);
-			if (santri.kategoriId) allKategoriIds.add(santri.kategoriId);
-
-			// Cek mapping gratis/nominal khusus (pakai kategori pertama yang cocok)
-			let nominalPerBulan = santri.nominalSyahriyah ?? 0;
-			if (syahriyahJenisId) {
-				for (const katId of allKategoriIds) {
-					const mapping = customNominals.find(cn => cn.kategoriId === katId && cn.jenisPembayaranId === syahriyahJenisId);
-					if (mapping && mapping.nominal !== null) { nominalPerBulan = mapping.nominal; break; }
-				}
-			}
-			
-			if (nominalPerBulan === 0) continue;
-
-			const tglMasuk = santri.tanggalMasuk ? new Date(santri.tanggalMasuk) : taStart;
-			const startHitung = tglMasuk > taStart ? tglMasuk : taStart;
-			const endHitung = santri.tanggalKeluar
-				? new Date(Math.min(new Date(santri.tanggalKeluar).getTime(), batasHitung.getTime()))
-				: batasHitung;
-			if (startHitung > endHitung) continue;
-
-			let bulanWajib = [];
-			let cur = new Date(startHitung.getFullYear(), startHitung.getMonth(), 1);
-			const endMonth = new Date(endHitung.getFullYear(), endHitung.getMonth(), 1);
-			while (cur <= endMonth) {
-				bulanWajib.push({
-					bulan: BULAN_NAMES[cur.getMonth()],
-					tahun: cur.getFullYear()
-				});
-				cur.setMonth(cur.getMonth() + 1);
-			}
-
-			const sudahBayarBulan = new Set(
-				allPembayaran
-					.filter(p => p.santriId === santri.id && p.tipe === 'bulanan')
-					.map(p => {
-						const tahunTagihan = Number(p.tahunTagihan || inferTahunTagihan(taName, p.bulan, taYear));
-						return `${tahunTagihan}-${p.bulan}`;
-					})
-			);
-			const belumBayar = bulanWajib.filter((periode) =>
-				!sudahBayarBulan.has(`${periode.tahun}-${periode.bulan}`)
-			);
-			const tunggakanSantri = belumBayar.length * nominalPerBulan;
-
-			if (tunggakanSantri > 0) {
-				totalTunggakan += tunggakanSantri;
-				rincianTunggakan.push({
-					nama: santri.namaLengkap,
-					jumlahBulan: belumBayar.length,
-					nominal: tunggakanSantri
-				});
-			}
-		}
-
-		const customTunggakanBySantri = new Map();
-		for (const item of tunggakanImportAktif.filter((row) => !!row.keteranganKhusus && row.santriId)) {
-			const key = `${item.santriId}-${String(item.keteranganKhusus || '').trim().toLowerCase()}`;
-			if (!customTunggakanBySantri.has(key)) {
-				customTunggakanBySantri.set(key, {
-					santriId: item.santriId,
-					keterangan: item.keteranganKhusus,
-					totalTagihan: 0
-				});
-			}
-			customTunggakanBySantri.get(key).totalTagihan += Number(item.nominalTagihan || 0);
-		}
-
-		for (const item of customTunggakanBySantri.values()) {
-			const totalDibayar = allPembayaran
-				.filter((payment) =>
-					payment.santriId === item.santriId &&
-					String(payment.keteranganKhusus || '').trim().toLowerCase() === String(item.keterangan || '').trim().toLowerCase()
-				)
-				.reduce((sum, payment) => sum + Number(payment.nominalDibayar || 0), 0);
-			const sisa = Math.max(0, item.totalTagihan - totalDibayar);
-			if (sisa <= 0) continue;
-
-			const santri = santris.find((row) => row.id === item.santriId);
-			totalTunggakan += sisa;
-			rincianTunggakan.push({
-				nama: santri?.namaLengkap || 'Santri',
-				jumlahBulan: 1,
-				nominal: sisa
-			});
-		}
 	}
 
 	return {

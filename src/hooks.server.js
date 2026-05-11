@@ -110,16 +110,33 @@ export const handle = async ({ event, resolve }) => {
 	}
 
 	// 2.5 Role-Based Page Access Protection
-	if (sessionUser) {
+	if (sessionUser && sessionUser.role !== 'admin') {
 		const path = event.url.pathname;
 		
+		// Hanya lindungi route utama yang ada di menu, biarkan API atau sub-route jika route utamanya diizinkan, kecuali explicitly blocked
+		// Kita akan load roleAccess dari DB untuk user ini
+		const roleAccessList = await db
+			.select()
+			.from(schema.roleAccess)
+			.where(eq(schema.roleAccess.role, sessionUser.role));
+
+		// Cari apakah ada rule yang memblokir akses ini.
+		// Jika route_id ada di database dan isAllowed == false (0), maka block.
+		// Cocokkan path dengan route_id (exact match atau path.startsWith(route_id + '/'))
+		const blockedRoute = roleAccessList.find(r => 
+			!r.isAllowed && (path === r.routeId || path.startsWith(r.routeId + '/'))
+		);
+
+		if (blockedRoute) {
+			throw redirect(303, '/');
+		}
+
+		// Fallback rules dasar agar aman jika roleAccess belum disetting
 		if (sessionUser.role === 'bendahara') {
-			// Bendahara is only allowed on /, /master/*, /transaksi/*, and /logout
 			const isAllowedForBendahara = 
 				path === '/' || 
 				path.startsWith('/master/') || 
 				path.startsWith('/transaksi/') ||
-				path === '/pengaturan/saldo-keuangan' ||
 				path === '/logout';
 				
 			if (!isAllowedForBendahara) {
@@ -128,7 +145,6 @@ export const handle = async ({ event, resolve }) => {
 		}
 		
 		if (sessionUser.role === 'petugas') {
-			// Petugas boleh akses dashboard, menu transaksi tertentu, dan data master
 			const isAllowedForPetugas =
 				path === '/' ||
 				path === '/master/santri' ||
@@ -171,4 +187,45 @@ export const handle = async ({ event, resolve }) => {
 	);
 
 	return response;
+};
+
+export const handleError = async ({ error, event, status, message }) => {
+	console.error('Unhandled error:', error);
+	
+	try {
+		const { db } = await import('$lib/server/db/index.js');
+		const schema = await import('$lib/server/db/schema.js');
+		const { sql } = await import('drizzle-orm');
+		
+		const sessionUser = event.locals?.user || null;
+		const userId = sessionUser ? sessionUser.id : null;
+		
+		let stackTrace = null;
+		if (error instanceof Error) {
+			stackTrace = error.stack;
+		}
+
+		// Insert the new log
+		await db.insert(schema.systemLogs).values({
+			userId: userId,
+			username: sessionUser ? sessionUser.username : 'system',
+			role: sessionUser ? sessionUser.role : 'system',
+			aksi: status === 404 ? '404_NOT_FOUND' : '500_ERROR',
+			modul: 'System Error',
+			keterangan: `URL: ${event.url.href} | Message: ${String(error?.message || message || error)}`,
+			ip: event.getClientAddress ? event.getClientAddress() : null,
+			stackTrace: stackTrace ? String(stackTrace).substring(0, 2000) : null,
+			createdAt: new Date().toISOString()
+		});
+
+		// Clean up old logs to save space (keep only last 1000)
+		await db.run(sql`DELETE FROM system_logs WHERE id NOT IN (SELECT id FROM system_logs ORDER BY id DESC LIMIT 1000)`);
+	} catch (logError) {
+		console.error('Failed to save error log:', logError);
+	}
+
+	return {
+		message: 'Terjadi kesalahan sistem. Detail telah dicatat.',
+		status
+	};
 };

@@ -38,8 +38,7 @@ export async function load() {
 			isActive: schema.santri.isActive
 		})
 		.from(schema.santri)
-		.leftJoin(schema.kategoriSantri, eq(schema.santri.kategoriId, schema.kategoriSantri.id))
-		.where(eq(schema.santri.isActive, true));
+		.leftJoin(schema.kategoriSantri, eq(schema.santri.kategoriId, schema.kategoriSantri.id));
 
 	const tahunAjarans = await db.select().from(schema.tahunAjaran);
 	const [tahunAjaranAktif] = tahunAjarans.filter((item) => item.isActive);

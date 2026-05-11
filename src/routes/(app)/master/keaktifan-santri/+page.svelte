@@ -53,6 +53,10 @@
 	};
 </script>
 
+<svelte:head>
+	<title>Keaktifan Santri</title>
+</svelte:head>
+
 <div class="flex flex-col lg:flex-row lg:items-end gap-3 mb-6">
 	<div class="form-control w-full sm:w-72">
 		<label class="label py-0" for="search-input"><span class="label-text text-xs">Cari Santri</span></label>

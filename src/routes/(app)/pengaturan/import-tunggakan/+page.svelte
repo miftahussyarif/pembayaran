@@ -4,6 +4,10 @@
 	const formatRupiah = (value) => `Rp ${Number(value || 0).toLocaleString('id-ID')}`;
 </script>
 
+<svelte:head>
+	<title>Import Tunggakan Khusus</title>
+</svelte:head>
+
 <div class="space-y-6">
 	<div class="card bg-base-100 shadow-sm border border-base-200">
 		<div class="card-body">

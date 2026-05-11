@@ -36,3 +36,15 @@ export const load = async ({ locals, url }) => {
 
 	return { logs, users, filters: { start, end, userId } };
 };
+
+export const actions = {
+	deleteAll: async ({ locals }) => {
+		if (locals.user?.role !== 'admin') {
+			throw redirect(303, '/');
+		}
+		
+		await db.delete(schema.systemLogs);
+		
+		return { success: true };
+	}
+};

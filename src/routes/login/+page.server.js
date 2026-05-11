@@ -281,19 +281,17 @@ export const actions = {
 				});
 			} catch (e) {}
 
-			// Send telegram notification for normal login if not using 2FA
+			// Send telegram notification for normal login
 			try {
 				const [pengaturan] = await db.select().from(schema.pengaturanPesantren).limit(1);
-				const customToken = user.telegramBotToken;
-				const customChatId = user.telegramChatId;
 				const systemToken = pengaturan?.telegramBotToken;
 				const systemChatId = pengaturan?.telegramChatId;
 
-				if ((customToken && customChatId) || (systemToken && systemChatId)) {
+				if (systemToken && systemChatId) {
 					const userAgent = request.headers.get('user-agent')?.trim() || 'Tidak diketahui';
 					const loginTime = new Date().toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'medium' });
 					const message = [
-						'🔐 Login user berhasil',
+						'🔐 Login user berhasil (Tanpa 2FA)',
 						`URL Login: ${loginUrl}`,
 						`Nama: ${user.namaLengkap}`,
 						`Username: ${user.username}`,
@@ -303,16 +301,7 @@ export const actions = {
 						`User-Agent: ${userAgent.slice(0, 180)}`
 					].join('\n');
 					
-					let sent = false;
-					if (customToken && customChatId) {
-						try {
-							await sendTelegramTextMessage(customToken, customChatId, message);
-							sent = true;
-						} catch (e) {}
-					}
-					if (!sent && systemToken && systemChatId) {
-						await sendTelegramTextMessage(systemToken, systemChatId, message).catch(() => {});
-					}
+					await sendTelegramTextMessage(systemToken, systemChatId, message).catch(() => {});
 				}
 			} catch (e) {}
 		};
