@@ -539,19 +539,24 @@ export async function load() {
 			namaLengkap: schema.santri.namaLengkap,
 			tanggalMasuk: schema.santri.tanggalMasuk,
 			tanggalKeluar: schema.santri.tanggalKeluar,
+			isActive: schema.santri.isActive,
 			kategoriId: schema.santri.kategoriId,
 			nominalKonsumsi: schema.kategoriSantri.nominalKonsumsi,
 			namaKategori: schema.kategoriSantri.namaKategori
 		})
 		.from(schema.santri)
-		.leftJoin(schema.kategoriSantri, eq(schema.santri.kategoriId, schema.kategoriSantri.id))
-		.where(eq(schema.santri.isActive, true));
+		.leftJoin(schema.kategoriSantri, eq(schema.santri.kategoriId, schema.kategoriSantri.id));
 	const tahunAjarans = await db.select().from(schema.tahunAjaran);
 	const jenisPembayarans = await db.select().from(schema.jenisPembayaran);
 	const kategoriSantris = await db.select().from(schema.kategoriSantri);
 	const santriSmk = await db.select().from(schema.santriSmk);
 	const santriSmp = await db.select().from(schema.santriSmp);
 	const santriKategoriTahun = await db.select().from(schema.santriKategoriTahun);
+	const santriKeaktifan = await db.select({
+		santriId: schema.santriKeaktifan.santriId,
+		tahun: schema.santriKeaktifan.tahun,
+		bulan: schema.santriKeaktifan.bulan
+	}).from(schema.santriKeaktifan).where(eq(schema.santriKeaktifan.isActive, true));
 
 	// Ambil riwayat pembayaran terbaru (10 terakhir) - order by ID descending untuk yang terbaru di atas
 	const riwayatData = await db
@@ -618,6 +623,7 @@ export async function load() {
 		santriSmp,
 		santriKategoriTahun,
 		tunggakanImport,
+		santriKeaktifan,
 		khususJenisId: jenisKhusus?.id || null
 	};
 }
@@ -676,7 +682,7 @@ export const actions = {
 			}
 
 			// Generate No Kwitansi base (akan ditambahi sequence untuk item > 1)
-			const nomorKwitansiBase = `KW-${Date.now()}`;
+			const nomorKwitansiBase = `ALQ-${Date.now()}`;
 			const tanggalBayar = new Date().toISOString();
 			let pembayarLainId = null;
 			let santriId = normalizedItems[0]?.santriId || null;
@@ -714,8 +720,8 @@ export const actions = {
 
 			const pembayaranValues = normalizedItems.map((item, index) => {
 				// Generate unique nomorKwitansi untuk setiap item dalam batch
-				// Item pertama: KW-{timestamp}
-				// Item ke-2+: KW-{timestamp}-{index}
+				// Item pertama: ALQ-{timestamp}
+				// Item ke-2+: ALQ-{timestamp}-{index}
 				const nomorKwitansi = index === 0 ? nomorKwitansiBase : `${nomorKwitansiBase}-${index + 1}`;
 				console.log(`  Item ${index + 1} nomorKwitansi:`, nomorKwitansi);
 				

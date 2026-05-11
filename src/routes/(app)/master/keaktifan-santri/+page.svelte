@@ -153,19 +153,23 @@
 							{/if}
 						</td>
 						<td>
-							{#if santri.currentMonthActive}
+							{#if !santri.isActive}
+								<div class="badge badge-neutral badge-sm">Sudah Tidak Aktif</div>
+							{:else if santri.currentMonthActive}
 								<div class="badge badge-success badge-sm">Sudah Diceklis</div>
 							{:else}
 								<div class="badge badge-warning badge-sm">Belum Diceklis</div>
 							{/if}
 						</td>
 						<td class="flex gap-1 flex-wrap">
-							<form method="POST" action="?/quickCheck" use:enhance class="inline">
-								<input type="hidden" name="santriId" value={santri.id} />
-								<button type="submit" class="btn btn-xs btn-outline btn-success" disabled={santri.currentMonthActive && santri.isActive}>
-									{santri.currentMonthActive && santri.isActive ? 'Sudah Ceklis' : santri.currentMonthActive ? 'Aktifkan Bulan Ini' : 'Ceklis Bulan Ini'}
-								</button>
-							</form>
+							{#if santri.isActive}
+								<form method="POST" action="?/quickCheck" use:enhance class="inline">
+									<input type="hidden" name="santriId" value={santri.id} />
+									<button type="submit" class="btn btn-xs btn-outline btn-success" disabled={santri.currentMonthActive}>
+										{santri.currentMonthActive ? 'Sudah Ceklis' : 'Ceklis Bulan Ini'}
+									</button>
+								</form>
+							{/if}
 							<button class="btn btn-xs btn-outline btn-primary" onclick={() => openEdit(santri)}>
 								<svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />

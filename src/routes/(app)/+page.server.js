@@ -101,7 +101,7 @@ export async function load() {
 	let rincianTunggakan = [];
 	
 	for (const rekap of rekapIndividu) {
-		if (rekap.isActive && rekap.totalBelumTerbayarKeseluruhan > 0) {
+		if (rekap.totalBelumTerbayarKeseluruhan > 0) {
 			totalTunggakan += rekap.totalBelumTerbayarKeseluruhan;
 		}
 	}

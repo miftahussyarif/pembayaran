@@ -50,19 +50,21 @@
 		<div class="info-grid">
 			<div class="info-left">
 				<span class="label">Telah Diterima Dari:</span>
-				<span class="nama-pembayar">{data.santri?.namaLengkap || data.pembayarLain?.namaPembayar || '-'}</span>
-				<div class="sub-info">
+				<span class="nama-pembayar">
+					{data.santri?.namaLengkap || data.pembayarLain?.namaPembayar || '-'}
 					{#if data.santri?.nomorInduk}
-						No Induk: {data.santri.nomorInduk}
-					{:else}
-						Kategori: Pembayar Umum
+						({data.santri.nomorInduk})
 					{/if}
-				</div>
+				</span>
+				{#if !data.santri?.nomorInduk}
+					<div class="sub-info">
+						Kategori: Pembayar Umum
+					</div>
+				{/if}
 			</div>
 			<div class="info-right">
 				<span class="label">Tanggal Bayar:</span>
 				<span class="tanggal">{new Date(data.pembayaran.tanggalBayar).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'})}</span>
-				<div class="sub-info">Tahun Ajaran: {data.tahunAjaran.nama}</div>
 			</div>
 		</div>
 

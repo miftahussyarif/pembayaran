@@ -379,6 +379,32 @@
 		return { startYear: currentYear, endYear: currentYear, mode: 'calendar' };
 	}
 
+	function hasActiveMonthInTahunAjaran(tahunAjaranNama, santriId) {
+		const range = parseTahunAjaranRange(tahunAjaranNama);
+		if (!range) return false;
+		
+		const activeKeys = new Set(
+			(data.santriKeaktifan || [])
+				.filter(k => k.santriId === santriId)
+				.map(k => `${k.tahun}-${k.bulan - 1}`)
+		);
+
+		if (range.startYear === range.endYear) {
+			for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
+				if (activeKeys.has(`${range.startYear}-${monthIndex}`)) return true;
+			}
+			return false;
+		}
+
+		for (let monthIndex = 6; monthIndex < 12; monthIndex++) {
+			if (activeKeys.has(`${range.startYear}-${monthIndex}`)) return true;
+		}
+		for (let monthIndex = 0; monthIndex < 6; monthIndex++) {
+			if (activeKeys.has(`${range.endYear}-${monthIndex}`)) return true;
+		}
+		return false;
+	}
+
 	function getTahunAjaranBounds(tahunAjaranNama) {
 		const { startYear, endYear, mode } = parseTahunAjaranRange(tahunAjaranNama);
 		if (mode === 'academic' && startYear !== endYear) {
@@ -668,6 +694,9 @@
 
 			const firstApplicableYear = getFirstApplicablePeriodeYear(jenis, santri, selectedTahunAjaran.nama);
 			if (!firstApplicableYear || firstApplicableYear !== selectedYearNumber) continue;
+
+			// Filter if not active in this academic year (matching rekap individu behavior)
+			if (!hasActiveMonthInTahunAjaran(selectedTahunAjaran.nama, santri.id)) continue;
 
 			const importedTotal = sumImportedTagihan({
 				santriId: santri.id,
@@ -1092,6 +1121,9 @@
 											<span class="font-semibold">{selectedSantri.nomorInduk}</span>
 											<span class="mx-1">—</span>
 											<span>{selectedSantri.namaLengkap}</span>
+											{#if selectedSantri.isActive === false}
+												<span class="badge badge-error badge-xs ml-1">Nonaktif</span>
+											{/if}
 											<span class="text-base-content/50 ml-1">({getSantriKategoriLabel(selectedSantri.id, selectedSantri.namaKategori) || 'Tanpa Kategori'})</span>
 										</span>
 										<button
@@ -1170,7 +1202,12 @@
 													}}
 												>
 													<span class="font-mono text-xs text-base-content/60 w-16 shrink-0">{s.nomorInduk}</span>
-													<span class="flex-1 truncate">{s.namaLengkap}</span>
+													<span class="flex-1 truncate">
+														{s.namaLengkap}
+														{#if s.isActive === false}
+															<span class="badge badge-error badge-xs ml-1">Nonaktif</span>
+														{/if}
+													</span>
 													<span class="badge badge-sm badge-ghost text-xs">{getSantriKategoriLabel(s.id, s.namaKategori) || 'Tanpa Kategori'}</span>
 												</button>
 											{/each}
