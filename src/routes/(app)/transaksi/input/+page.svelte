@@ -188,8 +188,45 @@
 			.reduce((sum, item) => sum + Number(item.nominalTagihan || 0), 0);
 		const totalTagihan = importedTotal > 0 ? importedTotal : nominalEfektif;
 
+		if (selectedSantri?.tanggalKeluar && selectedTahunAjaran) {
+			const window = getApplicableWindow(selectedJenis, selectedSantri);
+			const tahunBounds = getTahunAjaranBounds(selectedTahunAjaran.nama);
+			if (window?.end) {
+				const end = new Date(window.end.getFullYear(), window.end.getMonth(), 1);
+				const taStart = new Date(tahunBounds.start.getFullYear(), tahunBounds.start.getMonth(), 1);
+				if (end < taStart) {
+					return {
+						totalTagihan: 0,
+						totalDibayar: 0,
+						sisa: 0,
+						isLunas: true,
+						isInvalidKeluar: true
+					};
+				}
+			}
+		}
+
 		if (isBulanan) {
 			if (!selectedBulan || !selectedTahunTagihan || !selectedTahunAjaranId) return null;
+			
+			if (selectedSantri?.tanggalKeluar) {
+				const end = new Date(selectedSantri.tanggalKeluar);
+				const endMonthYear = new Date(end.getFullYear(), end.getMonth(), 1);
+				
+				const monthIndex = BULAN_NAMES.indexOf(selectedBulan);
+				const targetMonthYear = new Date(Number(selectedTahunTagihan), monthIndex, 1);
+				
+				if (targetMonthYear > endMonthYear) {
+					return {
+						totalTagihan: 0,
+						totalDibayar: 0,
+						sisa: 0,
+						isLunas: true,
+						isInvalidBulanKeluar: true
+					};
+				}
+			}
+
 			const periodPayments = relevantPayments.filter((p) =>
 				p.tahunAjaranId == selectedTahunAjaranId &&
 				p.bulan === selectedBulan &&
@@ -249,7 +286,9 @@
 		return selectedJenisId &&
 			(isGratis ? nominal >= 0 : nominal > 0) &&
 			(!isBulanan || (selectedBulan && selectedTahunTagihan)) &&
-			!(selectedPaymentStatus?.isLunas);
+			!(selectedPaymentStatus?.isLunas) &&
+			!(selectedPaymentStatus?.isInvalidKeluar) &&
+			!(selectedPaymentStatus?.isInvalidBulanKeluar);
 	});
 
 	// Cek apakah bulan sudah lunas
@@ -624,13 +663,24 @@
 			const nominalDefault = getEffectiveNominalForSantri(jenis, santri, tahunAjaranId);
 			if (nominalDefault <= 0) continue;
 
+			// Filter if not active in this academic year (matching rekap individu behavior)
+			if (!hasActiveMonthInTahunAjaran(selectedTahunAjaran.nama, santri.id)) continue;
+
 			if (isBulananJenis) {
 				const targetMonths = getMonthsForYearInTahunAjaran(selectedTahunAjaran.nama, selectedYearNumber);
 				const missingMonths = [];
 				const items = [];
 
+				const activeKeysForSantri = new Set(
+					(data.santriKeaktifan || [])
+						.filter(k => k.santriId === santri.id)
+						.map(k => `${k.tahun}-${k.bulan - 1}`)
+				);
+
 				for (const bulan of targetMonths) {
 					const monthIndex = BULAN_NAMES.indexOf(bulan);
+					if (!activeKeysForSantri.has(`${selectedYearNumber}-${monthIndex}`)) continue;
+
 					const periodeDate = getPeriodeDate(selectedYearNumber, monthIndex);
 					if (window.start) {
 						const startDate = new Date(window.start.getFullYear(), window.start.getMonth(), 1);
@@ -694,9 +744,6 @@
 
 			const firstApplicableYear = getFirstApplicablePeriodeYear(jenis, santri, selectedTahunAjaran.nama);
 			if (!firstApplicableYear || firstApplicableYear !== selectedYearNumber) continue;
-
-			// Filter if not active in this academic year (matching rekap individu behavior)
-			if (!hasActiveMonthInTahunAjaran(selectedTahunAjaran.nama, santri.id)) continue;
 
 			const importedTotal = sumImportedTagihan({
 				santriId: santri.id,
@@ -1427,31 +1474,53 @@
 								</div>
 							{/if}
 							{#if !isKhusus && isBulanan && selectedPaymentStatus}
-								<div class="label pt-1 pb-0">
-									<span class={`label-text-alt font-medium ${selectedPaymentStatus.isLunas ? 'text-success' : 'text-base-content/70'}`}>
-										Tagihan: {selectedPaymentStatus.totalTagihan.toLocaleString('id-ID')} ·
-										Sudah dibayar: {selectedPaymentStatus.totalDibayar.toLocaleString('id-ID')} ·
-										Sisa: {selectedPaymentStatus.sisa.toLocaleString('id-ID')}
-									</span>
-								</div>
+								{#if selectedPaymentStatus.isInvalidKeluar}
+									<div class="label pt-1 pb-0">
+										<span class="label-text-alt text-error font-medium">Santri sudah keluar sebelum tahun ajaran ini dimulai.</span>
+									</div>
+								{:else if selectedPaymentStatus.isInvalidBulanKeluar}
+									<div class="label pt-1 pb-0">
+										<span class="label-text-alt text-error font-medium">sudah keluar, tidak ada tagihan bulan ini</span>
+									</div>
+								{:else}
+									<div class="label pt-1 pb-0">
+										<span class={`label-text-alt font-medium ${selectedPaymentStatus.isLunas ? 'text-success' : 'text-base-content/70'}`}>
+											Tagihan: {selectedPaymentStatus.totalTagihan.toLocaleString('id-ID')} ·
+											Sudah dibayar: {selectedPaymentStatus.totalDibayar.toLocaleString('id-ID')} ·
+											Sisa: {selectedPaymentStatus.sisa.toLocaleString('id-ID')}
+										</span>
+									</div>
+								{/if}
 							{/if}
 							{#if !isKhusus && isSekali && selectedPaymentStatus}
-								<div class="label pt-2 pb-0">
-									<span class={`label-text-alt font-medium ${selectedPaymentStatus.isLunas ? 'text-success' : 'text-base-content/70'}`}>
-										Tagihan: {selectedPaymentStatus.totalTagihan.toLocaleString('id-ID')} ·
-										Sudah dibayar: {selectedPaymentStatus.totalDibayar.toLocaleString('id-ID')} ·
-										Sisa: {selectedPaymentStatus.sisa.toLocaleString('id-ID')}
-									</span>
-								</div>
+								{#if selectedPaymentStatus.isInvalidKeluar}
+									<div class="label pt-2 pb-0">
+										<span class="label-text-alt text-error font-medium">Santri sudah keluar sebelum tahun ajaran ini dimulai.</span>
+									</div>
+								{:else}
+									<div class="label pt-2 pb-0">
+										<span class={`label-text-alt font-medium ${selectedPaymentStatus.isLunas ? 'text-success' : 'text-base-content/70'}`}>
+											Tagihan: {selectedPaymentStatus.totalTagihan.toLocaleString('id-ID')} ·
+											Sudah dibayar: {selectedPaymentStatus.totalDibayar.toLocaleString('id-ID')} ·
+											Sisa: {selectedPaymentStatus.sisa.toLocaleString('id-ID')}
+										</span>
+									</div>
+								{/if}
 							{/if}
 							{#if !isKhusus && isTahunan && selectedPaymentStatus}
-								<div class="label pt-2 pb-0">
-									<span class={`label-text-alt font-medium ${selectedPaymentStatus.isLunas ? 'text-success' : 'text-base-content/70'}`}>
-										Tagihan: {selectedPaymentStatus.totalTagihan.toLocaleString('id-ID')} ·
-										Sudah dibayar: {selectedPaymentStatus.totalDibayar.toLocaleString('id-ID')} ·
-										Sisa: {selectedPaymentStatus.sisa.toLocaleString('id-ID')}
-									</span>
-								</div>
+								{#if selectedPaymentStatus.isInvalidKeluar}
+									<div class="label pt-2 pb-0">
+										<span class="label-text-alt text-error font-medium">Santri sudah keluar sebelum tahun ajaran ini dimulai.</span>
+									</div>
+								{:else}
+									<div class="label pt-2 pb-0">
+										<span class={`label-text-alt font-medium ${selectedPaymentStatus.isLunas ? 'text-success' : 'text-base-content/70'}`}>
+											Tagihan: {selectedPaymentStatus.totalTagihan.toLocaleString('id-ID')} ·
+											Sudah dibayar: {selectedPaymentStatus.totalDibayar.toLocaleString('id-ID')} ·
+											Sisa: {selectedPaymentStatus.sisa.toLocaleString('id-ID')}
+										</span>
+									</div>
+								{/if}
 							{/if}
 						</div>
 					</div>

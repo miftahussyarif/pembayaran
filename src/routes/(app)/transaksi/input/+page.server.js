@@ -339,6 +339,8 @@ async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItem
 		.select({
 			id: schema.santri.id,
 			kategoriId: schema.santri.kategoriId,
+			tanggalMasuk: schema.santri.tanggalMasuk,
+			tanggalKeluar: schema.santri.tanggalKeluar,
 			nominalKonsumsi: schema.kategoriSantri.nominalKonsumsi,
 			namaKategori: schema.kategoriSantri.namaKategori
 		})
@@ -394,6 +396,20 @@ async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItem
 		customNominalRow
 	});
 
+	if (santriRow?.tanggalKeluar && tahunAjaranRow) {
+		const end = new Date(santriRow.tanggalKeluar);
+		const endMonthYear = new Date(end.getFullYear(), end.getMonth(), 1);
+		
+		const parsedTa = parseTahunAjaranRange(tahunAjaranRow.nama);
+		const taStart = parsedTa.mode === 'academic' 
+			? new Date(parsedTa.startYear, 6, 1) 
+			: new Date(parsedTa.startYear, 0, 1);
+			
+		if (endMonthYear < taStart) {
+			return { error: 'Santri sudah keluar sebelum tahun ajaran ini dimulai.' };
+		}
+	}
+
 	if (isBulanan && !bulan) {
 		return { error: 'Bulan tagihan wajib dipilih untuk pembayaran bulanan.' };
 	}
@@ -404,6 +420,18 @@ async function validateAndNormalizePaymentItem(rawItem, previouslyNormalizedItem
 
 	if (isBulanan && (!tahunTagihan || Number.isNaN(tahunTagihan))) {
 		return { error: 'Tahun tagihan wajib dipilih untuk pembayaran bulanan.' };
+	}
+
+	if (isBulanan && santriRow?.tanggalKeluar) {
+		const end = new Date(santriRow.tanggalKeluar);
+		const endMonthYear = new Date(end.getFullYear(), end.getMonth(), 1);
+		
+		const monthIndex = BULAN_NAMES.indexOf(bulan);
+		const targetMonthYear = new Date(tahunTagihan, monthIndex, 1);
+		
+		if (targetMonthYear > endMonthYear) {
+			return { error: 'sudah keluar, tidak ada tagihan bulan ini' };
+		}
 	}
 
 	const existingPayments = await db

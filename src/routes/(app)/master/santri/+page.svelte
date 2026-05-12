@@ -201,6 +201,18 @@
 		}
 	}
 
+	function handleEditTanggalKeluarChange() {
+		if (editSantri.tanggalKeluar) {
+			const today = new Date();
+			const pad = (n) => String(n).padStart(2, '0');
+			const localDateStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+			if (editSantri.tanggalKeluar <= localDateStr) {
+				editSantri.isActive = false;
+			}
+		}
+		autoFillEditKategoriRows();
+	}
+
 	const openEdit = (santri) => {
 		editSantri = { ...santri, detail: santri.detail || {} };
 		// Build editKategoriRows dari kategoriTahun santri
@@ -476,9 +488,15 @@
 							   </a>
 							   <form method="POST" action="?/toggleAktif" class="inline" use:enhance>
 								   <input type="hidden" name="id" value={santri.id} />
-								   <button type="submit" class="btn btn-xs btn-outline {santri.isActive ? 'btn-error' : 'btn-success'}">
-									   {santri.isActive ? 'Nonaktifkan' : 'Aktifkan'}
+								   {#if santri.isActive}
+								   <button type="submit" class="btn btn-xs btn-outline btn-error" onclick={(e) => { if(!confirm('Keluarkan santri pada hari ini?')) e.preventDefault() }}>
+									   Nonaktifkan
 								   </button>
+								   {:else}
+								   <button type="submit" class="btn btn-xs btn-outline btn-success">
+									   Aktifkan
+								   </button>
+								   {/if}
 							   </form>
 							   <form method="POST" action="?/delete" class="inline" use:enhance>
 								   <input type="hidden" name="id" value={santri.id} />
@@ -892,7 +910,7 @@
 				</div>
 				<div class="form-control w-1/2">
 					<label class="label" for="editTanggalKeluar"><span class="label-text">Tanggal Keluar (Opsional)</span></label>
-					<input type="date" id="editTanggalKeluar" name="tanggalKeluar" bind:value={editSantri.tanggalKeluar} class="input input-bordered w-full" onchange={autoFillEditKategoriRows} />
+					<input type="date" id="editTanggalKeluar" name="tanggalKeluar" bind:value={editSantri.tanggalKeluar} class="input input-bordered w-full" onchange={handleEditTanggalKeluarChange} />
 				</div>
 			</div>
 			<div class="form-control w-full mb-4">

@@ -81,13 +81,34 @@ const getCurrentPeriod = () => {
 function buildSantriPeriods(santri, tahunAjarans) {
 	const { startYear, endYear } = getSystemYearRange(tahunAjarans);
 	const start = normalizeStartDate(santri.tanggalMasuk, startYear);
-	const finalYear = Math.max(endYear, start.year);
+	
+	let effectiveEndYear = Math.max(endYear, start.year);
+	let effectiveEndMonth = 12;
+
+	const isKeluar = !santri.isActive && santri.tanggalKeluar;
+	if (isKeluar) {
+		const end = normalizeStartDate(santri.tanggalKeluar, effectiveEndYear);
+		effectiveEndYear = end.year;
+		effectiveEndMonth = end.month;
+	}
+
+	// Safeguard in case data is anomalous (keluar before masuk)
+	if (effectiveEndYear < start.year) {
+		effectiveEndYear = start.year;
+		effectiveEndMonth = start.month;
+	}
+
 	const periods = [];
 
-	for (let year = start.year; year <= finalYear; year++) {
+	for (let year = start.year; year <= effectiveEndYear; year++) {
 		const firstMonth = year === start.year ? start.month : 1;
+		let lastMonth = 12;
+		if (year === effectiveEndYear && isKeluar) {
+			lastMonth = effectiveEndMonth;
+		}
+		
 		const months = [];
-		for (let month = firstMonth; month <= 12; month++) {
+		for (let month = firstMonth; month <= lastMonth; month++) {
 			months.push({
 				bulan: month,
 				namaBulan: BULAN[month - 1],
@@ -95,7 +116,9 @@ function buildSantriPeriods(santri, tahunAjarans) {
 				key: keyOf(year, month)
 			});
 		}
-		periods.push({ tahun: year, months });
+		if (months.length > 0) {
+			periods.push({ tahun: year, months });
+		}
 	}
 
 	return periods;

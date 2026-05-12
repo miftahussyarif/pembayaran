@@ -1,6 +1,6 @@
 import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
-import { eq, inArray } from 'drizzle-orm';
+import { eq, inArray, or, and, lt, gt } from 'drizzle-orm';
 import * as XLSX from 'xlsx';
 
 const parseCsv = (text) => {
@@ -179,7 +179,16 @@ export const actions = {
 		const namaLengkap = data.get('namaLengkap');
 		const tanggalMasuk = data.get('tanggalMasuk') || null;
 		const tanggalKeluar = data.get('tanggalKeluar') || null;
-		const isActive = data.get('isActive') === 'on';
+		let isActive = data.get('isActive') === 'on';
+
+		if (tanggalKeluar) {
+			const today = new Date();
+			const pad = (n) => String(n).padStart(2, '0');
+			const localDateStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+			if (tanggalKeluar <= localDateStr) {
+				isActive = false;
+			}
+		}
 		// Parsing multi-kategori per tahun ajaran dari JSON field
 		let kategoriTahunList = [];
 		try {
@@ -280,7 +289,16 @@ export const actions = {
 		const namaLengkap = data.get('namaLengkap')?.toString().trim();
 		const tanggalMasuk = data.get('tanggalMasuk') || null;
 		const tanggalKeluar = data.get('tanggalKeluar') || null;
-		const isActive = data.get('isActive') === 'on';
+		let isActive = data.get('isActive') === 'on';
+
+		if (tanggalKeluar) {
+			const today = new Date();
+			const pad = (n) => String(n).padStart(2, '0');
+			const localDateStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+			if (tanggalKeluar <= localDateStr) {
+				isActive = false;
+			}
+		}
 		// Parsing multi-kategori per tahun ajaran
 		let kategoriTahunList = [];
 		try {
@@ -339,6 +357,48 @@ export const actions = {
 			await db.update(schema.santri)
 				.set({ nomorInduk, namaLengkap, tanggalMasuk, tanggalKeluar, isActive })
 				.where(eq(schema.santri.id, id));
+
+			if (tanggalMasuk) {
+				const tm = new Date(tanggalMasuk);
+				if (!isNaN(tm.getTime())) {
+					const mYear = tm.getFullYear();
+					const mMonth = tm.getMonth() + 1;
+					await db.delete(schema.santriKeaktifan)
+						.where(
+							and(
+								eq(schema.santriKeaktifan.santriId, id),
+								or(
+									lt(schema.santriKeaktifan.tahun, mYear),
+									and(
+										eq(schema.santriKeaktifan.tahun, mYear),
+										lt(schema.santriKeaktifan.bulan, mMonth)
+									)
+								)
+							)
+						);
+				}
+			}
+
+			if (!isActive && tanggalKeluar) {
+				const tk = new Date(tanggalKeluar);
+				if (!isNaN(tk.getTime())) {
+					const kYear = tk.getFullYear();
+					const kMonth = tk.getMonth() + 1;
+					await db.delete(schema.santriKeaktifan)
+						.where(
+							and(
+								eq(schema.santriKeaktifan.santriId, id),
+								or(
+									gt(schema.santriKeaktifan.tahun, kYear),
+									and(
+										eq(schema.santriKeaktifan.tahun, kYear),
+										gt(schema.santriKeaktifan.bulan, kMonth)
+									)
+								)
+							)
+						);
+				}
+			}
 			const [currentDetail] = await db
 				.select()
 				.from(schema.santriDetail)
@@ -387,7 +447,37 @@ export const actions = {
 			const [current] = await db.select().from(schema.santri).where(eq(schema.santri.id, id));
 			if (!current) return { success: false, error: 'Santri tidak ditemukan.' };
 
-			await db.update(schema.santri).set({ isActive: !current.isActive }).where(eq(schema.santri.id, id));
+			let newTanggalKeluar = current.tanggalKeluar;
+			if (current.isActive) {
+				const today = new Date();
+				const pad = (n) => String(n).padStart(2, '0');
+				newTanggalKeluar = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+			} else {
+				newTanggalKeluar = null;
+			}
+
+			await db.update(schema.santri).set({ isActive: !current.isActive, tanggalKeluar: newTanggalKeluar }).where(eq(schema.santri.id, id));
+
+			if (current.isActive && newTanggalKeluar) {
+				const tk = new Date(newTanggalKeluar);
+				if (!isNaN(tk.getTime())) {
+					const kYear = tk.getFullYear();
+					const kMonth = tk.getMonth() + 1;
+					await db.delete(schema.santriKeaktifan)
+						.where(
+							and(
+								eq(schema.santriKeaktifan.santriId, id),
+								or(
+									gt(schema.santriKeaktifan.tahun, kYear),
+									and(
+										eq(schema.santriKeaktifan.tahun, kYear),
+										gt(schema.santriKeaktifan.bulan, kMonth)
+									)
+								)
+							)
+						);
+				}
+			}
 			try {
 				await db.insert(schema.systemLogs).values({
 					userId: locals.user?.id || null,
