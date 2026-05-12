@@ -22,7 +22,9 @@ export async function load() {
 		? await db.select().from(schema.santri).where(notInArray(schema.santri.id, smkSantriIds))
 		: await db.select().from(schema.santri);
 
-	return { dataSmk, santriList };
+	const tahunAjarans = await db.select().from(schema.tahunAjaran);
+
+	return { dataSmk, santriList, tahunAjarans };
 }
 
 export const actions = {

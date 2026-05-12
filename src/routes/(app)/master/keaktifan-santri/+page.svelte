@@ -5,6 +5,10 @@
 
 	let search = $state('');
 	let selectedTahunMasuk = $state('');
+	let selectedStatus = $state('');
+	let noIndukAwal = $state('');
+	let noIndukAkhir = $state('');
+	let sortBy = $state('');
 	let editSantri = $state(null);
 	let editActiveKeys = $state([]);
 
@@ -20,15 +24,38 @@
 			result = result.filter((santri) => String(santri.tahunMasuk) === String(selectedTahunMasuk));
 		}
 
-		if (!needle) return result;
+		if (selectedStatus === 'Aktif') {
+			result = result.filter((santri) => santri.isActive);
+		} else if (selectedStatus === 'Nonaktif') {
+			result = result.filter((santri) => !santri.isActive);
+		}
 
-		return result.filter((santri) => {
-			return (
-				santri.namaLengkap.toLowerCase().includes(needle) ||
-				santri.nomorInduk.toLowerCase().includes(needle) ||
-				(santri.kategoriLabels || []).some((label) => label.toLowerCase().includes(needle))
-			);
-		});
+		if (noIndukAwal) {
+			result = result.filter((santri) => santri.nomorInduk >= noIndukAwal);
+		}
+
+		if (noIndukAkhir) {
+			result = result.filter((santri) => santri.nomorInduk <= noIndukAkhir);
+		}
+
+		let finalResult = result;
+		if (needle) {
+			finalResult = result.filter((santri) => {
+				return (
+					santri.namaLengkap.toLowerCase().includes(needle) ||
+					santri.nomorInduk.toLowerCase().includes(needle) ||
+					(santri.kategoriLabels || []).some((label) => label.toLowerCase().includes(needle))
+				);
+			});
+		}
+
+		if (sortBy === 'nomorInduk') {
+			finalResult = [...finalResult].sort((a, b) => String(a.nomorInduk || '').localeCompare(String(b.nomorInduk || ''), undefined, { numeric: true }));
+		} else if (sortBy === 'namaLengkap') {
+			finalResult = [...finalResult].sort((a, b) => String(a.namaLengkap || '').localeCompare(String(b.namaLengkap || '')));
+		}
+
+		return finalResult;
 	});
 
 	const openEdit = (santri) => {
@@ -64,8 +91,8 @@
 	<title>Keaktifan Santri</title>
 </svelte:head>
 
-<div class="flex flex-col lg:flex-row lg:items-end gap-3 mb-6">
-	<div class="form-control w-full sm:w-72">
+<div class="flex flex-col lg:flex-row lg:items-end flex-wrap gap-3 mb-6">
+	<div class="form-control w-full sm:w-64">
 		<label class="label py-0" for="search-input"><span class="label-text text-xs">Cari Santri</span></label>
 		<input
 			id="search-input"
@@ -75,13 +102,37 @@
 			bind:value={search}
 		/>
 	</div>
-	<div class="form-control w-full sm:w-48">
+	<div class="form-control w-full sm:w-40">
 		<label class="label py-0" for="filter-tahun"><span class="label-text text-xs">Tahun Masuk</span></label>
 		<select id="filter-tahun" class="select select-sm select-bordered w-full" bind:value={selectedTahunMasuk}>
-			<option value="">Semua Tahun Masuk</option>
+			<option value="">Semua Tahun</option>
 			{#each data.tahunMasukOptions as option}
 				<option value={option.value}>{option.label}</option>
 			{/each}
+		</select>
+	</div>
+	<div class="form-control w-full sm:w-36">
+		<label class="label py-0" for="filter-status"><span class="label-text text-xs">Status Santri</span></label>
+		<select id="filter-status" class="select select-sm select-bordered w-full" bind:value={selectedStatus}>
+			<option value="">Semua Status</option>
+			<option value="Aktif">Aktif</option>
+			<option value="Nonaktif">Nonaktif</option>
+		</select>
+	</div>
+	<div class="form-control w-full sm:w-32">
+		<label class="label py-0" for="filter-awal"><span class="label-text text-xs">No Induk Awal</span></label>
+		<input id="filter-awal" type="text" class="input input-sm input-bordered w-full" placeholder="Awal" bind:value={noIndukAwal} />
+	</div>
+	<div class="form-control w-full sm:w-32">
+		<label class="label py-0" for="filter-akhir"><span class="label-text text-xs">No Induk Akhir</span></label>
+		<input id="filter-akhir" type="text" class="input input-sm input-bordered w-full" placeholder="Akhir" bind:value={noIndukAkhir} />
+	</div>
+	<div class="form-control w-full sm:w-48">
+		<label class="label py-0" for="sort-by"><span class="label-text text-xs">Urutkan Berdasarkan</span></label>
+		<select id="sort-by" class="select select-sm select-bordered w-full" bind:value={sortBy}>
+			<option value="">Default</option>
+			<option value="nomorInduk">Nomor Induk Terendah</option>
+			<option value="namaLengkap">Nama Santri (A - Z)</option>
 		</select>
 	</div>
 	<div class="stats stats-horizontal shadow-sm border border-base-200 bg-base-100 w-full sm:w-auto">

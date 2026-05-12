@@ -21,12 +21,22 @@
 	];
 
 	let searchSantri = $state('');
+	let selectedTahunAjaran = $state('');
 	let selectedSantriId = $state('');
 	let santriDropdownOpen = $state(false);
 	let santriHighlightIndex = $state(-1);
 	let santriComboboxRef = $state(null);
 	let santriInputRef = $state(null);
 	let selectedSantri = $derived(data.santriList.find(s => s.id == selectedSantriId) || null);
+
+	let filteredSantriData = $derived.by(() => {
+		let list = data.dataSmp;
+		if (selectedTahunAjaran) {
+			const filterYear = parseInt(selectedTahunAjaran);
+			list = list.filter((s) => s.startYear === filterYear);
+		}
+		return list;
+	});
 
 	let editSmp = $state(null);
 	let filteredSantri = $derived.by(() => {
@@ -112,6 +122,12 @@
 		<div class="flex justify-between items-center mb-4 print:hidden">
 			<h2 class="card-title text-2xl font-bold">Data Siswa SMP</h2>
 			<div class="flex gap-2">
+				<select class="select select-sm select-bordered w-full max-w-xs" bind:value={selectedTahunAjaran}>
+					<option value="">Semua Tahun Masuk</option>
+					{#each data.tahunAjarans as ta}
+						<option value={ta.nama}>{ta.nama}</option>
+					{/each}
+				</select>
 				<button type="button" class="btn btn-outline btn-secondary btn-sm" onclick={() => window.print()}>
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
 						<path d="M6 2a1 1 0 00-1 1v2h10V3a1 1 0 00-1-1H6z" />
@@ -143,12 +159,12 @@
 					</tr>
 				</thead>
 				<tbody>
-					{#if data.dataSmp.length === 0}
+					{#if filteredSantriData.length === 0}
 						<tr>
 							<td colspan="5" class="text-center text-base-content/50 py-6">Belum ada data siswa SMP.</td>
 						</tr>
 					{:else}
-						{#each data.dataSmp as s}
+						{#each filteredSantriData as s}
 							<tr>
 								<td class="font-medium">{s.namaLengkap}</td>
 								<td>{s.nomorInduk}</td>
