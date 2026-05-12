@@ -6,6 +6,7 @@
 	let sortBy = $state('nama');
 	let filterValue = $state('');
 	let selectedTahunMasuk = $state('');
+	let statusFilter = $state('');
 	let searchQuery = $state('');
 	let selectedSantris = $state([]);
 	const isAdmin = $derived($page.data.user?.role === 'admin');
@@ -56,6 +57,11 @@
 
 		if (selectedTahunMasuk) {
 			list = list.filter((santri) => String(santri.tahunMasuk) === String(selectedTahunMasuk));
+		}
+
+		if (statusFilter) {
+			const isAktif = statusFilter === 'aktif';
+			list = list.filter((s) => s.isActive === isAktif);
 		}
 
 		// Text search filter (name / nomor induk)
@@ -326,6 +332,14 @@
 			{#each data.tahunMasukOptions as option}
 				<option value={option.value}>{option.label}</option>
 			{/each}
+		</select>
+	</div>
+	<div class="form-control w-full sm:w-48">
+		<label class="label py-0" for="filter-status"><span class="label-text text-xs">Status Santri</span></label>
+		<select id="filter-status" class="select select-sm select-bordered w-full" bind:value={statusFilter}>
+			<option value="">Semua Status</option>
+			<option value="aktif">Santri Aktif</option>
+			<option value="nonaktif">Santri Nonaktif</option>
 		</select>
 	</div>
 	<button type="button" class="btn btn-sm btn-outline btn-secondary w-full sm:w-auto" onclick={() => window.print()}>
