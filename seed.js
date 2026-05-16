@@ -2,8 +2,9 @@ import 'dotenv/config';
 import fs from 'node:fs/promises';
 import { db } from './src/lib/server/db/index.js';
 import * as schema from './src/lib/server/db/schema.js';
+import bcrypt from 'bcrypt';
 
-const DEFAULT_BACKUP_PATH = '/backupdb.json';
+const DEFAULT_BACKUP_PATH = './backupdb.json';
 
 function getBackupPath() {
 	return process.env.SEED_BACKUP_PATH || process.argv[2] || DEFAULT_BACKUP_PATH;
@@ -60,8 +61,25 @@ async function seed() {
 	const backupPath = getBackupPath();
 	console.log(`🌱 Seeding database from ${backupPath}`);
 
-	const backup = await loadBackup(backupPath);
-	const data = backup.data ?? {};
+	let data = {};
+	try {
+		const backup = await loadBackup(backupPath);
+		data = backup.data ?? {};
+	} catch (error) {
+		console.log(`⚠️ Warning: ${error.message}`);
+		console.log(`💡 Menggunakan user default (admin/admin) karena file backup tidak tersedia.`);
+		data = {
+			users: [
+				{
+					username: 'admin',
+					passwordHash: await bcrypt.hash('admin', 10),
+					role: 'admin',
+					namaLengkap: 'Administrator',
+					otp2faEnabled: false
+				}
+			]
+		};
+	}
 
 	const normalized = {
 		users: ensureArray(data.users),
@@ -79,8 +97,8 @@ async function seed() {
 		pembayaran: ensureArray(data.pembayaran),
 		mutasiSaldoBendahara: ensureArray(data.mutasiSaldoBendahara ?? data.mutasi),
 		systemLogs: ensureArray(data.systemLogs),
-		loginAttempts: ensureArray(data.loginAttempts)
-    santriKategoriTahun: ensureArray(data.santriKategoriTahun),
+		loginAttempts: ensureArray(data.loginAttempts),
+		santriKategoriTahun: ensureArray(data.santriKategoriTahun)
 	};
 
 	await safeDelete(schema.loginAttempts, 'login_attempts');

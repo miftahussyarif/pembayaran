@@ -52,6 +52,39 @@ Aplikasi pembayaran pesantren berbasis web untuk input transaksi, cetak kwitansi
 
 ---
 
+## Instalasi (Windows)
+
+### 1. Persiapan Tools
+Pastikan Anda sudah menginstal tools berikut:
+- **Node.js (LTS):** [Unduh di nodejs.org](https://nodejs.org/)
+- **Git:** [Unduh di git-scm.com](https://git-scm.com/)
+
+### 2. Clone & Install Dependency
+Buka **Terminal**, **Command Prompt**, atau **PowerShell**, lalu jalankan:
+```bash
+git clone https://github.com/miftahussyarif/pembayaran.git
+cd pembayaran
+npm install
+```
+
+### 3. Inisialisasi Database
+Jalankan perintah berikut untuk menyiapkan database:
+```bash
+npx drizzle-kit push
+npm run db:seed
+```
+
+### 4. Jalankan Aplikasi
+Untuk memulai aplikasi dalam mode development:
+```bash
+npm run dev
+```
+Buka browser dan akses `http://localhost:5173`.
+
+> **Login Default:** admin / admin
+
+---
+
 ## Instalasi (Ubuntu Server)
 
 ### 1. Persiapan
@@ -70,17 +103,29 @@ npm -v
 
 ### 3. Clone & Install Dependency
 ```bash
-git clone <repo-anda> pembayaran
+git clone https://github.com/miftahussyarif/pembayaran.git pembayaran
 cd pembayaran
 npm install
 ```
 
-### 4. Jalankan Development (opsional)
+### 4. Setup Database
+Jalankan perintah ini untuk menyiapkan struktur database dan mengisi data awal:
+```bash
+npx drizzle-kit push
+npm run db:seed
+```
+
+### 5. Login Default
+Setelah melakukan seed, gunakan akun berikut untuk login pertama kali:
+- **Username:** `admin`
+- **Password:** `admin`
+
+### 6. Jalankan Development (opsional)
 ```bash
 npm run dev -- --host 0.0.0.0 --port 5173
 ```
 
-### 5. Build & Run Production
+### 7. Build & Run Production
 ```bash
 npm run build
 npm run preview -- --host 0.0.0.0 --port 4173
@@ -159,15 +204,19 @@ Opsi A (Upload ZIP):
 Opsi B (Git):
 1. aaPanel → **Terminal**.
 2. `cd /www/wwwroot/domain`
-3. `git clone <repo-anda> .`
+3. `git clone https://github.com/miftahussyarif/pembayaran.git .`
 
-### 4. Install Dependency & Build
+### 4. Install Dependency, DB Setup & Build
 Jalankan via Terminal aaPanel:
 ```bash
 cd /www/wwwroot/domain
 npm install
+npx drizzle-kit push
+npm run db:seed
 npm run build
 ```
+
+> **Login Default:** admin / admin
 
 ### 5. Jalankan Node Project
 1. aaPanel → **Node Project** → **Add Project**.
