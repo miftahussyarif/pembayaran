@@ -175,6 +175,9 @@
 									{:else}
 										<span class="text-base-content/40">Masih aktif</span>
 									{/if}
+									{#if s.isUjianBareng}
+										<span class="badge badge-sm badge-info ml-2">Ujian Bareng</span>
+									{/if}
 								</td>
 								<td class="text-right print:hidden">
 									<div class="flex gap-1 justify-end">
@@ -367,6 +370,12 @@
 					<input id="endYear" name="endYear" type="number" min="2000" class="input input-sm input-bordered w-full" placeholder="2027" />
 				</div>
 			</div>
+			<div class="form-control mt-3">
+				<label class="label cursor-pointer justify-start gap-3">
+					<input type="checkbox" name="isUjianBareng" class="checkbox checkbox-sm checkbox-info" />
+					<span class="label-text">Ujian Berbarengan (Kakak Beradik)</span>
+				</label>
+			</div>
 			<div class="modal-action">
 				<button type="button" class="btn" onclick={() => modal_add_smp.close()}>Batal</button>
 				<button type="submit" class="btn btn-primary">Simpan</button>
@@ -416,6 +425,12 @@
 					<label class="label" for="editEndYear"><span class="label-text">Selesai (Tahun)</span></label>
 					<input id="editEndYear" name="endYear" type="number" min="2000" class="input input-sm input-bordered w-full" value={editSmp.endYear || ''} />
 				</div>
+			</div>
+			<div class="form-control mt-3">
+				<label class="label cursor-pointer justify-start gap-3">
+					<input type="checkbox" name="isUjianBareng" class="checkbox checkbox-sm checkbox-info" checked={editSmp.isUjianBareng} />
+					<span class="label-text">Ujian Berbarengan (Kakak Beradik)</span>
+				</label>
 			</div>
 			<div class="modal-action">
 				<button type="button" class="btn" onclick={() => { modal_edit_smp.close(); editSmp = null; }}>Batal</button>

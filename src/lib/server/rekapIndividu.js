@@ -278,6 +278,17 @@ export async function getSemuaRekap() {
 
 		// Helper: cek gratisList dengan kategori yang berlaku untuk tahun tertentu
 		const getNominal = (jenisId, categoryColumnNominal, defaultNominal, tahunAjaranId = null) => {
+			const jenis = jenisList.find(j => j.id === jenisId);
+			if (jenis && /ujian/i.test(jenis.namaPembayaran)) {
+				if (jenis.tipe.startsWith('smk_')) {
+					const smkInfo = smkBySantriId.get(s.id);
+					if (smkInfo?.isUjianBareng) return 1000000;
+				} else if (jenis.tipe.startsWith('smp_')) {
+					const smpInfo = smpBySantriId.get(s.id);
+					if (smpInfo?.isUjianBareng) return 1000000;
+				}
+			}
+
 			const katIds = getKategoriIdsForTahun(tahunAjaranId);
 			for (const katId of katIds) {
 				const mapping = gratisList.find(g => g.kategoriId === katId && g.jenisPembayaranId === jenisId);

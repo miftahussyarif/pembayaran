@@ -12,7 +12,8 @@ export async function load() {
 			startMonth: schema.santriSmp.startMonth,
 			startYear: schema.santriSmp.startYear,
 			endMonth: schema.santriSmp.endMonth,
-			endYear: schema.santriSmp.endYear
+			endYear: schema.santriSmp.endYear,
+			isUjianBareng: schema.santriSmp.isUjianBareng
 		})
 		.from(schema.santriSmp)
 		.leftJoin(schema.santri, eq(schema.santriSmp.santriId, schema.santri.id));
@@ -35,6 +36,7 @@ export const actions = {
 		const startYear = Number(data.get('startYear'));
 		const endMonth = data.get('endMonth') ? Number(data.get('endMonth')) : null;
 		const endYear = data.get('endYear') ? Number(data.get('endYear')) : null;
+		const isUjianBareng = data.get('isUjianBareng') === 'true' || data.get('isUjianBareng') === 'on';
 
 		if (!santriId || !startMonth || !startYear) {
 			return { success: false, message: 'Data tidak lengkap.' };
@@ -55,7 +57,8 @@ export const actions = {
 			startMonth,
 			startYear,
 			endMonth,
-			endYear
+			endYear,
+			isUjianBareng
 		});
 
 		return { success: true };
@@ -68,6 +71,7 @@ export const actions = {
 		const startYear = Number(data.get('startYear'));
 		const endMonth = data.get('endMonth') ? Number(data.get('endMonth')) : null;
 		const endYear = data.get('endYear') ? Number(data.get('endYear')) : null;
+		const isUjianBareng = data.get('isUjianBareng') === 'true' || data.get('isUjianBareng') === 'on';
 
 		if (!id || !startMonth || !startYear) {
 			return { success: false, message: 'Data tidak lengkap.' };
@@ -84,7 +88,7 @@ export const actions = {
 		}
 
 		await db.update(schema.santriSmp)
-			.set({ startMonth, startYear, endMonth, endYear })
+			.set({ startMonth, startYear, endMonth, endYear, isUjianBareng })
 			.where(eq(schema.santriSmp.id, id));
 
 		return { success: true };

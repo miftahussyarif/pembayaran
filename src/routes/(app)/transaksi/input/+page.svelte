@@ -136,30 +136,61 @@
 	let isGratis = $derived.by(() => {
 		if (isKhusus) return false;
 		if (!selectedSantriId || !selectedJenisId) return false;
-		// Cari mapping kategoriGratis yang cocok
-		const mapping = data.kategoriGratis.find(g =>
-			g.kategoriId == selectedSantri?.kategoriId &&
-			g.jenisPembayaranId == selectedJenisId
-		);
-		// Hanya gratis jika mapping ada dan nominal === 0
-		if (mapping && Number(mapping.nominal) === 0) return true;
+		
+		const kategoriIds = getKategoriIdsForTahun(selectedSantriId, selectedTahunAjaranId, selectedSantri?.kategoriId);
+		for (const kategoriId of kategoriIds) {
+			const mapping = data.kategoriGratis.find(g =>
+				g.kategoriId == kategoriId &&
+				g.jenisPembayaranId == selectedJenisId
+			);
+			if (mapping && Number(mapping.nominal) === 0) return true;
+		}
+
 		// Jika tidak ada mapping, cek default nominal jenis pembayaran
 		const jenis = data.jenisPembayarans.find(j => j.id == selectedJenisId);
 		if (jenis && Number(jenis.nominalDefault) === 0) return true;
 		return false;
 	});
 
+	let activeMonthKeys = $derived.by(() => {
+		const keys = new Set();
+		if (data.santriKeaktifan && selectedSantriId) {
+			for (const row of data.santriKeaktifan) {
+				if (String(row.santriId) === String(selectedSantriId)) {
+					keys.add(`${row.tahun}-${row.bulan - 1}`);
+				}
+			}
+		}
+		return keys;
+	});
+
 	let nominalEfektif = $derived.by(() => {
 		if (isKhusus || !selectedJenis) return 0;
 		if (isGratis) return 0;
 
+		if (selectedJenis.tipe.startsWith('smk_') && !santriSmkBySantriId.has(selectedSantriId)) return 0;
+		if (selectedJenis.tipe.startsWith('smp_') && !santriSmpBySantriId.has(selectedSantriId)) return 0;
+
+		if (/ujian/i.test(selectedJenis.namaPembayaran)) {
+			if (selectedJenis.tipe.startsWith('smk_')) {
+				const smkInfo = santriSmkBySantriId.get(selectedSantriId);
+				if (smkInfo?.isUjianBareng) return 1000000;
+			} else if (selectedJenis.tipe.startsWith('smp_')) {
+				const smpInfo = santriSmpBySantriId.get(selectedSantriId);
+				if (smpInfo?.isUjianBareng) return 1000000;
+			}
+		}
+
 		if (selectedSantri && selectedJenisId) {
-			const customMapping = data.kategoriGratis.find(g =>
-				g.kategoriId == selectedSantri.kategoriId &&
-				g.jenisPembayaranId == selectedJenisId &&
-				g.nominal !== null
-			);
-			if (customMapping) return Number(customMapping.nominal || 0);
+			const kategoriIds = getKategoriIdsForTahun(selectedSantriId, selectedTahunAjaranId, selectedSantri.kategoriId);
+			for (const kategoriId of kategoriIds) {
+				const customMapping = data.kategoriGratis.find(g =>
+					g.kategoriId == kategoriId &&
+					g.jenisPembayaranId == selectedJenisId &&
+					g.nominal !== null
+				);
+				if (customMapping) return Number(customMapping.nominal || 0);
+			}
 		}
 
 		if (/konsumsi/i.test(selectedJenis.namaPembayaran) && selectedSantri?.nominalKonsumsi !== undefined) {
@@ -187,6 +218,56 @@
 			)
 			.reduce((sum, item) => sum + Number(item.nominalTagihan || 0), 0);
 		const totalTagihan = importedTotal > 0 ? importedTotal : nominalEfektif;
+
+		let isPast = false;
+		let hasTanggungan = true;
+
+		if (selectedTahunAjaran && importedTotal === 0 && !isGratis) {
+			if (nominalEfektif === 0) {
+				hasTanggungan = false;
+			} else if (isBulanan && selectedBulan && selectedTahunTagihan) {
+				const monthIndex = BULAN_NAMES.indexOf(selectedBulan);
+				const tagihanDate = new Date(Number(selectedTahunTagihan), monthIndex, 1);
+				const currentMonthYear = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+				if (tagihanDate < currentMonthYear) {
+					isPast = true;
+					if (!activeMonthKeys.has(`${selectedTahunTagihan}-${monthIndex}`)) {
+						hasTanggungan = false;
+					}
+				}
+			} else if (isTahunan || isSekali) {
+				const bounds = getTahunAjaranBounds(selectedTahunAjaran.nama);
+				if (bounds?.end) {
+					const tagihanEndDate = new Date(bounds.end.getFullYear(), bounds.end.getMonth(), 1);
+					const currentMonthYear = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+					if (tagihanEndDate < currentMonthYear) {
+						isPast = true;
+						if (isTahunan) {
+							let activeInYear = false;
+							for (let m = 0; m < 12; m++) {
+								const d = new Date(bounds.start.getFullYear(), bounds.start.getMonth() + m, 1);
+								if (d > bounds.end) break;
+								if (activeMonthKeys.has(`${d.getFullYear()}-${d.getMonth()}`)) {
+									activeInYear = true;
+									break;
+								}
+							}
+							if (!activeInYear) hasTanggungan = false;
+						}
+					}
+				}
+			}
+		}
+
+		if (isPast && !hasTanggungan) {
+			return {
+				totalTagihan: 0,
+				totalDibayar: 0,
+				sisa: 0,
+				isLunas: true,
+				isInvalidBukanTanggungan: true
+			};
+		}
 
 		if (selectedSantri?.tanggalKeluar && selectedTahunAjaran) {
 			const window = getApplicableWindow(selectedJenis, selectedSantri);
@@ -293,7 +374,7 @@
 
 	// Cek apakah bulan sudah lunas
 	let isBulanLunas = $derived.by(() => {
-		return !!selectedPaymentStatus?.isLunas && isBulanan;
+		return !!selectedPaymentStatus?.isLunas && isBulanan && !selectedPaymentStatus?.isInvalidBukanTanggungan;
 	});
 
 	function getTahunTagihanOptions(tahunAjaranNama) {
@@ -540,6 +621,16 @@
 
 	function getEffectiveNominalForSantri(jenis, santri, tahunAjaranId) {
 		if (!jenis || !santri) return 0;
+
+		if (/ujian/i.test(jenis.namaPembayaran)) {
+			if (jenis.tipe.startsWith('smk_')) {
+				const smkInfo = santriSmkBySantriId.get(santri.id);
+				if (smkInfo?.isUjianBareng) return 1000000;
+			} else if (jenis.tipe.startsWith('smp_')) {
+				const smpInfo = santriSmpBySantriId.get(santri.id);
+				if (smpInfo?.isUjianBareng) return 1000000;
+			}
+		}
 
 		const kategoriIds = getKategoriIdsForTahun(santri.id, tahunAjaranId, santri.kategoriId);
 		for (const kategoriId of kategoriIds) {
@@ -967,6 +1058,17 @@
 		isKhusus = false;
 		keteranganKhusus = '';
 		namaPembayarManual = '';
+	}
+
+	function handleResetForm() {
+		paymentItems = [];
+		selectedJenisId = '';
+		selectedBulan = '';
+		selectedTahunTagihan = '';
+		nominal = 0;
+		isKhusus = false;
+		keteranganKhusus = '';
+		batchError = '';
 	}
 
 	function addCurrentPaymentItem() {
@@ -1406,7 +1508,11 @@
 									</div>
 								</div>
 								{#if selectedBulan && (selectedSantriId && selectedTahunAjaranId && selectedJenisId)}
-									{#if isBulanLunas}
+									{#if selectedPaymentStatus?.isInvalidBukanTanggungan}
+										<div class="label pt-2 pb-0">
+											<span class="label-text-alt text-warning font-medium">Tidak ada tagihan untuk jenis pembayaran ini pada periode terpilih.</span>
+										</div>
+									{:else if isBulanLunas}
 										<div class="label pt-2 pb-0">
 											<span class="label-text-alt text-success font-medium">✓ Bulan dan tahun tagihan ini sudah lunas</span>
 										</div>
@@ -1482,6 +1588,10 @@
 									<div class="label pt-1 pb-0">
 										<span class="label-text-alt text-error font-medium">sudah keluar, tidak ada tagihan bulan ini</span>
 									</div>
+								{:else if selectedPaymentStatus.isInvalidBukanTanggungan}
+									<div class="label pt-1 pb-0">
+										<span class="label-text-alt text-warning font-medium">Santri ini tidak memiliki tanggungan untuk pembayaran ini pada periode terpilih (tidak tercatat di rekap individu).</span>
+									</div>
 								{:else}
 									<div class="label pt-1 pb-0">
 										<span class={`label-text-alt font-medium ${selectedPaymentStatus.isLunas ? 'text-success' : 'text-base-content/70'}`}>
@@ -1496,6 +1606,10 @@
 								{#if selectedPaymentStatus.isInvalidKeluar}
 									<div class="label pt-2 pb-0">
 										<span class="label-text-alt text-error font-medium">Santri sudah keluar sebelum tahun ajaran ini dimulai.</span>
+									</div>
+								{:else if selectedPaymentStatus.isInvalidBukanTanggungan}
+									<div class="label pt-2 pb-0">
+										<span class="label-text-alt text-warning font-medium">Santri ini tidak memiliki tanggungan untuk pembayaran ini pada periode terpilih (tidak tercatat di rekap individu).</span>
 									</div>
 								{:else}
 									<div class="label pt-2 pb-0">
@@ -1512,6 +1626,10 @@
 									<div class="label pt-2 pb-0">
 										<span class="label-text-alt text-error font-medium">Santri sudah keluar sebelum tahun ajaran ini dimulai.</span>
 									</div>
+								{:else if selectedPaymentStatus.isInvalidBukanTanggungan}
+									<div class="label pt-2 pb-0">
+										<span class="label-text-alt text-warning font-medium">Santri ini tidak memiliki tanggungan untuk pembayaran ini pada tahun terpilih (tidak tercatat di rekap individu).</span>
+									</div>
 								{:else}
 									<div class="label pt-2 pb-0">
 										<span class={`label-text-alt font-medium ${selectedPaymentStatus.isLunas ? 'text-success' : 'text-base-content/70'}`}>
@@ -1521,6 +1639,66 @@
 										</span>
 									</div>
 								{/if}
+							{/if}
+						</div>
+					</div>
+
+					<div class="divider"></div>
+
+					{#if batchError}
+						<div class="alert alert-warning mb-4 py-2 text-sm">
+							<span>{batchError}</span>
+						</div>
+					{/if}
+
+					<div class="card bg-base-200/40 border border-base-200 mb-4">
+						<div class="card-body p-4">
+							<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+								<div>
+									<h3 class="font-semibold">Multi Payment</h3>
+									<p class="text-xs text-base-content/60">Tambahkan pembayaran ke daftar terlebih dahulu, lalu simpan daftar tersebut untuk dibayar dan dicetak dalam satu kwitansi.</p>
+								</div>
+								<button type="button" class="btn btn-sm btn-outline btn-primary" onclick={addCurrentPaymentItem}>
+									Tambah ke Daftar
+								</button>
+							</div>
+
+							{#if paymentItems.length === 0}
+								<div class="text-sm text-base-content/60">Belum ada item pembayaran di daftar. Pilih tagihan dan nominal pembayaran, lalu klik Tambah ke Daftar sebelum menyimpan pembayaran atau mencetak kwitansi.</div>
+							{:else}
+								<div class="overflow-x-auto">
+									<table class="table table-sm w-full">
+										<thead>
+											<tr class="bg-base-100">
+												<th>Uraian</th>
+												<th>Periode</th>
+												<th class="text-right">Nominal</th>
+												<th class="text-center">Aksi</th>
+											</tr>
+										</thead>
+										<tbody>
+											{#each paymentItems as item, index}
+												<tr>
+													<td class="font-medium">{item.label}</td>
+													<td class="text-xs text-base-content/60">{item.periode || '-'}</td>
+													<td class="text-right font-semibold">{formatRupiah(item.nominalDibayar)}</td>
+													<td class="text-center">
+														<button type="button" class="btn btn-xs btn-ghost text-error" onclick={() => removePaymentItem(index)}>
+															Hapus
+														</button>
+													</td>
+												</tr>
+											{/each}
+										</tbody>
+										<tfoot>
+											<tr class="font-semibold">
+												<td colspan="2" class="text-right">Total</td>
+												<td class="text-right text-primary">{formatRupiah(totalPaymentItems)}</td>
+												<td></td>
+											</tr>
+										</tfoot>
+									</table>
+								</div>
 							{/if}
 						</div>
 					</div>
@@ -1608,67 +1786,9 @@
 					{/if}
 
 					<div class="divider"></div>
-
-					{#if batchError}
-						<div class="alert alert-warning mb-4 py-2 text-sm">
-							<span>{batchError}</span>
-						</div>
-					{/if}
-
-					<div class="card bg-base-200/40 border border-base-200 mb-4">
-						<div class="card-body p-4">
-							<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
-								<div>
-									<h3 class="font-semibold">Multi Payment</h3>
-									<p class="text-xs text-base-content/60">Tambahkan pembayaran ke daftar terlebih dahulu, lalu simpan daftar tersebut untuk dibayar dan dicetak dalam satu kwitansi.</p>
-								</div>
-								<button type="button" class="btn btn-sm btn-outline btn-primary" onclick={addCurrentPaymentItem}>
-									Tambah ke Daftar
-								</button>
-							</div>
-
-							{#if paymentItems.length === 0}
-								<div class="text-sm text-base-content/60">Belum ada item pembayaran di daftar. Pilih tagihan dan nominal pembayaran, lalu klik Tambah ke Daftar sebelum menyimpan pembayaran atau mencetak kwitansi.</div>
-							{:else}
-								<div class="overflow-x-auto">
-									<table class="table table-sm w-full">
-										<thead>
-											<tr class="bg-base-100">
-												<th>Uraian</th>
-												<th>Periode</th>
-												<th class="text-right">Nominal</th>
-												<th class="text-center">Aksi</th>
-											</tr>
-										</thead>
-										<tbody>
-											{#each paymentItems as item, index}
-												<tr>
-													<td class="font-medium">{item.label}</td>
-													<td class="text-xs text-base-content/60">{item.periode || '-'}</td>
-													<td class="text-right font-semibold">{formatRupiah(item.nominalDibayar)}</td>
-													<td class="text-center">
-														<button type="button" class="btn btn-xs btn-ghost text-error" onclick={() => removePaymentItem(index)}>
-															Hapus
-														</button>
-													</td>
-												</tr>
-											{/each}
-										</tbody>
-										<tfoot>
-											<tr class="font-semibold">
-												<td colspan="2" class="text-right">Total</td>
-												<td class="text-right text-primary">{formatRupiah(totalPaymentItems)}</td>
-												<td></td>
-											</tr>
-										</tfoot>
-									</table>
-								</div>
-							{/if}
-						</div>
-					</div>
 					
 					<div class="flex justify-end gap-3 mt-4">
-						<button type="reset" class="btn btn-ghost" disabled={isSubmitting}>Reset Form</button>
+						<button type="button" class="btn btn-ghost" onclick={handleResetForm} disabled={isSubmitting}>Reset Form</button>
 						<button type="submit" class="btn btn-primary px-8" disabled={!isFormValid || isSubmitting}>
 							{#if isSubmitting}
 								<span class="loading loading-spinner loading-sm"></span>

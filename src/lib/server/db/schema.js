@@ -77,7 +77,8 @@ export const santriSmk = sqliteTable('santri_smk', {
 	startMonth: integer('start_month').notNull(),
 	startYear: integer('start_year').notNull(),
 	endMonth: integer('end_month'),
-	endYear: integer('end_year')
+	endYear: integer('end_year'),
+	isUjianBareng: integer('is_ujian_bareng', { mode: 'boolean' }).default(false)
 });
 
 export const santriSmp = sqliteTable('santri_smp', {
@@ -86,7 +87,8 @@ export const santriSmp = sqliteTable('santri_smp', {
 	startMonth: integer('start_month').notNull(),
 	startYear: integer('start_year').notNull(),
 	endMonth: integer('end_month'),
-	endYear: integer('end_year')
+	endYear: integer('end_year'),
+	isUjianBareng: integer('is_ujian_bareng', { mode: 'boolean' }).default(false)
 });
 
 export const santriKeaktifan = sqliteTable('santri_keaktifan', {
