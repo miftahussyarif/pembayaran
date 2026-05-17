@@ -3,6 +3,7 @@ import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { generateBackup, sendBackupToTelegram } from '$lib/server/backup.js';
+import { generatePublicDatabase } from '$lib/server/publicBackup.js';
 import {
 	buildSessionCookieValue,
 	getSessionCookieName,
@@ -32,6 +33,9 @@ if (typeof process !== 'undefined') {
 						pengaturan[0].telegramChatId,
 						backupData
 					);
+					
+					// Also generate public tanggungan database
+					await generatePublicDatabase();
 					
 					if (result.ok) {
 						console.log(`[Backup] Scheduled backup sent to Telegram: ${today}`);
@@ -99,9 +103,11 @@ export const handle = async ({ event, resolve }) => {
 	}
 
 	// 2. Proteksi Halaman Internal
-	// Jika user BUKAN di halaman /login atau halamannya, dan dia TIDAK PUNYA session -> Redirect ke /login
-	if (!event.url.pathname.startsWith('/login') && !sessionUser) {
-		throw redirect(303, '/login');
+	if (!sessionUser) {
+		// Jika belum login dan BUKAN di halaman /login atau /public -> Redirect ke /public
+		if (!event.url.pathname.startsWith('/login') && !event.url.pathname.startsWith('/public')) {
+			throw redirect(303, '/public');
+		}
 	}
 
 	// Jika Punya session, dan malah mencoba buka halaman /login (kecuali logout) -> Redirect ke dashboard (/)

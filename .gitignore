@@ -28,3 +28,11 @@ local.db-*
 sqlite.db
 *.db
 *.db-*
+
+# Generated public data
+static/public-data/*
+!static/public-data/tanggungan.example.json
+
+# Uploads & Backups
+static/uploads/
+backup.json

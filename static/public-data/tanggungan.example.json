@@ -1,0 +1,50 @@
+{
+  "type": "pesantren-public-tanggungan",
+  "generatedAt": "2026-05-17T12:00:00.000Z",
+  "namaPesantren": "Pesantren Contoh",
+  "alamat": "Jl. Contoh No. 123",
+  "logoUrl": "",
+  "totalSantri": 1,
+  "santri": [
+    {
+      "nomorInduk": "12345",
+      "namaLengkap": "SANTRI DUMMY",
+      "namaKategori": "Reguler",
+      "isActive": true,
+      "totalTagihanKeseluruhan": 1500000,
+      "totalDibayarKeseluruhan": 500000,
+      "totalBelumTerbayar": 1000000,
+      "detailTanggungan": [
+        {
+          "kategori": "Bulanan Pondok",
+          "nama": "SPP Bulanan",
+          "totalTagihan": 500000,
+          "totalDibayar": 0,
+          "sisa": 500000,
+          "unpaidMonths": [
+            {
+              "bulan": "Januari",
+              "tahun": 2026,
+              "nominal": 500000
+            }
+          ]
+        },
+        {
+          "kategori": "Tahunan",
+          "nama": "Uang Gedung",
+          "totalTagihan": 1000000,
+          "totalDibayar": 500000,
+          "sisa": 500000,
+          "tahunDetails": [
+            {
+              "tahun": "2026",
+              "nominal": 1000000,
+              "dibayar": 500000,
+              "sisa": 500000
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

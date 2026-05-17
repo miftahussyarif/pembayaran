@@ -3,6 +3,7 @@ import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { generateBackup, sendBackupToTelegram } from '$lib/server/backup.js';
+import { generatePublicDatabase } from '$lib/server/publicBackup.js';
 
 export const load = async ({ locals }) => {
 	if (locals.user?.role !== 'admin') {
@@ -91,6 +92,8 @@ export const actions = {
 			);
 
 			if (result.ok) {
+				// Also generate public tanggungan database
+				await generatePublicDatabase();
 				return { success: true, message: 'Backup berhasil dikirim ke Telegram sekarang' };
 			} else {
 				return fail(500, { message: `Gagal mengirim ke Telegram: ${result.description || 'Unknown error'}` });
