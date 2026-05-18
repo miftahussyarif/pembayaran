@@ -94,7 +94,7 @@
 
 	<!-- Profile section -->
 	<div class="max-w-4xl mx-auto px-4 md:px-6">
-		<div class="relative -mt-16 md:-mt-20 flex flex-col md:flex-row md:items-end gap-4 md:gap-6 pb-6">
+		<div class="relative -mt-16 md:-mt-20 flex flex-col md:flex-row md:items-stretch gap-4 md:gap-6 pb-6">
 			<!-- Avatar -->
 			<div class="shrink-0">
 				<div 
@@ -106,9 +106,9 @@
 			</div>
 
 			<!-- Info -->
-			<div class="flex-1 pb-2">
-				<h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">{santri?.namaLengkap}</h1>
-				<div class="flex flex-wrap items-center gap-3 mt-2">
+			<div class="flex-1 flex flex-col justify-between py-2 md:pt-5 md:pb-3">
+				<h1 class="text-2xl md:text-3xl font-extrabold text-gray-900 md:text-white tracking-tight drop-shadow-sm">{santri?.namaLengkap}</h1>
+				<div class="flex flex-wrap items-center gap-3 mt-3 md:mt-0">
 					<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 text-gray-700 text-sm font-medium">
 						<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
