@@ -36,3 +36,4 @@ static/public-data/*
 # Uploads & Backups
 static/uploads/
 backup.json
+backupdb.json
