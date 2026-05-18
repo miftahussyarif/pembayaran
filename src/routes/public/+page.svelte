@@ -79,6 +79,16 @@
 
 <!-- Hero Section with gradient background -->
 <div class="relative overflow-hidden">
+	<!-- Tombol Admin -->
+	<div class="absolute top-4 right-4 z-50">
+		<a href="/login" class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/20 backdrop-blur-md text-white text-sm font-medium rounded-full transition-all duration-300 shadow-lg hover:shadow-xl">
+			<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+			</svg>
+			Admin
+		</a>
+	</div>
+
 	<!-- Animated Background -->
 	<div class="absolute inset-0 bg-gradient-to-br from-emerald-900 via-teal-800 to-cyan-900"></div>
 	<div class="absolute inset-0 opacity-20" style="background-image: url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><defs><pattern id=%22grain%22 width=%224%22 height=%224%22 patternUnits=%22userSpaceOnUse%22><circle cx=%222%22 cy=%222%22 r=%220.5%22 fill=%22white%22 opacity=%220.3%22/></pattern></defs><rect width=%22100%22 height=%22100%22 fill=%22url(%23grain)%22/></svg>');"></div>
