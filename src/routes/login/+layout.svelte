@@ -16,7 +16,12 @@
 <svelte:head>
 	<title>Login - Aplikasi Pesantren</title>
 	<link rel="icon" href={faviconUrl} type={faviconType} />
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 </svelte:head>
 
 <!-- Layout khusus login tanpa Sidebar dan Navbar -->
-{@render children()}
+<div class="min-h-screen" style="font-family: 'Inter', sans-serif;" data-theme="corporate">
+	{@render children()}
+</div>

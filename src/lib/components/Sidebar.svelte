@@ -53,18 +53,18 @@
 	}
 </script>
 
-<div class="drawer-side z-40">
+<div class="drawer-side z-40 print:hidden">
 	<label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"
 	></label>
 	<ul
-		class="menu p-4 w-72 min-h-full bg-base-100 text-base-content shadow-lg border-r border-base-200 gap-1 rounded-r-3xl md:rounded-r-none flex flex-col"
+		class="menu p-0 w-72 min-h-full sidebar-bg text-white shadow-xl border-r border-emerald-800/50 gap-0 rounded-r-3xl md:rounded-r-none flex flex-col"
 	>
 		<!-- Sidebar content here -->
-		<li class="mb-4">
-			<div class="p-6 pb-2">
+		<li class="mb-2">
+			<div class="px-5 pt-6 pb-4 border-b border-white/10">
 				<div class="flex items-center gap-3">
 					<div
-						class="w-10 h-10 rounded-lg bg-primary text-primary-content flex items-center justify-center font-bold text-xl shadow-md overflow-hidden"
+						class="w-11 h-11 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center font-bold text-xl shadow-md overflow-hidden shrink-0"
 					>
 						{#if $page.data.profilPesantren?.logoUrl}
 							<img
@@ -73,33 +73,29 @@
 								class="w-full h-full object-cover"
 							/>
 						{:else}
-							{$page.data.profilPesantren?.namaPesantren?.charAt(
-								0,
-							) || "P"}
+							{$page.data.profilPesantren?.namaPesantren?.charAt(0) || "P"}
 						{/if}
 					</div>
-					<div>
+					<div class="min-w-0">
 						<h2
-							class="font-bold text-lg leading-tight tracking-tight max-w-[160px] truncate"
-							title={$page.data.profilPesantren?.namaPesantren ||
-								"Aplikasi Pesantren"}
+							class="font-bold text-sm leading-tight tracking-tight max-w-[160px] truncate text-white"
+							title={$page.data.profilPesantren?.namaPesantren || "Aplikasi Pesantren"}
 						>
-							{$page.data.profilPesantren?.namaPesantren ||
-								"Aplikasi Pesantren"}
+							{$page.data.profilPesantren?.namaPesantren || "Aplikasi Pesantren"}
 						</h2>
-						<p class="text-xs text-base-content/60 font-medium">
+						<p class="text-xs text-emerald-300/80 font-medium mt-0.5">
 							Sistem Pembayaran
 						</p>
 					</div>
 				</div>
 			</div>
 		</li>
-		<li>
+		<li class="px-3 py-1">
 			<a
 				href="/"
 				class={$page.url.pathname === "/"
-					? "active bg-primary text-primary-content"
-					: ""}
+					? "active-menu"
+					: "inactive-menu"}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -118,23 +114,18 @@
 			</a>
 		</li>
 		<!-- Data Master Section -->
-		<div class="divider my-0"></div>
-		<li>
+		<div class="sidebar-divider"></div>
+		<li class="px-3">
 			<button
 				type="button"
-				class="flex items-center w-full px-4 py-2 text-left gap-2 hover:bg-base-200 rounded-lg"
+				class="section-btn"
 				onclick={() => {
 					openMaster = !openMaster;
 					saveState();
 				}}
 			>
-				<span
-					class="font-semibold text-xs uppercase text-base-content/60"
-					>Data Master</span
-				>
-				<span class="ml-auto text-xs text-base-content/50"
-					>{openMaster ? "−" : "+"}</span
-				>
+				<span class="section-label">Data Master</span>
+				<span class="section-chevron">{openMaster ? "−" : "+"}</span>
 			</button>
 		</li>
 		{#if openMaster}
@@ -146,8 +137,8 @@
 						class={$page.url.pathname.includes(
 							"/master/tahun-ajaran",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -173,8 +164,8 @@
 						class={$page.url.pathname.includes(
 							"/master/kategori-santri",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -200,8 +191,8 @@
 						class={$page.url.pathname.includes(
 							"/master/jenis-pembayaran",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -226,8 +217,8 @@
 					<a
 						href="/master/santri"
 						class={$page.url.pathname.includes("/master/santri")
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -253,8 +244,8 @@
 						class={$page.url.pathname.includes(
 							"/master/keaktifan-santri",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -279,8 +270,8 @@
 					<a
 						href="/master/data-siswa-smk"
 						class={$page.url.pathname.includes("/master/data-siswa-smk")
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -304,8 +295,8 @@
 					<a
 						href="/master/data-siswa-smp"
 						class={$page.url.pathname.includes("/master/data-siswa-smp")
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -325,23 +316,18 @@
 				</li>
 			{/if}
 		{/if}
-		<div class="divider my-0"></div>
-		<li>
+		<div class="sidebar-divider"></div>
+		<li class="px-3">
 			<button
 				type="button"
-				class="flex items-center w-full px-4 py-2 text-left gap-2 hover:bg-base-200 rounded-lg"
+				class="section-btn"
 				onclick={() => {
 					openTransaksi = !openTransaksi;
 					saveState();
 				}}
 			>
-				<span
-					class="font-semibold text-xs uppercase text-base-content/60"
-					>Transaksi Pembayaran</span
-				>
-				<span class="ml-auto text-xs text-base-content/50"
-					>{openTransaksi ? "−" : "+"}</span
-				>
+				<span class="section-label">Transaksi Pembayaran</span>
+				<span class="section-chevron">{openTransaksi ? "−" : "+"}</span>
 			</button>
 		</li>
 		{#if openTransaksi}
@@ -350,8 +336,8 @@
 					<a
 						href="/transaksi/input"
 						class={$page.url.pathname.includes("/transaksi/input")
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -377,8 +363,8 @@
 						class={$page.url.pathname.includes(
 							"/transaksi/rekap-individu",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -402,8 +388,8 @@
 					<a
 						href="/transaksi/riwayat"
 						class={$page.url.pathname.includes("/transaksi/riwayat")
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -429,8 +415,8 @@
 						class={$page.url.pathname.includes(
 							"/transaksi/tambah-tagihan-khusus",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -456,8 +442,8 @@
 						class={$page.url.pathname.includes(
 							"/transaksi/rekapitulasi",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -483,8 +469,8 @@
 						class={$page.url.pathname.includes(
 							"/transaksi/rekap-petugas",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -511,8 +497,8 @@
 						class={$page.url.pathname.includes(
 							"/transaksi/saldo-keuangan",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -534,23 +520,18 @@
 		{/if}
 
 		{#if $page.data.user?.role === "admin"}
-			<div class="divider my-0"></div>
-			<li>
+			<div class="sidebar-divider"></div>
+			<li class="px-3">
 				<button
 					type="button"
-					class="flex items-center w-full px-4 py-2 text-left gap-2 hover:bg-base-200 rounded-lg"
+					class="section-btn"
 					onclick={() => {
 						openAdmin = !openAdmin;
 						saveState();
 					}}
 				>
-					<span
-						class="font-semibold text-xs uppercase text-base-content/60"
-						>Pengaturan Administrator</span
-					>
-					<span class="ml-auto text-xs text-base-content/50"
-						>{openAdmin ? "−" : "+"}</span
-					>
+					<span class="section-label">Pengaturan Administrator</span>
+					<span class="section-chevron">{openAdmin ? "−" : "+"}</span>
 				</button>
 			</li>
 			{#if openAdmin}
@@ -558,8 +539,8 @@
 					<a
 						href="/pengaturan/profil"
 						class={$page.url.pathname.includes("/pengaturan/profil")
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -581,8 +562,8 @@
 					<a
 						href="/pengaturan/user"
 						class={$page.url.pathname.includes("/pengaturan/user")
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -606,8 +587,8 @@
 						class={$page.url.pathname.includes(
 							"/pengaturan/import-tunggakan",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -631,8 +612,8 @@
 						class={$page.url.pathname.includes(
 							"/pengaturan/system-full-log",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -656,8 +637,8 @@
 						class={$page.url.pathname.includes(
 							"/pengaturan/reset-database",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -681,8 +662,8 @@
 						class={$page.url.pathname.includes(
 							"/pengaturan/backup-database",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -706,8 +687,8 @@
 						class={$page.url.pathname.includes(
 							"/pengaturan/restore-database",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -731,8 +712,8 @@
 						class={$page.url.pathname.includes(
 							"/pengaturan/akses-halaman",
 						)
-							? "active bg-primary text-primary-content"
-							: ""}
+							? "active-menu"
+							: "inactive-menu"}
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -753,12 +734,12 @@
 			{/if}
 		{/if}
 		<div class="mt-auto"></div>
-		<div class="divider my-0"></div>
-		<li>
+		<div class="sidebar-divider"></div>
+		<li class="px-3 py-2 mb-2">
 			<form method="POST" action="/logout" class="w-full">
 				<button
 					type="submit"
-					class="btn btn-ghost justify-start text-error w-full"
+					class="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-red-300 hover:bg-red-500/20 hover:text-red-200 transition-all duration-200 text-sm font-medium"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -779,3 +760,69 @@
 		</li>
 	</ul>
 </div>
+
+<style>
+	.sidebar-bg {
+		background: linear-gradient(180deg, #064e3b 0%, #065f46 50%, #047857 100%);
+	}
+	.active-menu {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+		padding: 0.625rem 0.875rem;
+		border-radius: 0.75rem;
+		background: rgba(255,255,255,0.18);
+		color: white;
+		font-weight: 600;
+		font-size: 0.875rem;
+		transition: all 0.2s;
+	}
+	.inactive-menu {
+		display: flex;
+		align-items: center;
+		gap: 0.625rem;
+		padding: 0.625rem 0.875rem;
+		border-radius: 0.75rem;
+		background: transparent;
+		color: rgba(255,255,255,0.75);
+		font-size: 0.875rem;
+		transition: all 0.2s;
+	}
+	.inactive-menu:hover {
+		background: rgba(255,255,255,0.1);
+		color: white;
+	}
+	.sidebar-divider {
+		height: 1px;
+		background: rgba(255,255,255,0.08);
+		margin: 0.375rem 1rem;
+	}
+	.section-btn {
+		display: flex;
+		align-items: center;
+		width: 100%;
+		padding: 0.375rem 0.5rem;
+		text-align: left;
+		gap: 0.5rem;
+		border-radius: 0.5rem;
+		background: transparent;
+		transition: background 0.2s;
+		cursor: pointer;
+		border: none;
+	}
+	.section-btn:hover {
+		background: rgba(255,255,255,0.06);
+	}
+	.section-label {
+		font-weight: 700;
+		font-size: 0.65rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: rgba(110,231,183,0.8);
+	}
+	.section-chevron {
+		margin-left: auto;
+		font-size: 0.75rem;
+		color: rgba(255,255,255,0.4);
+	}
+</style>

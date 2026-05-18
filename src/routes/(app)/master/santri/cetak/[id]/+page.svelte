@@ -24,21 +24,40 @@
 			margin: 8mm;
 		}
 		@media print {
-			.navbar { display: none !important; }
-			.drawer, .drawer-content, main { background: white !important; }
+			/* Sembunyikan semua elemen navigasi */
+			.navbar,
+			.drawer-side,
+			[class*="drawer-side"],
+			.topbar-gradient { display: none !important; }
+
+			/* Hilangkan offset drawer agar konten full width */
+			.drawer, .drawer-open, .lg\:drawer-open {
+				display: block !important;
+			}
+			.drawer-content {
+				margin-left: 0 !important;
+				padding-left: 0 !important;
+			}
+
+			/* Reset background */
+			body, .drawer, .drawer-content, main { background: white !important; }
 			.min-h-screen { min-height: auto !important; }
 			.card-body { padding: 0 !important; }
-			table th, table td { padding-top: 0.2rem !important; padding-bottom: 0.2rem !important; }
+
+			/* Typography scale */
 			h1 { font-size: 18px !important; }
 			h2 { font-size: 14px !important; }
 			h3 { font-size: 12px !important; }
-			p { font-size: 11px !important; }
+			p  { font-size: 11px !important; }
 			.print-page { font-size: 11px !important; }
-			.print-page .border { padding: 0.5rem !important; }
-			.print-page .mb-6 { margin-bottom: 0.5rem !important; }
-			.print-page .mb-4 { margin-bottom: 0.35rem !important; }
-			.print-page .gap-4 { gap: 0.5rem !important; }
-			.print-page .gap-3 { gap: 0.4rem !important; }
+
+			/* Compact layout */
+			table th, table td { padding-top: 0.2rem !important; padding-bottom: 0.2rem !important; }
+			.print-page .border  { padding: 0.5rem !important; }
+			.print-page .mb-6    { margin-bottom: 0.5rem !important; }
+			.print-page .mb-4    { margin-bottom: 0.35rem !important; }
+			.print-page .gap-4   { gap: 0.5rem !important; }
+			.print-page .gap-3   { gap: 0.4rem !important; }
 			.card { max-width: none !important; box-shadow: none !important; }
 			.badge { font-size: 9px !important; padding-left: 0.35rem !important; padding-right: 0.35rem !important; }
 		}

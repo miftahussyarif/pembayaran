@@ -8,6 +8,6 @@ export const load = async () => {
 		.limit(1);
 
 	return {
-		profilPesantren: profilPesantren || { namaPesantren: 'Pesantren Al-Hikmah' }
+		profilPesantren: profilPesantren || { namaPesantren: 'Pesantren Al-Hikmah', alamat: '', logoUrl: '' }
 	};
 };
