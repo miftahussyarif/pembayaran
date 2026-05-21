@@ -1,6 +1,7 @@
 <script>
 	import { enhance } from '$app/forms';
 	import { page } from '$app/stores';
+	import { startSaving, finishSaving } from '$lib/stores/saving.js';
 	let { data, form } = $props();
 
 	let hapusRiwayat = $state(null); // transaksi yang akan dihapus
@@ -351,8 +352,10 @@
 				</button>
 				<form method="POST" action="?/deleteRiwayat"
 					use:enhance={() => {
+						startSaving();
 						return async ({ update }) => {
 							await update();
+							finishSaving();
 							modal_hapus_riwayat.close();
 							hapusRiwayat = null;
 						};

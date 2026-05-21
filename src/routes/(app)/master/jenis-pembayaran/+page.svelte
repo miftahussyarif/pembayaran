@@ -1,5 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { startSaving, finishSaving } from '$lib/stores/saving.js';
 	let { data, form } = $props();
 	let deleteError = $state('');
 
@@ -109,8 +110,10 @@
 			<button class="btn" type="button" onclick={() => { modal_hapus_jp.close(); hapusJp = null; }}>Batal</button>
 			<form method="POST" action="?/delete"
 				use:enhance={() => {
+					startSaving();
 					return async ({ update, result }) => {
 						await update();
+						finishSaving();
 						if (result?.data?.success === false) {
 							deleteError = result.data.error || 'Gagal menghapus jenis pembayaran.';
 						} else {
@@ -132,7 +135,8 @@
 	<div class="modal-box">
 		<h3 class="font-bold text-lg mb-4">Tambah Jenis Pembayaran</h3>
 		<form method="POST" action="?/create" use:enhance={() => {
-			return async ({ update }) => { await update(); modal_jenis_pembayaran.close(); };
+			startSaving();
+			return async ({ update }) => { await update(); finishSaving(); modal_jenis_pembayaran.close(); };
 		}}>
 			<div class="form-control w-full mb-3">
 				<label class="label" for="namaTagihan"><span class="label-text">Nama Tagihan</span></label>
@@ -175,7 +179,8 @@
 		<h3 class="font-bold text-lg mb-4">Edit Jenis Pembayaran & Nominal Kategori</h3>
 		{#if editJp}
 		<form method="POST" action="?/update" use:enhance={() => {
-			return async ({ update }) => { await update(); modal_edit_jp.close(); editJp = null; };
+			startSaving();
+			return async ({ update }) => { await update(); finishSaving(); modal_edit_jp.close(); editJp = null; };
 		}}>
 			<input type="hidden" name="id" value={editJp.id} />
 			

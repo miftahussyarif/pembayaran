@@ -1,5 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { startSaving, finishSaving } from '$lib/stores/saving.js';
 
 	let { data, form } = $props();
 	
@@ -42,9 +43,11 @@
 		<div class="card-body p-0">
 			<form method="POST" action="?/save" use:enhance={() => {
 				loading = true;
+				startSaving();
 				return async ({ update }) => {
 					await update();
 					loading = false;
+					finishSaving();
 				};
 			}}>
 				

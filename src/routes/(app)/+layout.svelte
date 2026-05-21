@@ -2,6 +2,7 @@
 	import '../layout.css';
 	import Sidebar from '$lib/components/Sidebar.svelte';
 	import Topbar from '$lib/components/Topbar.svelte';
+	import SaveIndicator from '$lib/components/SaveIndicator.svelte';
 	import { page } from '$app/state';
 
 	// Page Title Management
@@ -11,6 +12,7 @@
 		page.url.pathname.includes('/master/santri') ? 'Data Santri' :
 		page.url.pathname.includes('/master/jenis-pembayaran') ? 'Jenis Pembayaran' :
 		page.url.pathname.includes('/transaksi/input') ? 'Input Pembayaran' :
+		page.url.pathname.includes('/transaksi/daftar-tagihan-khusus') ? 'Daftar Tagihan Khusus' :
 		page.url.pathname.includes('/transaksi/tambah-tagihan-khusus') ? 'Tambahkan Tagihan Khusus' :
 		page.url.pathname.includes('/transaksi/riwayat') ? 'Riwayat Pembayaran' :
 		page.url.pathname.includes('/transaksi/rekapitulasi') ? 'Rekapitulasi Pembayaran' :
@@ -55,3 +57,5 @@
 	
 	<Sidebar />
 </div>
+
+<SaveIndicator />

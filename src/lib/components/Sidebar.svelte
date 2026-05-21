@@ -37,18 +37,23 @@
 	function isMenuAllowed(routeId) {
 		if ($page.data.user?.role === 'admin') return true;
 		const accessList = $page.data.roleAccessList || [];
-		const blocked = accessList.find(r => r.routeId === routeId && !r.isAllowed);
-		if (blocked) return false;
-		
-		// apply existing hardcoded defaults visually
+
+		// Kalau ada record di DB, gunakan nilai dari DB (respects admin toggle)
+		const dbRule = accessList.find(r => r.routeId === routeId);
+		if (dbRule) return dbRule.isAllowed;
+
+		// Tidak ada di DB → gunakan hardcoded default per role
 		if ($page.data.user?.role === 'petugas') {
 			if (routeId === '/master/tahun-ajaran' || routeId === '/master/kategori-santri' || routeId === '/master/jenis-pembayaran') return false;
 			if (routeId.startsWith('/pengaturan')) return false;
+			if (routeId === '/transaksi/tambah-tagihan-khusus') return false;
+			if (routeId === '/transaksi/daftar-tagihan-khusus') return false;
+			if (routeId === '/transaksi/saldo-keuangan') return false;
 		}
 		if ($page.data.user?.role === 'bendahara') {
 			if (routeId.startsWith('/pengaturan')) return false;
 		}
-		
+
 		return true;
 	}
 </script>
@@ -412,9 +417,7 @@
 				<li>
 					<a
 						href="/transaksi/tambah-tagihan-khusus"
-						class={$page.url.pathname.includes(
-							"/transaksi/tambah-tagihan-khusus",
-						)
+						class={$page.url.pathname === "/transaksi/tambah-tagihan-khusus"
 							? "active-menu"
 							: "inactive-menu"}
 					>
@@ -432,6 +435,31 @@
 							/></svg
 						>
 						Input Tagihan Khusus
+					</a>
+				</li>
+			{/if}
+			{#if isMenuAllowed('/transaksi/daftar-tagihan-khusus')}
+				<li>
+					<a
+						href="/transaksi/daftar-tagihan-khusus"
+						class={$page.url.pathname.includes("/transaksi/daftar-tagihan-khusus")
+							? "active-menu"
+							: "inactive-menu"}
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-5 w-5"
+							fill="none"
+							viewBox="0 0 24 24"
+							stroke="currentColor"
+							><path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M4 6h16M4 10h16M4 14h16M4 18h16"
+							/></svg
+						>
+						Daftar Tagihan Khusus
 					</a>
 				</li>
 			{/if}

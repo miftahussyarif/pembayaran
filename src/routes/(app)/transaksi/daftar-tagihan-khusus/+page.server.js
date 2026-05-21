@@ -29,21 +29,8 @@ async function ensureJenisKhusus() {
 }
 
 export async function load() {
-	const santris = await db
-		.select({
-			id: schema.santri.id,
-			nomorInduk: schema.santri.nomorInduk,
-			namaLengkap: schema.santri.namaLengkap,
-			kategoriId: schema.santri.kategoriId,
-			namaKategori: schema.kategoriSantri.namaKategori,
-			isActive: schema.santri.isActive
-		})
-		.from(schema.santri)
-		.leftJoin(schema.kategoriSantri, eq(schema.santri.kategoriId, schema.kategoriSantri.id));
-
-	const tahunAjarans = await db.select().from(schema.tahunAjaran);
-	const [tahunAjaranAktif] = tahunAjarans.filter((item) => item.isActive);
 	const jenisKhusus = await ensureJenisKhusus();
+	const tahunAjarans = await db.select().from(schema.tahunAjaran);
 
 	const tagihanKhususRows = await db
 		.select({
@@ -54,6 +41,7 @@ export async function load() {
 			keteranganKhusus: schema.tunggakanImport.keteranganKhusus,
 			catatan: schema.tunggakanImport.catatan,
 			updatedAt: schema.tunggakanImport.updatedAt,
+			createdAt: schema.tunggakanImport.createdAt,
 			namaSantri: schema.santri.namaLengkap,
 			nomorInduk: schema.santri.nomorInduk,
 			namaKategori: schema.kategoriSantri.namaKategori,
@@ -95,93 +83,13 @@ export async function load() {
 	});
 
 	return {
-		santris,
+		tagihanKhusus,
 		tahunAjarans,
-		tahunAjaranAktif: tahunAjaranAktif || null,
-		jenisKhususId: jenisKhusus?.id || null,
-		tagihanKhusus
+		jenisKhususId: jenisKhusus?.id || null
 	};
 }
 
 export const actions = {
-	create: async ({ request, locals, getClientAddress }) => {
-		return dbWrite(async () => {
-		try {
-			const formData = await request.formData();
-			const santriId = Number(formData.get('santriId'));
-			const tahunAjaranId = Number(formData.get('tahunAjaranId'));
-			const namaTagihan = String(formData.get('namaTagihan') || '').trim();
-			const nominalTagihan = Number(formData.get('nominalTagihan'));
-			const catatan = String(formData.get('catatan') || '').trim() || null;
-
-			if (!santriId || !tahunAjaranId || !namaTagihan) {
-				return { success: false, message: 'Santri, tahun ajaran, dan nama tagihan wajib diisi.' };
-			}
-
-			if (!Number.isFinite(nominalTagihan) || nominalTagihan <= 0) {
-				return { success: false, message: 'Nominal tagihan harus lebih dari 0.' };
-			}
-
-			const [santri] = await db.select().from(schema.santri).where(eq(schema.santri.id, santriId));
-			if (!santri) {
-				return { success: false, message: 'Santri tidak ditemukan.' };
-			}
-
-			const [tahunAjaran] = await db.select().from(schema.tahunAjaran).where(eq(schema.tahunAjaran.id, tahunAjaranId));
-			if (!tahunAjaran) {
-				return { success: false, message: 'Tahun ajaran tidak ditemukan.' };
-			}
-
-			const jenisKhusus = await ensureJenisKhusus();
-			if (!jenisKhusus?.id) {
-				return { success: false, message: 'Jenis pembayaran khusus belum tersedia.' };
-			}
-
-			const now = new Date().toISOString();
-			const signatureKey = `manual-khusus-${santriId}-${tahunAjaranId}-${Date.now()}`;
-
-			await db.insert(schema.tunggakanImport).values({
-				santriId,
-				pembayarLainId: null,
-				tahunAjaranId,
-				jenisPembayaranId: jenisKhusus.id,
-				bulan: null,
-				tahunTagihan: null,
-				nominalAsalTagihan: nominalTagihan,
-				nominalTagihan,
-				keteranganKhusus: namaTagihan,
-				catatan,
-				signatureKey,
-				createdAt: now,
-				updatedAt: now
-			});
-
-			try {
-				await db.insert(schema.systemLogs).values({
-					userId: locals.user?.id || null,
-					username: locals.user?.username || null,
-					role: locals.user?.role || null,
-					aksi: 'input',
-					modul: 'tagihan_khusus',
-					keterangan: `Tambah tagihan khusus "${namaTagihan}" untuk santri ${santri.namaLengkap} (${tahunAjaran.nama}) sebesar Rp ${nominalTagihan.toLocaleString('id-ID')}`,
-					ip: getClientAddress(),
-					createdAt: now
-				});
-			} catch (error) {
-				console.error('⚠️ Logging error (ignored):', error);
-			}
-
-			return { success: true, message: 'Tagihan khusus berhasil ditambahkan.' };
-		} catch (error) {
-			console.error('❌ Error create tagihan khusus:', error);
-			return {
-				success: false,
-				message: error instanceof Error ? error.message : 'Gagal menambahkan tagihan khusus.'
-			};
-		}
-		}); // end dbWrite
-	},
-
 	delete: async ({ request, locals, getClientAddress }) => {
 		return dbWrite(async () => {
 		try {
@@ -237,6 +145,61 @@ export const actions = {
 			return {
 				success: false,
 				message: error instanceof Error ? error.message : 'Gagal menghapus tagihan khusus.'
+			};
+		}
+		}); // end dbWrite
+	},
+
+	update: async ({ request, locals, getClientAddress }) => {
+		return dbWrite(async () => {
+		try {
+			if (locals.user?.role !== 'admin') {
+				return { success: false, message: 'Hanya admin yang dapat mengedit tagihan khusus.' };
+			}
+
+			const formData = await request.formData();
+			const tagihanId = Number(formData.get('tagihanId'));
+			const keteranganKhusus = String(formData.get('keteranganKhusus') || '').trim();
+			const catatan = String(formData.get('catatan') || '').trim() || null;
+			const nominalTagihan = Number(formData.get('nominalTagihan'));
+
+			if (!tagihanId) {
+				return { success: false, message: 'ID tagihan tidak valid.' };
+			}
+			if (!keteranganKhusus) {
+				return { success: false, message: 'Nama tagihan tidak boleh kosong.' };
+			}
+			if (!Number.isFinite(nominalTagihan) || nominalTagihan <= 0) {
+				return { success: false, message: 'Nominal tagihan harus lebih dari 0.' };
+			}
+
+			const now = new Date().toISOString();
+			await db
+				.update(schema.tunggakanImport)
+				.set({ keteranganKhusus, catatan, nominalTagihan, updatedAt: now })
+				.where(eq(schema.tunggakanImport.id, tagihanId));
+
+			try {
+				await db.insert(schema.systemLogs).values({
+					userId: locals.user?.id || null,
+					username: locals.user?.username || null,
+					role: locals.user?.role || null,
+					aksi: 'edit',
+					modul: 'tagihan_khusus',
+					keterangan: `Edit tagihan khusus id=${tagihanId}: "${keteranganKhusus}", nominal Rp ${nominalTagihan.toLocaleString('id-ID')}`,
+					ip: getClientAddress(),
+					createdAt: now
+				});
+			} catch (error) {
+				console.error('⚠️ Logging error (ignored):', error);
+			}
+
+			return { success: true, message: 'Tagihan khusus berhasil diperbarui.' };
+		} catch (error) {
+			console.error('❌ Error update tagihan khusus:', error);
+			return {
+				success: false,
+				message: error instanceof Error ? error.message : 'Gagal memperbarui tagihan khusus.'
 			};
 		}
 		}); // end dbWrite

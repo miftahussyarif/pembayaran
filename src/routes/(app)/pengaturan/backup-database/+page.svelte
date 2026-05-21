@@ -1,5 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { startSaving, finishSaving } from '$lib/stores/saving.js';
 	export let data;
 	export let form;
 
@@ -47,10 +48,12 @@
 			
 			<form method="POST" action="?/saveSettings" use:enhance={() => {
 				loading = true;
-				testLoading = true; // Use testLoading for any action to prevent multiple clicks
+				testLoading = true;
+				startSaving();
 				return async ({ update }) => {
 					loading = false;
 					testLoading = false;
+					finishSaving();
 					update();
 				};
 			}}>

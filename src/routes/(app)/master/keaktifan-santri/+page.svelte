@@ -1,5 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { startSaving, finishSaving } from '$lib/stores/saving.js';
 
 	let { data, form } = $props();
 
@@ -255,8 +256,10 @@
 				method="POST"
 				action="?/save"
 				use:enhance={() => {
+					startSaving();
 					return async ({ update }) => {
 						await update();
+						finishSaving();
 						my_modal_keaktifan.close();
 						editSantri = null;
 						editActiveKeys = [];

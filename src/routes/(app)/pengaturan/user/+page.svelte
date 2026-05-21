@@ -1,5 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { startSaving, finishSaving } from '$lib/stores/saving.js';
 	let { data, form } = $props();
 
 	let editUser = $state(null);
@@ -183,7 +184,8 @@
 		<h3 class="font-bold text-lg mb-4">Edit Data User</h3>
 		{#if editUser}
 		<form method="POST" action="?/updateUser" enctype="multipart/form-data" use:enhance={() => {
-			return async ({ update }) => { await update(); modal_edit_user.close(); editUser = null; };
+			startSaving();
+			return async ({ update }) => { await update(); finishSaving(); modal_edit_user.close(); editUser = null; };
 		}}>
 			<input type="hidden" name="id" value={editUser.id} />
 			<div class="form-control w-full mb-3">
@@ -237,7 +239,8 @@
 		{#if passwordUser}
 		<p class="text-sm text-base-content/60 mb-4">Mengubah password untuk: <strong>{passwordUser.namaLengkap}</strong> ({passwordUser.username})</p>
 		<form method="POST" action="?/resetPassword" use:enhance={() => {
-			return async ({ update }) => { await update(); modal_reset_pw.close(); passwordUser = null; };
+			startSaving();
+			return async ({ update }) => { await update(); finishSaving(); modal_reset_pw.close(); passwordUser = null; };
 		}}>
 			<input type="hidden" name="id" value={passwordUser.id} />
 			<div class="form-control w-full mb-6">

@@ -1,5 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { startSaving, finishSaving } from '$lib/stores/saving.js';
 	import { page } from '$app/stores';
 	let { data, form } = $props();
 
@@ -213,7 +214,8 @@
 	<div class="modal-box">
 		<h3 class="font-bold text-lg mb-4">Tambah Siswa SMK</h3>
 		<form method="POST" action="?/create" use:enhance={() => {
-			return async ({ update }) => { await update(); modal_add_smk.close(); };
+			startSaving();
+			return async ({ update }) => { await update(); finishSaving(); modal_add_smk.close(); };
 		}}>
 			<div class="form-control w-full mb-3">
 				<label class="label" for="santriSearch"><span class="label-text">Pilih Santri</span></label>
@@ -390,7 +392,8 @@
 		<h3 class="font-bold text-lg mb-4">Edit Periode Siswa SMK</h3>
 		{#if editSmk}
 		<form method="POST" action="?/update" use:enhance={() => {
-			return async ({ update }) => { await update(); modal_edit_smk.close(); editSmk = null; };
+			startSaving();
+			return async ({ update }) => { await update(); finishSaving(); modal_edit_smk.close(); editSmk = null; };
 		}}>
 			<input type="hidden" name="id" value={editSmk.id} />
 			<div class="form-control w-full mb-3">

@@ -2,6 +2,7 @@
 	import { enhance } from '$app/forms';
 	import { invalidateAll } from '$app/navigation';
 	import { page } from '$app/stores';
+	import { startSaving, finishSaving } from '$lib/stores/saving.js';
 
 	let { data, form } = $props();
 
@@ -71,10 +72,12 @@
 					class="mt-4"
 					use:enhance={() => {
 						isSubmitting = true;
+						startSaving();
 						return async ({ update }) => {
 							isSubmitting = false;
 							await update();
 							await invalidateAll();
+							finishSaving();
 						};
 					}}
 				>
@@ -252,7 +255,15 @@
 	<div class="xl:col-span-1">
 		<div class="card bg-base-100 shadow-sm border border-base-200">
 			<div class="card-body">
-				<h3 class="card-title text-lg">Tagihan Khusus Terbaru</h3>
+				<div class="flex items-center justify-between">
+					<h3 class="card-title text-lg">Tagihan Khusus Terbaru</h3>
+					<a href="/transaksi/daftar-tagihan-khusus" class="btn btn-ghost btn-xs gap-1 text-primary">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+						</svg>
+						Lihat Semua
+					</a>
+				</div>
 				<div class="overflow-x-auto mt-2">
 					<table class="table table-sm w-full">
 						<thead>
@@ -293,10 +304,12 @@
 														const confirmed = confirm(`Yakin hapus tagihan "${item.keteranganKhusus}" untuk ${item.namaSantri}?`);
 														if (!confirmed) return ({ cancel }) => cancel();
 														isDeleting = true;
+														startSaving();
 														return async ({ update }) => {
 															isDeleting = false;
 															await update();
 															await invalidateAll();
+															finishSaving();
 														};
 													}}
 												>

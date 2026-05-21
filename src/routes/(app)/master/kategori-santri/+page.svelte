@@ -1,5 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { startSaving, finishSaving } from '$lib/stores/saving.js';
 	let { data, form } = $props();
 	let editKategori = $state(null);
 
@@ -90,7 +91,8 @@
 		<h3 class="font-bold text-lg mb-4">Edit Kategori Santri</h3>
 		{#if editKategori}
 		<form method="POST" action="?/update" use:enhance={() => {
-			return async ({ update }) => { await update(); my_modal_edit_kategori.close(); editKategori = null; };
+			startSaving();
+			return async ({ update }) => { await update(); finishSaving(); my_modal_edit_kategori.close(); editKategori = null; };
 		}}>
 			<input type="hidden" name="id" value={editKategori.id} />
 			<div class="form-control w-full mb-4">

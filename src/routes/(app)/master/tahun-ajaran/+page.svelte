@@ -1,5 +1,6 @@
 <script>
 	import { enhance } from '$app/forms';
+	import { startSaving, finishSaving } from '$lib/stores/saving.js';
 	let { data } = $props();
 
 	let hapusTahun = $state(null);
@@ -97,8 +98,10 @@
 				<!-- Form DELETE langsung di dalam modal, ID diambil dari hapusTahun reactive -->
 				<form method="POST" action="?/delete"
 					use:enhance={() => {
+						startSaving();
 						return async ({ update }) => {
 							await update();
+							finishSaving();
 							modal_konfirmasi_hapus_ta.close();
 							hapusTahun = null;
 						};
@@ -117,7 +120,8 @@
 	<div class="modal-box">
 		<h3 class="font-bold text-lg mb-4">Tambah Tahun</h3>
 		<form method="POST" action="?/create" use:enhance={() => {
-			return async ({ update }) => { await update(); my_modal_tambah.close(); };
+			startSaving();
+			return async ({ update }) => { await update(); finishSaving(); my_modal_tambah.close(); };
 		}}>
 			<div class="form-control w-full mb-2">
 				<label class="label" for="tahunInput"><span class="label-text font-semibold">Tahun</span></label>

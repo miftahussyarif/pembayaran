@@ -15,6 +15,7 @@ const ROUTES = [
 	{ id: '/transaksi/rekap-individu', name: 'Rekap Individu Santri', group: 'Transaksi' },
 	{ id: '/transaksi/riwayat', name: 'Riwayat Pembayaran', group: 'Transaksi' },
 	{ id: '/transaksi/tambah-tagihan-khusus', name: 'Input Tagihan Khusus', group: 'Transaksi' },
+	{ id: '/transaksi/daftar-tagihan-khusus', name: 'Daftar Tagihan Khusus', group: 'Transaksi' },
 	{ id: '/transaksi/rekapitulasi', name: 'Rekapitulasi Pembayaran', group: 'Transaksi' },
 	{ id: '/transaksi/rekap-petugas', name: 'Rekap Individu Petugas', group: 'Transaksi' },
 	{ id: '/transaksi/saldo-keuangan', name: 'Saldo Keuangan Masuk', group: 'Transaksi' }
@@ -27,7 +28,8 @@ const DEFAULT_RULES = {
 	bendahara: [
 		'/master/tahun-ajaran', '/master/kategori-santri', '/master/jenis-pembayaran', 
 		'/master/santri', '/master/keaktifan-santri', '/master/data-siswa-smk', '/master/data-siswa-smp',
-		'/transaksi/input', '/transaksi/tambah-tagihan-khusus', '/transaksi/riwayat', '/transaksi/rekapitulasi', 
+		'/transaksi/input', '/transaksi/tambah-tagihan-khusus', '/transaksi/daftar-tagihan-khusus',
+		'/transaksi/riwayat', '/transaksi/rekapitulasi', 
 		'/transaksi/rekap-individu', '/transaksi/rekap-petugas', '/transaksi/saldo-keuangan'
 	],
 	petugas: [

@@ -2,6 +2,7 @@ import { redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { eq, isNotNull, desc, and } from 'drizzle-orm';
+import { dbWrite } from '$lib/server/db/writeQueue.js';
 
 const BULAN_NAMES = [
 	'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -658,6 +659,7 @@ export async function load() {
 
 export const actions = {
 	create: async ({ request, locals, getClientAddress }) => {
+		return dbWrite(async () => {
 		try {
 			const formData = await request.formData();
 			const paymentItemsJson = formData.get('paymentItemsJson')?.toString().trim() || '';
@@ -838,5 +840,6 @@ export const actions = {
 				message: error instanceof Error ? error.message : 'Terjadi kesalahan saat menyimpan transaksi'
 			};
 		}
+		}); // end dbWrite
 	}
 };

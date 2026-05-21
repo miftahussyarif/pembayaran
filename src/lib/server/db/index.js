@@ -28,7 +28,23 @@ function inferTahunTagihan(tahunAjaranNama, bulan, tanggalBayar) {
 }
 
 const sqlite = new Database('local.db');
+
+// WAL mode: memungkinkan baca dan tulis berjalan bersamaan tanpa saling blokir
 sqlite.pragma('journal_mode = WAL');
+
+// busy_timeout: jika DB sedang dikunci oleh proses lain, tunggu hingga 5000ms
+// sebelum melempar error (bukan langsung crash "database is locked")
+sqlite.pragma('busy_timeout = 5000');
+
+// synchronous NORMAL: aman untuk WAL mode, lebih cepat dari FULL
+sqlite.pragma('synchronous = NORMAL');
+
+// cache_size: alokasi cache 8MB untuk performa query lebih baik
+sqlite.pragma('cache_size = -8000');
+
+// foreign_keys: aktifkan validasi foreign key
+sqlite.pragma('foreign_keys = ON');
+
 sqlite.exec(`
 	CREATE TABLE IF NOT EXISTS mutasi_saldo_bendahara (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
