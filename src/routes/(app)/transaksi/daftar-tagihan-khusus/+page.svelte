@@ -6,7 +6,7 @@
 
 	let { data, form } = $props();
 
-	const isAdmin = $derived($page.data.user?.role === 'admin');
+	const isAdmin = $derived($page.data.user?.role === 'admin' || $page.data.user?.role === 'bendahara');
 
 	let isDeleting = $state(false);
 	let isUpdating = $state(false);

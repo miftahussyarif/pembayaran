@@ -1,6 +1,48 @@
 <script>
 	import { page } from '$app/stores';
+	import html2canvas from 'html2canvas-pro';
+	import { jsPDF } from 'jspdf';
 	let { data } = $props();
+
+	let isDownloading = $state(false);
+	let receiptEl = $state(null);
+
+	async function downloadPDF() {
+		if (!receiptEl || isDownloading) return;
+		isDownloading = true;
+		try {
+			const canvas = await html2canvas(receiptEl, {
+				scale: 3,
+				useCORS: true,
+				allowTaint: true,
+				backgroundColor: '#ffffff',
+				logging: false
+			});
+
+			const imgData = canvas.toDataURL('image/png');
+			const imgWidthPx = canvas.width;
+			const imgHeightPx = canvas.height;
+
+			// Convert px to mm (at 72 DPI base, scale 3 => effective 216 DPI)
+			const pxPerMm = (3 * 96) / 25.4; // scale * screen DPI / mm per inch
+			const pdfWidthMm = imgWidthPx / pxPerMm;
+			const pdfHeightMm = imgHeightPx / pxPerMm;
+
+			const pdf = new jsPDF({
+				orientation: pdfWidthMm > pdfHeightMm ? 'landscape' : 'portrait',
+				unit: 'mm',
+				format: [pdfWidthMm, pdfHeightMm]
+			});
+
+			pdf.addImage(imgData, 'PNG', 0, 0, pdfWidthMm, pdfHeightMm);
+			pdf.save(`Kwitansi-${data.pembayaran.nomorKwitansi || 'download'}.pdf`);
+		} catch (err) {
+			console.error('PDF generation error:', err);
+			alert('Gagal membuat PDF. Silakan coba lagi.');
+		} finally {
+			isDownloading = false;
+		}
+	}
 
 	const angka = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas'];
 	function terbilang(n) {
@@ -24,7 +66,7 @@
 
 <div class="cetak-page">
 	<!-- Receipt Content -->
-	<div class="receipt">
+	<div class="receipt" bind:this={receiptEl}>
 		<!-- Header -->
 		<div class="receipt-header">
 			<div class="header-left">
@@ -148,6 +190,15 @@
 	<!-- Action Buttons (hidden on print) -->
 	<div class="action-buttons no-print">
 		<a href="/transaksi/input" class="btn-back">Kembali</a>
+		<button class="btn-download" onclick={downloadPDF} disabled={isDownloading}>
+			{#if isDownloading}
+				<svg class="spin-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+				Memproses...
+			{:else}
+				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+				Download PDF
+			{/if}
+		</button>
 		<button class="btn-print" onclick={() => window.print()}>
 			<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
 			Cetak Sekarang
@@ -454,6 +505,33 @@
 	}
 	.btn-print:hover {
 		background: #4338ca;
+	}
+	.btn-download {
+		padding: 8px 24px;
+		border-radius: 8px;
+		border: none;
+		background: #059669;
+		color: #fff;
+		font-size: 14px;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		transition: background 0.15s;
+	}
+	.btn-download:hover {
+		background: #047857;
+	}
+	.btn-download:disabled {
+		background: #9ca3af;
+		cursor: not-allowed;
+	}
+	@keyframes spin {
+		from { transform: rotate(0deg); }
+		to { transform: rotate(360deg); }
+	}
+	.spin-icon {
+		animation: spin 1s linear infinite;
 	}
 
 	/* ==================== PRINT STYLES ==================== */

@@ -93,8 +93,8 @@ export const actions = {
 	delete: async ({ request, locals, getClientAddress }) => {
 		return dbWrite(async () => {
 		try {
-			if (locals.user?.role !== 'admin') {
-				return { success: false, message: 'Hanya admin yang dapat menghapus tagihan khusus.' };
+			if (locals.user?.role !== 'admin' && locals.user?.role !== 'bendahara') {
+				return { success: false, message: 'Hanya admin/bendahara yang dapat menghapus tagihan khusus.' };
 			}
 
 			const formData = await request.formData();
@@ -153,8 +153,8 @@ export const actions = {
 	update: async ({ request, locals, getClientAddress }) => {
 		return dbWrite(async () => {
 		try {
-			if (locals.user?.role !== 'admin') {
-				return { success: false, message: 'Hanya admin yang dapat mengedit tagihan khusus.' };
+			if (locals.user?.role !== 'admin' && locals.user?.role !== 'bendahara') {
+				return { success: false, message: 'Hanya admin/bendahara yang dapat mengedit tagihan khusus.' };
 			}
 
 			const formData = await request.formData();
