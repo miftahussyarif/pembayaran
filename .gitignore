@@ -28,3 +28,4 @@ local.db-*
 sqlite.db
 *.db
 *.db-*
+backupdb.json
