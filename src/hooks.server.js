@@ -219,7 +219,7 @@ export const handleError = async ({ error, event, status, message }) => {
 		});
 
 		// Clean up old logs to save space (keep only last 1000)
-		await db.run(sql`DELETE FROM system_logs WHERE id NOT IN (SELECT id FROM system_logs ORDER BY id DESC LIMIT 1000)`);
+		await db.execute(sql`DELETE FROM system_logs WHERE id NOT IN (SELECT id FROM system_logs ORDER BY id DESC LIMIT 1000)`);
 	} catch (logError) {
 		console.error('Failed to save error log:', logError);
 	}

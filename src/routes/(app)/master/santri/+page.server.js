@@ -246,22 +246,22 @@ export const actions = {
 		};
 
 		try {
-			db.transaction((tx) => {
-				const newSantri = tx
+			await db.transaction(async (tx) => {
+				const [newSantri] = await tx
 					.insert(schema.santri)
 					.values({ nomorInduk, namaLengkap, tanggalMasuk, tanggalKeluar, isActive })
-					.returning().get();
-				tx.insert(schema.santriDetail).values({ santriId: newSantri.id, ...detailData }).run();
+					.returning();
+				await tx.insert(schema.santriDetail).values({ santriId: newSantri.id, ...detailData });
 
 				// Insert relasi multi-kategori per tahun ajaran
-				const tahunAjarans = tx.select().from(schema.tahunAjaran).all();
+				const tahunAjarans = await tx.select().from(schema.tahunAjaran);
 				const expandedKategoriRows = expandKategoriTahunRows({ kategoriTahunList, tahunAjarans, tanggalMasuk });
 				for (const row of expandedKategoriRows) {
-					tx.insert(schema.santriKategoriTahun).values({ santriId: newSantri.id, ...row }).run();
+					await tx.insert(schema.santriKategoriTahun).values({ santriId: newSantri.id, ...row });
 				}
 
 				try {
-					tx.insert(schema.systemLogs).values({
+					await tx.insert(schema.systemLogs).values({
 						userId: locals.user?.id || null,
 						username: locals.user?.username || null,
 						role: locals.user?.role || null,
@@ -270,7 +270,7 @@ export const actions = {
 						keterangan: `Tambah santri: ${namaLengkap} (${nomorInduk})`,
 						ip: getClientAddress(),
 						createdAt: new Date().toISOString()
-					}).run();
+					});
 				} catch (e) {
 					// ignore
 				}
@@ -768,14 +768,14 @@ export const actions = {
 		let skipped = 0;
 
 		try {
-			db.transaction((tx) => {
+			await db.transaction(async (tx) => {
 				for (const item of prepared) {
 					let santriId = existingMap.get(item.santri.nomorInduk);
 					if (!santriId) {
 						// Insert santri baru
-						const newSantri = tx.insert(schema.santri).values(item.santri).returning().get();
+						const [newSantri] = await tx.insert(schema.santri).values(item.santri).returning();
 						santriId = newSantri.id;
-						tx.insert(schema.santriDetail).values({ santriId, ...item.detail }).run();
+						await tx.insert(schema.santriDetail).values({ santriId, ...item.detail });
 						insertedSantri++;
 					} else {
 						skipped++;
@@ -787,7 +787,7 @@ export const actions = {
 							skippedKategoriTahun++;
 							continue;
 						}
-						tx.insert(schema.santriKategoriTahun).values({ santriId, tahunAjaranId: item.tahunAjaranId, kategoriId }).run();
+						await tx.insert(schema.santriKategoriTahun).values({ santriId, tahunAjaranId: item.tahunAjaranId, kategoriId });
 						existingKatTahunSet.add(key); // update set agar batch yang sama juga ter-deduplikasi
 						insertedKategoriTahun++;
 					}
@@ -796,22 +796,22 @@ export const actions = {
 					if (item.tanggalMulaiSmp) {
 						const dSmp = new Date(item.tanggalMulaiSmp);
 						if (!isNaN(dSmp)) {
-							tx.insert(schema.santriSmp).values({
+							await tx.insert(schema.santriSmp).values({
 								santriId,
 								startMonth: dSmp.getMonth() + 1,
 								startYear: dSmp.getFullYear()
-							}).onConflictDoNothing().run();
+							}).onConflictDoNothing();
 						}
 					}
 					// Process santriSmk
 					if (item.tanggalMulaiSmk) {
 						const dSmk = new Date(item.tanggalMulaiSmk);
 						if (!isNaN(dSmk)) {
-							tx.insert(schema.santriSmk).values({
+							await tx.insert(schema.santriSmk).values({
 								santriId,
 								startMonth: dSmk.getMonth() + 1,
 								startYear: dSmk.getFullYear()
-							}).onConflictDoNothing().run();
+							}).onConflictDoNothing();
 						}
 					}
 				}

@@ -300,23 +300,21 @@ export const actions = {
 		const currentPeriod = getCurrentPeriod();
 		const currentIsActive = normalizedKeys.includes(currentPeriod.key);
 
-		db.transaction((tx) => {
-			tx.delete(schema.santriKeaktifan)
+		await db.transaction(async (tx) => {
+			await tx.delete(schema.santriKeaktifan)
 				.where(eq(schema.santriKeaktifan.santriId, santriId))
-				.run();
+				;
 
 			for (const key of normalizedKeys) {
 				const [tahun, bulan] = key.split('-').map(Number);
 				if (!tahun || !bulan) continue;
-				tx.insert(schema.santriKeaktifan)
-					.values({ santriId, bulan, tahun, isActive: true, updatedAt: now })
-					.run();
+				await tx.insert(schema.santriKeaktifan)
+					.values({ santriId, bulan, tahun, isActive: true, updatedAt: now });
 			}
 
-			tx.update(schema.santri)
+			await tx.update(schema.santri)
 				.set({ isActive: currentIsActive })
-				.where(eq(schema.santri.id, santriId))
-				.run();
+				.where(eq(schema.santri.id, santriId));
 		});
 
 		await logAction({

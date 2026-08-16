@@ -1,38 +1,38 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { boolean, integer, pgTable, serial, text } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
-export const tahunAjaran = sqliteTable('tahun_ajaran', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const tahunAjaran = pgTable('tahun_ajaran', {
+	id: serial('id').primaryKey(),
 	nama: text('nama').notNull(), // e.g. "2023/2024"
-	isActive: integer('is_active', { mode: 'boolean' }).default(false)
+	isActive: boolean('is_active').default(false)
 });
 
-export const jenisPembayaran = sqliteTable('jenis_pembayaran', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const jenisPembayaran = pgTable('jenis_pembayaran', {
+	id: serial('id').primaryKey(),
 	namaPembayaran: text('nama_pembayaran').notNull(),
 	tipe: text('tipe', { enum: ['bulanan', 'tahunan', 'sekali', 'smk_bulanan', 'smk_tahunan', 'smk_sekali', 'smp_bulanan', 'smp_tahunan', 'smp_sekali'] }).notNull(),
 	nominalDefault: integer('nominal_default').notNull()
 });
 
-export const kategoriSantri = sqliteTable('kategori_santri', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const kategoriSantri = pgTable('kategori_santri', {
+	id: serial('id').primaryKey(),
 	namaKategori: text('nama_kategori').notNull().unique(),
 	nominalSyahriyah: integer('nominal_syahriyah').notNull().default(0),
 	nominalKonsumsi: integer('nominal_konsumsi').notNull().default(0)
 });
 
-export const santri = sqliteTable('santri', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const santri = pgTable('santri', {
+	id: serial('id').primaryKey(),
 	nomorInduk: text('nomor_induk').notNull().unique(),
 	namaLengkap: text('nama_lengkap').notNull(),
 	tanggalMasuk: text('tanggal_masuk'),
 	tanggalKeluar: text('tanggal_keluar'),
 	kategoriId: integer('kategori_id').references(() => kategoriSantri.id),
-	isActive: integer('is_active', { mode: 'boolean' }).default(true)
+	isActive: boolean('is_active').default(true)
 });
 
-export const santriDetail = sqliteTable('santri_detail', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const santriDetail = pgTable('santri_detail', {
+	id: serial('id').primaryKey(),
 	santriId: integer('santri_id').references(() => santri.id).notNull().unique(),
 	tempatLahir: text('tempat_lahir'),
 	tanggalLahir: text('tanggal_lahir'),
@@ -71,8 +71,8 @@ export const santriDetail = sqliteTable('santri_detail', {
 	penghasilanIbu: integer('penghasilan_ibu')
 });
 
-export const santriSmk = sqliteTable('santri_smk', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const santriSmk = pgTable('santri_smk', {
+	id: serial('id').primaryKey(),
 	santriId: integer('santri_id').references(() => santri.id).notNull().unique(),
 	startMonth: integer('start_month').notNull(),
 	startYear: integer('start_year').notNull(),
@@ -80,8 +80,8 @@ export const santriSmk = sqliteTable('santri_smk', {
 	endYear: integer('end_year')
 });
 
-export const santriSmp = sqliteTable('santri_smp', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const santriSmp = pgTable('santri_smp', {
+	id: serial('id').primaryKey(),
 	santriId: integer('santri_id').references(() => santri.id).notNull().unique(),
 	startMonth: integer('start_month').notNull(),
 	startYear: integer('start_year').notNull(),
@@ -89,23 +89,23 @@ export const santriSmp = sqliteTable('santri_smp', {
 	endYear: integer('end_year')
 });
 
-export const santriKeaktifan = sqliteTable('santri_keaktifan', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const santriKeaktifan = pgTable('santri_keaktifan', {
+	id: serial('id').primaryKey(),
 	santriId: integer('santri_id').references(() => santri.id).notNull(),
 	bulan: integer('bulan').notNull(),
 	tahun: integer('tahun').notNull(),
-	isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+	isActive: boolean('is_active').notNull().default(true),
 	updatedAt: text('updated_at').notNull()
 });
 
-export const pembayarLain = sqliteTable('pembayar_lain', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const pembayarLain = pgTable('pembayar_lain', {
+	id: serial('id').primaryKey(),
 	namaPembayar: text('nama_pembayar').notNull(),
 	createdAt: text('created_at').notNull()
 });
 
-export const pembayaran = sqliteTable('pembayaran', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const pembayaran = pgTable('pembayaran', {
+	id: serial('id').primaryKey(),
 	santriId: integer('santri_id').references(() => santri.id),
 	pembayarLainId: integer('pembayar_lain_id').references(() => pembayarLain.id),
 	jenisPembayaranId: integer('jenis_pembayaran_id').references(() => jenisPembayaran.id).notNull(),
@@ -119,8 +119,8 @@ export const pembayaran = sqliteTable('pembayaran', {
 	keteranganKhusus: text('keterangan_khusus') // for custom/special payments
 });
 
-export const tunggakanImport = sqliteTable('tunggakan_import', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const tunggakanImport = pgTable('tunggakan_import', {
+	id: serial('id').primaryKey(),
 	santriId: integer('santri_id').references(() => santri.id),
 	pembayarLainId: integer('pembayar_lain_id').references(() => pembayarLain.id),
 	tahunAjaranId: integer('tahun_ajaran_id').references(() => tahunAjaran.id).notNull(),
@@ -136,8 +136,8 @@ export const tunggakanImport = sqliteTable('tunggakan_import', {
 	updatedAt: text('updated_at').notNull()
 });
 
-export const users = sqliteTable('users', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const users = pgTable('users', {
+	id: serial('id').primaryKey(),
 	username: text('username').notNull().unique(),
 	passwordHash: text('password_hash').notNull(),
 	role: text('role', { enum: ['admin', 'bendahara', 'petugas'] }).notNull().default('admin'),
@@ -146,11 +146,11 @@ export const users = sqliteTable('users', {
 	sessionId: text('session_id'),
 	telegramBotToken: text('telegram_bot_token'),
 	telegramChatId: text('telegram_chat_id'),
-	otp2faEnabled: integer('otp_2fa_enabled', { mode: 'boolean' }).notNull().default(true)
+	otp2faEnabled: boolean('otp_2fa_enabled').notNull().default(true)
 });
 
-export const mutasiSaldoBendahara = sqliteTable('mutasi_saldo_bendahara', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const mutasiSaldoBendahara = pgTable('mutasi_saldo_bendahara', {
+	id: serial('id').primaryKey(),
 	bendaharaId: integer('bendahara_id').references(() => users.id).notNull(),
 	nominal: integer('nominal').notNull(),
 	catatan: text('catatan'),
@@ -158,8 +158,8 @@ export const mutasiSaldoBendahara = sqliteTable('mutasi_saldo_bendahara', {
 	inputById: integer('input_by_id').references(() => users.id)
 });
 
-export const systemLogs = sqliteTable('system_logs', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const systemLogs = pgTable('system_logs', {
+	id: serial('id').primaryKey(),
 	userId: integer('user_id').references(() => users.id),
 	username: text('username'),
 	role: text('role'),
@@ -171,8 +171,8 @@ export const systemLogs = sqliteTable('system_logs', {
 	createdAt: text('created_at').notNull()
 });
 
-export const pengaturanPesantren = sqliteTable('pengaturan_pesantren', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const pengaturanPesantren = pgTable('pengaturan_pesantren', {
+	id: serial('id').primaryKey(),
 	namaPesantren: text('nama_pesantren').notNull().default('Pesantren Al-Hikmah'),
 	alamat: text('alamat').notNull().default('Jl. Pendidikan No. 123, Kota Santri'),
 	noTelp: text('no_telp').notNull().default('(021) 1234567'),
@@ -181,34 +181,33 @@ export const pengaturanPesantren = sqliteTable('pengaturan_pesantren', {
 	telegramBotToken: text('telegram_bot_token'),
 	telegramChatId: text('telegram_chat_id')
 });
-export const kategoriGratis = sqliteTable('kategori_gratis', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const kategoriGratis = pgTable('kategori_gratis', {
+	id: serial('id').primaryKey(),
 	kategoriId: integer('kategori_id').references(() => kategoriSantri.id).notNull(),
 	jenisPembayaranId: integer('jenis_pembayaran_id').references(() => jenisPembayaran.id).notNull(),
 	nominal: integer('nominal').default(0) // 0 = gratis, null = use default
 });
 
 // Relasi multi-kategori per santri per tahun ajaran
-export const santriKategoriTahun = sqliteTable('santri_kategori_tahun', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
+export const santriKategoriTahun = pgTable('santri_kategori_tahun', {
+  id: serial('id').primaryKey(),
   santriId: integer('santri_id').references(() => santri.id).notNull(),
   tahunAjaranId: integer('tahun_ajaran_id').references(() => tahunAjaran.id).notNull(),
   kategoriId: integer('kategori_id').references(() => kategoriSantri.id).notNull(),
 });
 
-export const loginAttempts = sqliteTable('login_attempts', {
+export const loginAttempts = pgTable('login_attempts', {
 	ip: text('ip').primaryKey(),
 	attempts: integer('attempts').notNull().default(0),
 	lockUntil: text('lock_until'),
 	lastAttemptAt: text('last_attempt_at')
 });
 
-export const roleAccess = sqliteTable('role_access', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
+export const roleAccess = pgTable('role_access', {
+	id: serial('id').primaryKey(),
 	role: text('role').notNull(),
 	routeId: text('route_id').notNull(),
-	isAllowed: integer('is_allowed', { mode: 'boolean' }).notNull().default(true),
+	isAllowed: boolean('is_allowed').notNull().default(true),
 	updatedAt: text('updated_at')
 });
-
 
