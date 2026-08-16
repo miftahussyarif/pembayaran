@@ -11,13 +11,19 @@ Dokumen ini menjadi backlog kerja untuk branch `versivercel`. Targetnya bukan me
 - Backup otomatis saat ini: `setInterval` di `src/hooks.server.js`.
 - Deploy target: GitHub repository terhubung ke Vercel.
 
+## Environment Variable Minimum
+
+- `DATABASE_URL`: koneksi PostgreSQL target, wajib setelah Phase 2.
+- `CRON_SECRET`: secret untuk endpoint Vercel Cron, wajib setelah Phase 5.
+- Storage credentials: mengikuti provider storage yang dipilih di Phase 4.
+
 ## Phase 1 - Fondasi Deploy Vercel
 
-- [ ] Pasang `@sveltejs/adapter-vercel`.
-- [ ] Ubah `svelte.config.js` dari `adapter-auto` ke `adapter-vercel`.
-- [ ] Tambahkan konfigurasi runtime Node.js bila diperlukan oleh dependency server.
-- [ ] Jalankan `npm run build` untuk memastikan build SvelteKit tetap lolos.
-- [ ] Dokumentasikan environment variable minimum untuk Vercel.
+- [x] Pasang `@sveltejs/adapter-vercel`.
+- [x] Ubah `svelte.config.js` dari `adapter-auto` ke `adapter-vercel`.
+- [x] Tambahkan konfigurasi runtime Node.js bila diperlukan oleh dependency server.
+- [x] Jalankan `npm run build` untuk memastikan build SvelteKit tetap lolos.
+- [x] Dokumentasikan environment variable minimum untuk Vercel.
 
 ## Phase 2 - Migrasi Database SQLite ke PostgreSQL
 
