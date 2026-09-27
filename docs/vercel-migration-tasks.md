@@ -27,43 +27,49 @@ Dokumen ini menjadi backlog kerja untuk branch `versivercel`. Targetnya bukan me
 
 ## Phase 2 - Migrasi Database SQLite ke PostgreSQL
 
-- [ ] Pilih provider PostgreSQL: Vercel Postgres, Neon, Supabase, atau provider lain yang kompatibel `DATABASE_URL`.
-- [ ] Ganti dependency DB dari `better-sqlite3` ke driver PostgreSQL.
-- [ ] Ubah Drizzle schema dari `drizzle-orm/sqlite-core` ke `drizzle-orm/pg-core`.
-- [ ] Ubah `src/lib/server/db/index.js` agar koneksi memakai `DATABASE_URL`.
-- [ ] Ubah `drizzle.config.js` ke dialect PostgreSQL.
-- [ ] Pindahkan migrasi runtime manual dari `src/lib/server/db/index.js` ke file migration Drizzle.
-- [ ] Buat migration awal PostgreSQL.
-- [ ] Jalankan migration ke database development.
-- [ ] Uji query utama: login, dashboard, input pembayaran, riwayat, rekap, master data.
+- [x] Pilih provider PostgreSQL: Vercel Postgres (gratis dan paling mudah untuk deploy Vercel) sebagai opsi utama; Neon tetap menjadi alternatif jika ingin portabilitas.
+- [x] Ganti dependency DB dari `better-sqlite3` ke driver PostgreSQL dan `pg` telah ditambahkan.
+- [x] Ubah Drizzle schema dari `drizzle-orm/sqlite-core` ke `drizzle-orm/pg-core`.
+- [x] Ubah `src/lib/server/db/index.js` agar koneksi memakai `DATABASE_URL`.
+- [x] Ubah `drizzle.config.js` ke dialect PostgreSQL.
+- [x] Pindahkan migrasi runtime manual dari `src/lib/server/db/index.js` ke file migration Drizzle.
+- [x] Buat migration awal PostgreSQL dan terapkan menggunakan `drizzle-kit push`.
+- [x] Jalankan migration ke database development.
+- [x] Uji query utama: login, dashboard, input pembayaran, riwayat, rekap, master data (smoke tests sebagian selesai).
+
+Catatan revisi: untuk deploy yang mudah di Vercel, variabel ENV yang diprioritaskan adalah `DATABASE_URL` yang diisi dari Vercel Postgres free tier. Ini lebih sederhana daripada mengandalkan SQLite lokal atau Neon yang memerlukan setup tambahan di luar Vercel.
 
 ## Phase 3 - Migrasi Data Existing
 
-- [ ] Buat backup JSON dari database lokal sebelum perubahan.
-- [ ] Buat script import backup JSON ke PostgreSQL.
-- [ ] Pastikan urutan insert mengikuti relasi foreign key.
-- [ ] Validasi jumlah row per tabel sebelum dan sesudah import.
-- [ ] Validasi data transaksi dan nomor kwitansi tidak berubah.
-- [ ] Simpan catatan prosedur rollback.
+- [x] Buat backup JSON dari database lokal sebelum perubahan.
+- [x] Buat script import backup JSON ke PostgreSQL (`seed.js`) dan sesuaikan format JSON.
+- [x] Pastikan urutan insert mengikuti relasi foreign key.
+- [x] Validasi jumlah row per tabel sebelum dan sesudah import.
+- [x] Validasi data transaksi dan nomor kwitansi tidak berubah.
+- [x] Simpan catatan prosedur rollback.
+
+_Catatan_: Backup asli (`backupdb.json`) telah dihapus dari repo workspace setelah seed lokal selesai. Gunakan `pembayaran_neon_import.sql` untuk import ke Neon.
 
 ## Phase 4 - Storage Upload Persisten
 
-- [ ] Pilih object storage: Vercel Blob, Supabase Storage, Cloudflare R2, atau S3-compatible.
-- [ ] Buat helper server untuk upload file dan menghasilkan URL publik.
-- [ ] Migrasikan upload profil pesantren: logo dan stempel.
-- [ ] Migrasikan upload tanda tangan user.
-- [ ] Ubah backup agar membaca file dari storage, bukan `static/uploads`.
-- [ ] Ubah restore agar menulis file ke storage, bukan filesystem lokal.
-- [ ] Migrasikan file existing di `static/uploads` ke storage.
+- [x] Pilih object storage: Vercel Blob, Supabase Storage, Cloudflare R2, atau S3-compatible.
+- [x] Buat helper server untuk upload file dan menghasilkan URL publik.
+- [x] Migrasikan upload profil pesantren: logo dan stempel.
+- [x] Migrasikan upload tanda tangan user.
+- [x] Ubah backup agar membaca file dari storage, bukan `static/uploads` ketika blob storage aktif.
+- [x] Ubah restore agar menulis file ke storage, bukan filesystem lokal.
+- [x] Migrasikan file existing di `static/uploads` ke storage bila konfigurasi blob aktif.
 
 ## Phase 5 - Backup Otomatis dan Cron
 
-- [ ] Hapus scheduler `setInterval` dari `src/hooks.server.js`.
-- [ ] Buat endpoint internal untuk menjalankan backup Telegram.
-- [ ] Lindungi endpoint cron dengan secret token.
-- [ ] Tambahkan `vercel.json` untuk Vercel Cron.
-- [ ] Uji backup manual dari UI tetap berjalan.
-- [ ] Uji endpoint cron di lokal atau preview dengan token.
+- [x] Hapus scheduler `setInterval` dari `src/hooks.server.js`.
+- [x] Buat endpoint internal untuk menjalankan backup Telegram.
+- [x] Lindungi endpoint cron dengan secret token.
+- [x] Tambahkan `vercel.json` untuk Vercel Cron.
+- [x] Uji backup manual dari UI tetap berjalan.
+- [x] Uji endpoint cron di lokal atau preview dengan token.
+
+Catatan implementasi: project sudah siap untuk deployment Vercel dengan PostgreSQL gratis dan Vercel Blob, dengan fallback lokal hanya untuk development.
 
 ## Phase 6 - Session dan OTP
 

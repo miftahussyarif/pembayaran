@@ -13,7 +13,7 @@ export const load = async ({ locals }) => {
 	const [tahunAjaranAktif] = await db
 		.select()
 		.from(schema.tahunAjaran)
-		.where(sql`${schema.tahunAjaran.isActive} = 1`)
+		.where(sql`${schema.tahunAjaran.isActive} = true`)
 		.limit(1);
 
 	// Ambil role access list untuk user saat ini

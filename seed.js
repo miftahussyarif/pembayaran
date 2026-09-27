@@ -79,8 +79,8 @@ async function seed() {
 		pembayaran: ensureArray(data.pembayaran),
 		mutasiSaldoBendahara: ensureArray(data.mutasiSaldoBendahara ?? data.mutasi),
 		systemLogs: ensureArray(data.systemLogs),
-		loginAttempts: ensureArray(data.loginAttempts)
-    santriKategoriTahun: ensureArray(data.santriKategoriTahun),
+		loginAttempts: ensureArray(data.loginAttempts),
+		santriKategoriTahun: ensureArray(data.santriKategoriTahun),
 	};
 
 	await safeDelete(schema.loginAttempts, 'login_attempts');

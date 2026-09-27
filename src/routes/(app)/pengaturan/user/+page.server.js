@@ -3,8 +3,7 @@ import * as schema from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { redirect } from '@sveltejs/kit';
 import bcrypt from 'bcrypt';
-import { mkdir, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { upload } from '$lib/server/storage.js';
 import {
 	createSessionToken,
 	isValidRole,
@@ -19,14 +18,10 @@ const saveSignature = async (file) => {
 	if (!allowed.includes(file.type)) {
 		throw new Error('Format tanda tangan harus JPG/JPEG atau PNG.');
 	}
-	const uploadsDir = path.join('static', 'uploads');
-	await mkdir(uploadsDir, { recursive: true });
 	const ext = file.type === 'image/png' ? 'png' : 'jpg';
 	const filename = `signature-${Date.now()}.${ext}`;
-	const filePath = path.join(uploadsDir, filename);
 	const buffer = Buffer.from(await file.arrayBuffer());
-	await writeFile(filePath, buffer);
-	return `/uploads/${filename}`;
+	return await upload(buffer, filename, 'signature');
 };
 
 export const load = async ({ locals }) => {

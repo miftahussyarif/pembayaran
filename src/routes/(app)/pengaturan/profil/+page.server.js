@@ -2,8 +2,7 @@ import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import { redirect } from '@sveltejs/kit';
-import { mkdir, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { upload } from '$lib/server/storage.js';
 
 export const load = async ({ locals }) => {
 	// Pastikan hanya ADMIN yang boleh akses Pengaturan
@@ -41,13 +40,9 @@ export const actions = {
 				const ext = logoFile.type === 'image/png' ? 'png'
 					: logoFile.type === 'image/webp' ? 'webp'
 					: 'jpg';
-				const uploadsDir = path.join('static', 'uploads');
-				await mkdir(uploadsDir, { recursive: true });
 				const filename = `logo-${id}-${Date.now()}.${ext}`;
-				const filePath = path.join(uploadsDir, filename);
 				const buffer = Buffer.from(await logoFile.arrayBuffer());
-				await writeFile(filePath, buffer);
-				logoUrl = `/uploads/${filename}`;
+				logoUrl = await upload(buffer, filename, 'profil');
 			}
 
 			if (stampFile && typeof stampFile === 'object' && 'arrayBuffer' in stampFile && stampFile.size > 0) {
@@ -59,13 +54,9 @@ export const actions = {
 				const ext = stampFile.type === 'image/png' ? 'png'
 					: stampFile.type === 'image/webp' ? 'webp'
 					: 'jpg';
-				const uploadsDir = path.join('static', 'uploads');
-				await mkdir(uploadsDir, { recursive: true });
 				const filename = `stamp-${id}-${Date.now()}.${ext}`;
-				const filePath = path.join(uploadsDir, filename);
 				const buffer = Buffer.from(await stampFile.arrayBuffer());
-				await writeFile(filePath, buffer);
-				stampUrl = `/uploads/${filename}`;
+				stampUrl = await upload(buffer, filename, 'profil');
 			}
 
 			await db.update(schema.pengaturanPesantren)

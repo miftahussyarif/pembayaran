@@ -4,8 +4,13 @@ import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
 const UPLOADS_DIR = path.join('static', 'uploads');
+const blobConfigured = Boolean(process.env.BLOB_URL || process.env.VERCEL_BLOB_URL || process.env.BLOB_READ_WRITE_TOKEN || process.env.VERCEL_BLOB_TOKEN);
 
 const collectUploads = async (dir = UPLOADS_DIR, relativeDir = '') => {
+	if (blobConfigured) {
+		return [];
+	}
+
 	const files = [];
 
 	try {

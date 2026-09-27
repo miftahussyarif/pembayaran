@@ -1,0 +1,300 @@
+--- LOG ---
+id: 5058
+created_at: 2026-06-10T17:11:34.707Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri ANANDA PUTRI AYU WANDIRA (2024) sebesar Rp 500.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5057
+created_at: 2026-06-10T17:11:16.683Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri RISKI EKO SAPUTRA (2024) sebesar Rp 500.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5056
+created_at: 2026-06-10T17:10:20.984Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri RISKI DWI ALFADHIL (2024) sebesar Rp 1.000.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5055
+created_at: 2026-06-10T17:09:37.539Z
+aksi: input
+modul: transaksi
+keterangan: Input 1 item pembayaran kwitansi ALQ-1781111377537 untuk santri 58
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5054
+created_at: 2026-06-10T17:08:33.374Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri RASHYA HAIKAL AHDAN (2024) sebesar Rp 1.000.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5053
+created_at: 2026-06-10T17:08:31.060Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan Pengembangan Tahun 2023" untuk santri MUHAMMAD ULINUHA (2023) sebesar Rp 1.000.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5052
+created_at: 2026-06-10T17:08:05.474Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "konsumsi januari - juni 2025" untuk santri M FATKHURROSYID (2025) sebesar Rp 600.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5051
+created_at: 2026-06-10T17:07:49.634Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan Pengembangan Tahun 2023" untuk santri M TOYIB MUBAROK (2023) sebesar Rp 1.000.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5050
+created_at: 2026-06-10T17:06:59.902Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "konsumsi januari - juni 2025" untuk santri YUDA KURNIAWAN (2025) sebesar Rp 600.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5049
+created_at: 2026-06-10T17:06:42.459Z
+aksi: input
+modul: transaksi
+keterangan: Input 1 item pembayaran kwitansi ALQ-1781111202457 untuk santri 51
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5048
+created_at: 2026-06-10T17:06:15.236Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "konsumsi januari 2024" untuk santri YUDA KURNIAWAN (2024) sebesar Rp 100.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5047
+created_at: 2026-06-10T17:06:04.145Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan Pengembangan Tahun 2023" untuk santri M MALIK (2023) sebesar Rp 500.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5046
+created_at: 2026-06-10T17:05:44.262Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri RAFA KURNIAWAN DZAKI (2024) sebesar Rp 1.000.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5045
+created_at: 2026-06-10T17:05:43.874Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan Pengembangan Tahun 2023" untuk santri M SHULTHON ARIFIN (2023) sebesar Rp 500.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5044
+created_at: 2026-06-10T17:04:56.481Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan Pengembangan Tahun 2023" untuk santri M SOHIB IZAR (2023) sebesar Rp 1.000.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5043
+created_at: 2026-06-10T17:04:50.871Z
+aksi: input
+modul: transaksi
+keterangan: Input 1 item pembayaran kwitansi ALQ-1781111090869 untuk santri 48
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5042
+created_at: 2026-06-10T17:03:26.447Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri M Ibnu Atho'ilah (2024) sebesar Rp 400.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5041
+created_at: 2026-06-10T17:03:17.930Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan Pengembangan Tahun 2023" untuk santri M SHODIQIN (2023) sebesar Rp 1.000.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5040
+created_at: 2026-06-10T17:02:52.852Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri NURYAN EKA PRATAMA (2024) sebesar Rp 400.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5039
+created_at: 2026-06-10T17:02:50.204Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan Pengembangan Tahun 2023" untuk santri M SAEFUL UYUN (2023) sebesar Rp 1.000.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5038
+created_at: 2026-06-10T17:01:21.238Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri NUR WAHID MANGGAL (2024) sebesar Rp 1.000.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5037
+created_at: 2026-06-10T17:00:34.270Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri NUR WAHID BANDONGAN (2024) sebesar Rp 1.000.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5036
+created_at: 2026-06-10T16:59:43.231Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri HENDI (2024) sebesar Rp 500.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5035
+created_at: 2026-06-10T16:59:08.859Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri NUR MUHAMMAD NADHIEF (2024) sebesar Rp 500.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5034
+created_at: 2026-06-10T16:57:50.999Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri NUR AFIF (2024) sebesar Rp 400.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5033
+created_at: 2026-06-10T16:57:40.800Z
+aksi: input
+modul: transaksi
+keterangan: Input 1 item pembayaran kwitansi ALQ-1781110660798 untuk santri 105
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5032
+created_at: 2026-06-10T16:57:14.685Z
+aksi: input
+modul: transaksi
+keterangan: Input 1 item pembayaran kwitansi ALQ-1781110634683 untuk santri 94
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5031
+created_at: 2026-06-10T16:56:37.043Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri MIFTAHUL MUJIB (2024) sebesar Rp 1.000.000
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5030
+created_at: 2026-06-10T16:56:31.487Z
+aksi: input
+modul: transaksi
+keterangan: Input 1 item pembayaran kwitansi ALQ-1781110591485 untuk santri 84
+stack_trace:
+<no stack>
+
+
+--- LOG ---
+id: 5029
+created_at: 2026-06-10T16:55:53.234Z
+aksi: input
+modul: tagihan_khusus
+keterangan: Tambah tagihan khusus "Kekurangan pengembangan tahun 24/25" untuk santri MAKRUF RAMADHANI (2024) sebesar Rp 1.000.000
+stack_trace:
+<no stack>
+
+

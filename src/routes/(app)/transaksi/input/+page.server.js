@@ -2,6 +2,8 @@ import { redirect } from '@sveltejs/kit';
 import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { eq, isNotNull, desc, and } from 'drizzle-orm';
+import fs from 'fs/promises';
+import path from 'path';
 
 const BULAN_NAMES = [
 	'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -832,7 +834,15 @@ export const actions = {
 			return response;
 		} catch (error) {
 			console.error('❌ Error dalam create action:', error);
-			
+			try {
+				const logsDir = path.join(process.cwd(), 'run_logs');
+				await fs.mkdir(logsDir, { recursive: true });
+				const logPath = path.join(logsDir, 'trans_create_errors.log');
+				await fs.appendFile(logPath, JSON.stringify({ time: new Date().toISOString(), error: (error && error.stack) ? error.stack : String(error) }) + '\n');
+			} catch (e) {
+				console.error('Failed to write run_logs/trans_create_errors.log', e);
+			}
+
 			return {
 				success: false,
 				message: error instanceof Error ? error.message : 'Terjadi kesalahan saat menyimpan transaksi'

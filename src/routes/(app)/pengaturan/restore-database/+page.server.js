@@ -3,15 +3,14 @@ import { db } from '$lib/server/db/index.js';
 import * as schema from '$lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcrypt';
-import { mkdir, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { upload } from '$lib/server/storage.js';
 
-const resolveUploadPath = (url) => {
+const normalizeBackupRelativePath = (url) => {
 	if (!url || typeof url !== 'string') return null;
-	if (!url.startsWith('/uploads/')) return null;
-	const filename = url.replace('/uploads/', '');
-	if (!filename) return null;
-	return path.join('static', 'uploads', filename);
+	const cleaned = url.replace(/^\/+/, '');
+	if (cleaned.startsWith('uploads/')) return cleaned.replace(/^uploads\//, '');
+	if (cleaned.startsWith('uploads/blob/')) return cleaned.replace(/^uploads\/blob\//, '');
+	return null;
 };
 
 export const load = async ({ locals }) => {
@@ -170,14 +169,15 @@ export const actions = {
 			});
 
 			if (backupFiles.length) {
-				const uploadsDir = path.join('static', 'uploads');
-				await mkdir(uploadsDir, { recursive: true });
 				for (const file of backupFiles) {
-					const filePath = resolveUploadPath(file?.path);
-					if (!filePath || !file?.contentBase64) continue;
-					await mkdir(path.dirname(filePath), { recursive: true });
+					const relativePath = normalizeBackupRelativePath(file?.path);
+					if (!relativePath || !file?.contentBase64) continue;
+
+					const pathParts = relativePath.split('/');
+					const filename = pathParts.pop();
+					const folder = pathParts.join('/');
 					const buffer = Buffer.from(file.contentBase64, 'base64');
-					await writeFile(filePath, buffer);
+					await upload(buffer, filename, folder);
 				}
 			}
 
